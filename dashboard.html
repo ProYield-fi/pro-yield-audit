@@ -114,9 +114,9 @@ Blend model: 80% TVL-weighted core, 10% fixed, 10% satellite. Satellites above p
 </table>
 
 <h2>On-Ramp Situation — Bahamas</h2>
-<div class="card"><div class="k">Problem</div>Stripe does not support the Bahamas. Ramp Network explicitly blocks the Bahamas. The embedded onramp is EU/US only.</div>
-<div class="card"><div class="k">Viable Options</div><b>1. MoonPay</b> — 200+ countries, likely supports Bahamas. But NO KEYS configured. Needs MOONPAY_SECRET_KEY + VITE_MOONPAY_KEY from MoonPay dashboard.<br/><br/><b>2. Transak</b> — 150+ countries, registered in USA/UK/Canada/Australia/Hong Kong. May support Bahamas. Need to check Transak country list and get API keys.<br/><br/><b>3. Canadian entity</b> — User is an Engineer in Toronto ET. Could register a Canadian entity for Stripe (Stripe supports Canada). Bahamas is tax base via wife's citizenship.</div>
-<div class="card"><div class="k">Action Required</div>Apply for <b>Transak</b> onramp (check transak.com/global-coverage for Bahamas support), OR get <b>MoonPay API keys</b> from MoonPay dashboard and configure MOONPAY_SECRET_KEY. Stripe requires a legal entity in a supported country (Canada is possible given Toronto residency).</div>
+<div class="card"><div class="k">Status</div><b>MoonPay</b> — ✅ FULLY CONFIGURED (200+ countries, Bahamas supported). <b>Stripe</b> ❌ NOT supported in Bahamas (EU/US only). <b>Ramp</b> ❌ Explicitly blocks Bahamas.</div>
+<div class="card"><div class="k">Current Setup</div><b>MoonPay</b> — pk_test_59DnsDRRtJa40GZ2esBNJ4JvYAd3sPL, sk_tes...fYvw (HMAC), wk_test_MdZuETvXJpeJTPTgZMhh0w9sXE9ITy (webhook), account ID 6f192cde-3160-49e2-9ff8-dc3bb9253b85. Affiliate program via Impact.com: 0.5-1.25% kickback (KYB pending). <b>Stripe</b> ❌ Not viable — Bahamas unsupported. <b>Transak</b> ❌ Not confirmed for Bahamas.</div>
+<div class="card"><div class="k">Action Required</div>Complete MoonPay KYB on app.moonpay.com/dashboard → Affiliate Program → Business Verification to activate the 0.5-1.25% kickback. No other on-ramp alternative supports Bahamas with an affiliate program.</div>
 
 <h2>Referral Program — PROYIELD</h2>
 <table>
