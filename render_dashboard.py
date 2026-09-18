@@ -434,7 +434,7 @@ Blend model: 80% TVL-weighted core, 10% fixed, 10% satellite. Satellites above p
 <h2>Service Providers & Revenue Streams</h2>
 <table>
 <tr><th>Stream</th><th>Status</th><th>Commission</th><th>Notes</th></tr>
-<tr><td><b>HL Referral (PROYELL)</b></td><td class="ok">✅ ACTIVE</td><td class="r">10% of fees</td><td>Code active via API. Claim at app.hyperliquid.xyz/referrals (>$1)</td></tr>
+<tr><td><b>HL Referral (PROYIELD)</b></td><td class="ok">✅ ACTIVE</td><td class="r">10% of fees</td><td>Code active via API. Claim at app.hyperliquid.xyz/referrals (>$1)</td></tr>
 <tr><td><b>MoonPay On-Ramp</b></td><td class="bad">❌ BROKEN</td><td class="r">0%</td><td>No API keys. 4.5% card + 1% bank. Only on-ramp supporting Bahamas (200+ countries)</td></tr>
 <tr><td><b>Stripe On-Ramp</b></td><td class="bad">❌ BLOCKED</td><td class="r">2.9% + $0.30</td><td>Not supported in Bahamas. EU/US only. Requires legal entity in supported country</td></tr>
 <tr><td><b>Ramp Network</b></td><td class="bad">❌ BLOCKED</td><td class="r">N/A</td><td>Explicitly blocks Bahamas. Cannot use.</td></tr>
@@ -447,14 +447,14 @@ Blend model: 80% TVL-weighted core, 10% fixed, 10% satellite. Satellites above p
 <div class="card"><div class="k">Viable Options</div><b>1. MoonPay</b> — 200+ countries, likely supports Bahamas. But NO KEYS configured. Needs MOONPAY_SECRET_KEY + VITE_MOONPAY_KEY from MoonPay dashboard.<br/><br/><b>2. Transak</b> — 150+ countries, registered in USA/UK/Canada/Australia/Hong Kong. May support Bahamas. Need to check Transak country list and get API keys.<br/><br/><b>3. Canadian entity</b> — User is an Engineer in Toronto ET. Could register a Canadian entity for Stripe (Stripe supports Canada). Bahamas is tax base via wife's citizenship.</div>
 <div class="card"><div class="k">Action Required</div>Apply for <b>Transak</b> onramp (check transak.com/global-coverage for Bahamas support), OR get <b>MoonPay API keys</b> from MoonPay dashboard and configure MOONPAY_SECRET_KEY. Stripe requires a legal entity in a supported country (Canada is possible given Toronto residency).</div>
 
-<h2>Referral Program — PROYELL</h2>
+<h2>Referral Program — PROYIELD</h2>
 <table>
 <tr><th>Metric</th><th>Value</th></tr>
-<tr><td>Referral Code</td><td><b>PROYELL</b></td></tr>
+<tr><td>Referral Code</td><td><b>PROYIELD</b></td></tr>
 <tr><td>Commission Rate</td><td>10% of referred users' trading fees</td></tr>
 <tr><td>Discount to Referred</td><td>4% on first $25M volume</td></tr>
 <tr><td>Claim Threshold</td><td>&gt;$1 (real-time)</td></tr>
-<tr><td>Referral Link</td><td><a href="https://app.hyperliquid.xyz/join/PROYELL">app.hyperliquid.xyz/join/PROYELL</a></td></tr>
+<tr><td>Referral Link</td><td><a href="https://app.hyperliquid.xyz/join/PROYIELD">app.hyperliquid.xyz/join/PROYIELD</a></td></tr>
 <tr><td>Auto-Injection</td><td>Code attached to ALL deposit URLs (MoonPay, Stripe when configured)</td></tr>
 <tr><td>Tracking</td><td>track_hl_referral_earnings() in vault_keeper.py + business_automation.py</td></tr>
 </table>
