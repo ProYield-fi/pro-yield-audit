@@ -1,0 +1,334 @@
+{
+  "name": "Pro Yield",
+  "description": "Non-custodial stablecoin yield on audited DeFi lending protocols",
+  "tagline": "Professional Yield. No trading.",
+  "philosophy": "Non-custodial, audited protocols only, no leverage, transparent fee recycling",
+  "current_phase": "Pre-launch / testing",
+  "website_url": "https://pyd.fi",
+  "social": {
+    "twitter": "https://x.com/ProYieldFi",
+    "discord": "https://discord.gg/kw3n7Fah",
+    "telegram": "https://t.me/ProYieldFi"
+  },
+  "strategy": {
+    "allocation": {
+      "core_audited": "80%",
+      "fixed_yield": "10%",
+      "satellites": "10%"
+    },
+    "blend_apy": "5.80%",
+    "safe_ceiling": "5.80%",
+    "core_pools_count": 17,
+    "strategy_opportunities_count": 9,
+    "satellite_pools_count": 4
+  },
+  "dashboard": {
+    "url": "http://localhost:8123/dashboard.html",
+    "status": "live",
+    "last_rendered": "2026-09-14T04:36:17Z",
+    "blend_apy": "5.80%",
+    "safe_pools": 17,
+    "strategy_pools": 9,
+    "note": "Maple pools included with credit risk flags"
+  },
+  "core_pools": [
+    {
+      "protocol": "Aave V3",
+      "chain": "Ethereum",
+      "asset": "USDC",
+      "apy": "5.11%",
+      "tvl": "$2.29B",
+      "safety": "5/5",
+      "tag": "Core"
+    },
+    {
+      "protocol": "Sky Savings",
+      "asset": "sUSDS",
+      "apy": "3.60%",
+      "tvl": "$4.66B",
+      "safety": "5/5",
+      "tag": "Core"
+    },
+    {
+      "protocol": "Morpho",
+      "asset": "USDC",
+      "apy": "4.74%",
+      "tvl": "$425M",
+      "safety": "5/5",
+      "tag": "Core"
+    }
+  ],
+  "fixed_yield": {
+    "protocol": "Pendle",
+    "safety": "5/5",
+    "apy": "8.81%",
+    "tvl": "$2.63B+",
+    "type": "Fixed-yield locked",
+    "allocation": "10%"
+  },
+  "satellites": [
+    {
+      "protocol": "SUSDAT",
+      "chain": "Ethereum",
+      "apy": "15.47%",
+      "tvl": "$71M",
+      "safety": "1/5",
+      "status": "in portfolio"
+    },
+    {
+      "protocol": "APXUSD",
+      "chain": "Ethereum",
+      "apy": "12.49%",
+      "tvl": "$177M",
+      "safety": "1/5",
+      "status": "in portfolio"
+    },
+    {
+      "protocol": "Maple syrupUSDC",
+      "chain": "Ethereum",
+      "apy": "4.97%",
+      "tvl": "$2.63B",
+      "safety": "2/5",
+      "status": "FIXED",
+      "warning": "Credit risk"
+    },
+    {
+      "protocol": "Maple syrupUSDT",
+      "chain": "Ethereum",
+      "apy": "4.62%",
+      "tvl": "$870M",
+      "safety": "2/5",
+      "status": "FIXED",
+      "warning": "Credit risk"
+    },
+    {
+      "protocol": "Maple USDG",
+      "chain": "Ethereum",
+      "apy": "4.93%",
+      "tvl": "$363M",
+      "safety": "1/5",
+      "status": "FIXED",
+      "warning": "Lowest safety"
+    }
+  ],
+  "maple": {
+    "status": "Included on dashboard with credit risk disclosure",
+    "safety_score": "2/5",
+    "auditor": "Trail of Bits",
+    "pools": [
+      {
+        "asset": "syrupUSDC",
+        "apy": "4.97%",
+        "tvl": "$2.63B",
+        "safety": "2/5",
+        "tag": "FIXED"
+      },
+      {
+        "asset": "syrupUSDT",
+        "apy": "4.62%",
+        "tvl": "$870M",
+        "safety": "2/5",
+        "tag": "FIXED"
+      },
+      {
+        "asset": "USDG",
+        "apy": "4.93%",
+        "tvl": "$363M",
+        "safety": "1/5",
+        "tag": "FIXED"
+      }
+    ],
+    "credit_risk": "Maple Finance experienced defaults in 2022; over-collateralized but counterparty risk remains",
+    "fee_recycle_recommended": false,
+    "dashboard_tag": "FIXED",
+    "dashboard_warning": "warning_credit",
+    "review_flag": "new"
+  },
+  "competitive_comparison": {
+    "cex_example": {
+      "platform": "Kraken",
+      "asset": "USDC",
+      "apy": "1.75%",
+      "type": "Custodial"
+    },
+    "deFi_advantage": "Audited DeFi yields 3x better at 5.11% (Aave USDC) vs CEX 1.75%",
+    "tradeoff": "CEX: simplicity + 12%+ rates + fiat on-ramp vs custody. DeFi: non-custodial + audited + better yield",
+    "12_percent_apy": "Requires ~57% satellite allocation = same risk as CEX. Not achievable safely."
+  },
+  "fee_recycling": {
+    "design_date": "2026-08-26",
+    "design_doc": "/home/user/archive_20260908/trading_era/proyield-demo/PROTOCOL_FEE_REFERENCE.md",
+    "status": "Designed, not yet live",
+    "ethical_basis": "No fiduciary duty to DeFi DAO holders; smart contract terms govern",
+    "fee_streams": [
+      "Hyperliquid maker rebates",
+      "Polymarket rebates",
+      "Curator fees",
+      "Referral fees",
+      "Protocol revenue from $PYD trading"
+    ],
+    "fee_distributor": {
+      "path": "/home/user/.hermes/scripts/fee_distributor.py",
+      "lines": 243,
+      "status": "Initialized Web3 stub",
+      "test_result": {
+        "total_distributed": 0,
+        "distributions": 0,
+        "depositors": 0
+      }
+    },
+    "website_components": [
+      {
+        "file": "FeeTransparency.tsx",
+        "path": "src/components/dashboard/FeeTransparency.tsx",
+        "changes": "Rebates go to users before treasury"
+      },
+      {
+        "file": "RevenueSharing.tsx",
+        "path": "src/components/token/RevenueSharing.tsx",
+        "changes": "Concrete recycling design with $PYD mechanism"
+      },
+      {
+        "file": "OurCommitments.tsx",
+        "path": "src/components/token/OurCommitments.tsx",
+        "changes": "Fee Recycling commitment with 50/50 split"
+      },
+      {
+        "file": "ReferralCard.tsx",
+        "path": "src/components/dashboard/ReferralCard.tsx",
+        "changes": "References recycled rebates"
+      },
+      {
+        "file": "liveRates.ts",
+        "path": "src/lib/liveRates.ts",
+        "changes": "Synced rates: 5.85% blend, 8.81% fixed, 13.94% satellites"
+      }
+    ],
+    "pyd_design": {
+      "goal": "Non-custodial asset tradeable on open market",
+      "mechanism": "Fee pool contract proportional claim trades on DEX",
+      "target_yield": "5.85% + 1-2% rebate = 6.85-7.85% (long-term goal)",
+      "status": "Conceptual needs token deployment"
+    },
+    "maple_fee_recycle": {
+      "considered": true,
+      "rejected": true,
+      "reason": "4.97% vs current STUSDS 5.11% net negative"
+    }
+  },
+  "website": {
+    "tech_stack": "React TypeScript Vite",
+    "dist_dir": "/home/user/websites/pro-yield-web/dist/",
+    "source_dir": "/home/user/websites/pro-yield-web/src/",
+    "serving": {
+      "dashboard_url": "http://localhost:8123/dashboard.html",
+      "website_url": "http://localhost:8080/"
+    },
+    "build_status": "Latest build includes all updates"
+  },
+  "scripts": {
+    "render_dashboard": {
+      "path": "/home/user/yield_scout/render_dashboard.py",
+      "lines": 349,
+      "purpose": "Unified dashboard renderer",
+      "features": [
+        "Maple FIXED filter",
+        "Fee recycle status",
+        "HL rebate monitor",
+        "CEX benchmarks"
+      ],
+      "test_result": "blend=5.80% safe=17 strategy=9"
+    },
+    "daily_all": {
+      "path": "/home/user/yield_scout/daily_all.py",
+      "lines": 97,
+      "purpose": "Composite cron runner",
+      "test_result": "Exit 0"
+    },
+    "fee_distributor": {
+      "path": "/home/user/.hermes/scripts/fee_distributor.py",
+      "lines": 243,
+      "purpose": "Monitor rebate addresses proportional distribution",
+      "status": "Web3 stub"
+    }
+  },
+  "cron_jobs": [
+    {
+      "name": "yield-strategy-scout",
+      "schedule": "09:00 daily",
+      "command": "python3 daily_all.py",
+      "mode": "no_agent"
+    },
+    {
+      "name": "yield-strategy-advisor",
+      "schedule": "09:15 daily",
+      "mode": "agent"
+    }
+  ],
+  "scoring_methodology": {
+    "function": "score_safety(pool)",
+    "formula": {
+      "base": 1,
+      "TVL>3B+stable": "+3",
+      "TVL>50M+stable": "+2",
+      "Bluechip": "+1",
+      "Audited": "+0",
+      "Credit tag": "-1",
+      "Max": 5
+    },
+    "core_selection": "Top 17 pools safety >= 4/5",
+    "satellite_selection": "Top 2 satellites by APY (all currently 1/5 safety)"
+  },
+  "documentation": [
+    {
+      "file": "yield_scout/CHANGES-LOG.md",
+      "description": "Change summary"
+    },
+    {
+      "file": "yield_scout/FEE-PYD-ANALYSIS.md",
+      "description": "Fee recycling design"
+    },
+    {
+      "file": "yield_scout/MAPLE-FEE-RECYCLE.md",
+      "description": "Maple credit risk analysis"
+    },
+    {
+      "file": "yield_scout/TEST-PLAN.md",
+      "description": "$20 test plan"
+    },
+    {
+      "file": "yield_scout/SATELLITE-RISK-EXPLAINED.md",
+      "description": "Satellite risk for users"
+    },
+    {
+      "file": "yield_scout/COMPETITIVE_ANALYSIS.md",
+      "description": "CEX/DeFi landscape"
+    }
+  ],
+  "open_items": [
+    "Fee recycling not live: needs real Web3 provider",
+    "$PYD token not deployed",
+    "12% APY not achievable safely (5.80% ceiling)",
+    "All satellites score 1/5 safety",
+    "Minimum deposit practical: $200+",
+    "Fee distributor monitors stub addresses"
+  ],
+  "environment": {
+    "user": "Nathanael Inniss",
+    "location": "Toronto ET",
+    "working_directory": "/home/user/",
+    "trading_context": "Post-trading era passive DEFI-ONLY 90% blue-chip + 10% Pendle SEC-clean"
+  },
+  "deployment": {
+    "dashboard": {
+      "url": "http://localhost:8123/dashboard.html",
+      "status": "live"
+    },
+    "website": {
+      "url": "http://localhost:8080/",
+      "status": "live"
+    },
+    "deployed_to_production": false,
+    "deploy_target": "Cloudflare Pages pyd.fi"
+  }
+}

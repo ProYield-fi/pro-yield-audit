@@ -1,0 +1,138 @@
+{
+  "created_utc": "2026-09-17T03:25:55.932128+00:00",
+  "updated_utc": "2026-09-18T13:00:56.749096+00:00",
+  "total_reserves_usd": 54455.1,
+  "total_user_deposits_usd": 0.0,
+  "coverage_ratio": 0,
+  "reserve_status": "INSUFFICIENT",
+  "cold_storage": {
+    "balance_usd": 43564.08,
+    "wallet_type": "hardware_wallet",
+    "security": "multi-sig_cold_storage",
+    "description": "Offline reserves \u2014 hardware wallets, multi-sig, no network access"
+  },
+  "active_deployment": {
+    "balance_usd": 10891.02,
+    "tier": "Maximum",
+    "apy": 9.2,
+    "protocols": [],
+    "description": "Active reserves deployed on Maximum tier for yield",
+    "weekly_yield_usd": 19.268727692307692
+  },
+  "fee_accumulation": {
+    "pm_rewards_7d": 84637,
+    "performance_fees": 0,
+    "referral_fees": 0,
+    "total_collected": 54455.1,
+    "last_collection": "2026-09-18T13:00:56.749093+00:00"
+  },
+  "coverage_history": [
+    {
+      "timestamp": "2026-09-17T03:25:55.932365+00:00",
+      "reserves_usd": 3963.05,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-17T03:25:55.932392+00:00",
+      "reserves_usd": 7926.1,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-17T03:26:06.607237+00:00",
+      "reserves_usd": 11823.35,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-17T03:26:06.607255+00:00",
+      "reserves_usd": 15720.6,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-17T03:26:29.135965+00:00",
+      "reserves_usd": 19617.85,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-17T03:26:29.135984+00:00",
+      "reserves_usd": 23515.1,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-17T13:00:19.308787+00:00",
+      "reserves_usd": 27018.25,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-17T13:00:19.308808+00:00",
+      "reserves_usd": 30521.4,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-17T13:00:21.938546+00:00",
+      "reserves_usd": 34024.55,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-17T13:00:21.938561+00:00",
+      "reserves_usd": 37527.700000000004,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-18T13:00:54.988992+00:00",
+      "reserves_usd": 41759.55,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-18T13:00:54.989011+00:00",
+      "reserves_usd": 45991.4,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-18T13:00:56.749081+00:00",
+      "reserves_usd": 50223.25,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-18T13:00:56.749096+00:00",
+      "reserves_usd": 54455.1,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    }
+  ],
+  "claims": [],
+  "config": {
+    "reserve_ratio": 1.0,
+    "max_tier_deployment": 0.1,
+    "min_cold_storage": 0.8,
+    "max_active_deployment": 0.2,
+    "fee_collection_rate": 0.05,
+    "min_coverage_amount": 1000
+  }
+}

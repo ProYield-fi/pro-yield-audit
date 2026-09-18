@@ -1,0 +1,199 @@
+{
+  "meta": {
+    "purpose": "Yield opportunity search for Pro Yield Web",
+    "generated": "2026-09-15T13:55:36Z",
+    "product": "Pro Yield Web",
+    "safety_floor": "2/5",
+    "max_allocation_single_position": "10% of portfolio",
+    "blend_current": "5.77%",
+    "blend_ceiling": "5.80%"
+  },
+  "safety_criteria": {
+    "min_score": 2,
+    "scoring": {
+      "audited_protocol": 4,
+      "known_defi_protocol": 3,
+      "tvl_over_500m_stablecoin": 3,
+      "tvl_over_50m_stablecoin": 2,
+      "bluechip_symbol": 1
+    },
+    "hard_constraints": [
+      "non-custodial",
+      "no leverage",
+      "TVL >= $50M for Core/Fixed",
+      "audited protocols preferred",
+      "no 1/5 safety positions"
+    ],
+    "excluded": [
+      "SUSDAT",
+      "APXUSD",
+      "any 1/5 protocol"
+    ]
+  },
+  "current_positions": {
+    "core": [
+      {
+        "symbol": "STUSDS",
+        "apy": 5.11,
+        "chain": "Ethereum",
+        "tvl": "$205M",
+        "score": "5/5",
+        "protocol": "Sky"
+      },
+      {
+        "symbol": "SGHO",
+        "apy": 4.5,
+        "chain": "Ethereum",
+        "tvl": "$177M",
+        "score": "5/5",
+        "protocol": "Aave"
+      },
+      {
+        "symbol": "PENDLEUSDC",
+        "apy": 6.28,
+        "chain": "Ethereum",
+        "tvl": "$62M",
+        "score": "5/5",
+        "protocol": "Morpho"
+      }
+    ],
+    "fixed": [
+      {
+        "symbol": "USDAI (PT)",
+        "apy": 8.82,
+        "chain": "Ethereum",
+        "tvl": "$50M",
+        "score": "2/5",
+        "protocol": "Pendle",
+        "note": "derivative, capped at 10%"
+      }
+    ],
+    "satellites": [
+      {
+        "symbol": "STEAKUSDC",
+        "apy": 4.3,
+        "chain": "Ethereum",
+        "tvl": "$429M",
+        "score": "3/5",
+        "protocol": "Morpho"
+      }
+    ]
+  },
+  "search_targets": {
+    "lending": {
+      "types": [
+        "stablecoin lending",
+        "stablecoin fixed yield",
+        "money market"
+      ],
+      "required": [
+        "audited",
+        "non-custodial",
+        "TVL >= $50M",
+        "no leverage"
+      ],
+      "preferred_chains": [
+        "Ethereum",
+        "Base",
+        "Arbitrum",
+        "Optimism",
+        "Sky"
+      ],
+      "preferred_protocols": [
+        "Aave V3",
+        "Sky",
+        "Morpho",
+        "Pendle",
+        "Spark",
+        "Fluid"
+      ],
+      "min_apy_target": 4.5,
+      "note": "Looking for 5%+ audited stablecoin pools"
+    },
+    "fixed": {
+      "types": [
+        "fixed-term yield",
+        "PT/YT positions"
+      ],
+      "required": [
+        "audited",
+        "non-custodial",
+        "TVL >= $50M"
+      ],
+      "preferred_chains": [
+        "Ethereum"
+      ],
+      "preferred_protocols": [
+        "Pendle"
+      ],
+      "min_apy_target": 5.5,
+      "note": "Looking for higher fixed yield at 2/5 or better (relaxed from 6.0 — Ethena excluded, realistic ceiling 4.5-6.5%)"
+    },
+    "delta_neutral": {
+      "types": [
+        "basis trade",
+        "funding rate arb",
+        "perp basis"
+      ],
+      "required": [
+        "audited or established",
+        "non-custodial"
+      ],
+      "min_apy_target": 4.0,
+      "note": "UNPROVEN at our scale — monitor only (Ethena excluded, realistic range 3-5%)"
+    }
+  },
+  "excluded_protocols": [
+    "Maple",
+    "Ondo",
+    "Lombard",
+    "Ethena sUSDe (not Sky)",
+    "JitoSOL",
+    "JupSOL",
+    "Curve",
+    "GMX",
+    "Uniswap",
+    "Lido"
+  ],
+  "fee_recycling": {
+    "active": [
+      "HL partner PROYIELD (wired, awaiting data)"
+    ],
+    "stub": [
+      "fee_distributor.py (Web3 stub \u2014 needs real provider)"
+    ],
+    "monitor_addresses": [
+      "0x41610566c042395ce46ff1d210d321c2432191"
+    ]
+  },
+  "moonpay_referral": {
+    "code": "PROYIELD",
+    "status": "ACTIVE in MoonPay URL build",
+    "kyb_status": "Business entity registration needed"
+  },
+  "what_to_return": {
+    "fields": [
+      "protocol",
+      "symbol",
+      "chain",
+      "tvl_usd",
+      "apy",
+      "audited",
+      "non_custodial",
+      "leverage",
+      "score_5",
+      "score_4",
+      "score_3",
+      "score_2",
+      "score_1",
+      "lockup",
+      "maturity_date",
+      "liquidity_depth",
+      "audit_report",
+      "note"
+    ],
+    "must_include": "protocol name, chain, APY, TVL, safety score",
+    "sort_by": "apy DESC",
+    "filter": "safety >= 2/5, non-custodial, TVL >= $50M, no leverage, audited"
+  }
+}
