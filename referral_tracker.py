@@ -266,8 +266,8 @@ if __name__ == "__main__":
 # Processes MoonPay payment webhook events to track on-ramp deposits
 # for the ProYield referral system.
 
-MOONPAY_SECRET_KEY = "***"  # From env: MOONPAY_SECRET_KEY
-MOONPAY_WEBHOOK_SECRET = "***"  # From env: MOONPAY_WEBHOOK_SECRET
+MOONPAY_SECRET_KEY = "sk_test_eoAQCRvdhOYWfAEYKdFOODZqQmufYvw"  # From env: MOONPAY_SECRET_KEY
+MOONPAY_WEBHOOK_SECRET = "wk_test_MdZuETvXJpeJTPTgZMhh0w9sXE9ITy"  # From env: MOONPAY_WEBHOOK_SECRET
 
 def process_moonpay_webhook(event: dict, signature: str = None) -> dict:
     """Verify and process a MoonPay webhook event.
