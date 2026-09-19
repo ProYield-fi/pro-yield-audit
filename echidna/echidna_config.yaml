@@ -1,0 +1,29 @@
+# Echidna Configuration for ProYield Vault
+# Run from hypervault dir: echidna echidna/echidna_properties.sol --config echidna/echidna_config.yaml
+
+contract: EchidnaProYieldProperties
+
+# Solc remaps for OpenZeppelin imports
+solc-remaps: "@openzeppelin/contracts/=/home/user/hypervault/node_modules/@openzeppelin/contracts/"
+
+# Crytic compile args for OpenZeppelin node_modules
+crytic-args: "--solc-remaps @openzeppelin/contracts/=/home/user/hypervault/node_modules/@openzeppelin/contracts/"
+
+# Target contract and network
+rpc: http://localhost:8545
+
+# Deployer and sender addresses
+deployer: "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D"
+sender: ["0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D"]
+
+# Fuzzing parameters
+seqLen: 100
+testLimit: 10000
+workers: 4
+timeout: 60
+
+# Disable Slither (we already ran it)
+disableSlither: false
+
+# All contracts in the project
+allContracts: true
