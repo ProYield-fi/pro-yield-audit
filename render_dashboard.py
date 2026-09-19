@@ -214,11 +214,13 @@ def main():
         # Shifted to satellite/fixed for higher yield. No delta drag.
         blend = 0.20 * core_apy + 0.15 * delta_apy + 0.30 * fixed_apy + 0.35 * sat_apy if (core_apy or delta_apy or fixed_apy or sat_apy) else float("nan")  # Optimal: 20% CORE / 15% DELTA / 30% FIXED / 35% SATELLITE
     
-    # Identify dragging assets (below blended rate)
+    # Identify dragging assets (below blended rate) — EXCLUDE current portfolio picks;
+    # flagging picks as REMOVE/REPLACE contradicted the Core table (audit fix 2026-09-19)
+    picked = {(p["symbol"], p["project"], p["chain"]) for p in core_pick + fixed_pick + sat_pick}
     dragging = []
     for p in pools:
         apy = p.get("apy_base", 0)
-        if 0 < apy < blend:
+        if 0 < apy < blend and (p["symbol"], p["project"], p["chain"]) not in picked:
             dragging.append(p)
     
     # Fee recycling status (embedded in action items, not used separately)
@@ -252,7 +254,12 @@ def main():
             safety_badge = f'<span class="{sclass}">safety {safety}/5</span>'
             sym = p["symbol"]
             in_alloc = any(sym == pk["symbol"] for pk in core_pick + fixed_pick + sat_pick)
-            status = '<span class="ok">✓ in portfolio</span>' if in_alloc else '<span class="warn">→ new</span>'
+            if in_alloc and safety >= 3:
+                status = '<span class="ok">✓ in portfolio</span>'
+            elif in_alloc:
+                status = '<span class="warn">⚠ in portfolio — below audited bar</span>'
+            else:
+                status = '<span class="warn">→ new</span>'
             credit = ""
             if any(a in p.get("project","").lower() for a in ("maple","ondo")):
                 credit = ' ⚠<span class="warn">credit</span>'
@@ -264,6 +271,41 @@ def main():
             <td>{safety_badge}</td><td>{status}</td></tr>"""
         return out
     
+    # Allocation weights + provenance from snapshot.json — never hardcode % (audit fix 2026-09-19)
+    alloc = standard_data.get("blend", {}).get("allocation", {}) if isinstance(standard_data, dict) else {}
+    def _w(tag, default):
+        v = alloc.get(tag) if isinstance(alloc, dict) else None
+        if isinstance(v, dict) and isinstance(v.get("weight"), (int, float)):
+            return v["weight"] * 100
+        return default
+    w_core, w_fixed = _w("CORE", 35.0), _w("FIXED", 10.0)
+    w_sat, w_dn = _w("SATELLITE", 40.0), _w("DELTA_NEUTRAL", 15.0)
+    alloc_badge = f"{w_core:.0f}% core · {w_fixed:.0f}% fixed · {w_sat:.0f}% satellite"
+    if w_dn:
+        alloc_badge += f" · {w_dn:.0f}% delta-neutral"
+    snap_gen = standard_data.get("generated_utc") if isinstance(standard_data, dict) else None
+    snap_label = f"snapshot {snap_gen} · rendered {ts}" if snap_gen else f"rendered {ts}"
+    # Risk tiers from data/risk_tiers.json — live file, never stale hardcoded numbers
+    tier_line, rt_gen = None, None
+    tier_path = os.path.join(DATA, "risk_tiers.json")
+    if os.path.exists(tier_path):
+        try:
+            rt = json.load(open(tier_path))
+            rt_gen = rt.get("generated_utc", "?")
+            tt = rt.get("tiers", {})
+            tier_line = " | ".join(f"{tt[k]['label']} {tt[k]['expected_apy']:.2f}%"
+                                   for k in ("conservative", "balanced", "aggressive", "maximum") if k in tt)
+        except Exception:
+            tier_line, rt_gen = None, None
+    top_core = safe_pools[0] if safe_pools else None
+    if top_core:
+        prem_str = (f"{top_core['apy_base']:.2f}% non-custodial ({top_core['symbol']}) beats 1.75% CEX (Kraken) "
+                    f"by {top_core['apy_base']/1.75:.1f}x")
+        cex_top = f"{top_core['apy_base']:.2f}% vs 1.75% = {top_core['apy_base']/1.75:.1f}x vs Kraken"
+    else:
+        prem_str = "UNAVAILABLE (no core pools)"
+        cex_top = "UNAVAILABLE"
+
     # Action items — concrete, data-driven, dynamic allocation strategy
     action_lines = []
     if safe_pools:
@@ -273,8 +315,11 @@ def main():
         if sp["apy_base"] > 10:
             credit_flag = " ⚠credit risk" if any(a in sp.get("project","").lower() for a in ("maple","ondo")) else ""
             action_lines.append(f"Opportunity: {sp['symbol']} ({sp['project']}, {sp['chain']}) at {sp['apy_base']}% — safety {sp.get('safety',2)}/5, review for satellite sleeve{credit_flag}")
-    # Satellite review decisions
-    action_lines.append(f"Review: USDC accountable (Monad) — DECLINED, already declining (11.4% vs 12.28% 30d)")
+    # Satellite review decisions — derived from live pool data, never hardcoded
+    acc = next((p for p in strategy_pools if "accountable" in p.get("project", "").lower()), None)
+    if acc:
+        verdict = "DECLINED" if acc["apy_base"] <= acc.get("apy_30d", 0) else "watch"
+        action_lines.append(f"Review: {acc['symbol']} accountable ({acc['chain']}) — {verdict} ({acc['apy_base']}% vs {acc['apy_30d']}% 30d)")
     pm_daily = pm.get("total_daily_usd") or 0
     action_lines.append(f"Fee recycling: ${pm_daily:,}/day PM rewards tracked, HL rebates pending — routing + distribution code not yet implemented (fee_distributor.py: 0 distributed)")
     # Momentum-driven strategy (replaces static timing insight)
@@ -285,7 +330,8 @@ def main():
             pp = mom.get("by_momentum", {}).get("past_peak", [])
             rising = mom.get("by_momentum", {}).get("rising", [])
             decl = mom.get("by_momentum", {}).get("declining", [])
-            action_lines.append(f"Strategy: AI balancer valid for SATELLITE rotation — ride yields then exit. Core static (STUSDS 5.11% vs 5.46% 30d)")
+            top_core_m = f"Core static ({top_core['symbol']} {top_core['apy_base']}% vs {top_core['apy_30d']}% 30d)" if top_core else "Core static"
+            action_lines.append(f"Strategy: AI balancer valid for SATELLITE rotation — ride yields then exit. {top_core_m}")
             if pp:
                 top_pp = pp[0]
                 action_lines.append(f"Momentum: {len(pp)} past peak — {top_pp['symbol']} {top_pp['project']} at {top_pp['apy']:.2f}% is {top_pp['gap']:+.2f}pp above 30d mean")
@@ -296,7 +342,7 @@ def main():
             action_lines.append(f"Strategy: AI balancer valid for SATELLITE rotation — ride yields then exit. Core static")
     else:
         action_lines.append(f"Strategy: AI balancer valid for SATELLITE rotation — ride yields then exit. Core static")
-    
+
     # Outside-box research findings (RESEARCH-OUTSIDE-BOX.md)
     action_lines.append(f"Research: Outside-box — Jupiter Lend USDC (Solana) 5.21%, $442M, audited, fits model perfectly")
     action_lines.append(f"Research: REUSD (Re Protocol) 6.71%, $259M, principal-protected, basis-trade+T-bill yield")
@@ -305,11 +351,12 @@ def main():
     action_lines.append(f"Tangibles: PAXG/XAUT gold — NYDFS-regulated, $66M XAUT TVL, AI-managed LP fees")
     # ProYield 2.0 vision
     action_lines.append(f"Vision: ProYield 2.0 — 6-path yield aggregator (lending, PT, delta-neutral, outsourcing, tangibles, satellites)")
-    action_lines.append(f"Weight optimization: Sat 20%→35% = 7.94% (MED risk)")
-    action_lines.append(f"VERDICT: 7.94% is the engine's optimal — Maximum tier reaches 9.20%")
-    action_lines.append(f"Risk Tiers: Conservative 6.25% | Balanced 7.94% | Aggressive 8.66% | Maximum 9.20%")
+    action_lines.append(f"Engine: live blend {blend:.2f}% from snapshot {snap_gen or 'UNAVAILABLE'} — weights {w_core:.0f}% core / {w_fixed:.0f}% fixed / {w_sat:.0f}% satellite / {w_dn:.0f}% delta-neutral")
+    if tier_line:
+        action_lines.append(f"Risk Tiers (risk_tiers.json {rt_gen}): {tier_line}")
+    else:
+        action_lines.append("Risk Tiers: UNAVAILABLE (risk_tiers.json missing or unreadable)")
     action_lines.append(f"Risk tiers: 4 profiles available on ProYield Web — conservative to maximum risk")
-    action_lines.append(f"Engine optimization: satellite weight 20%→35%, all 4 satellite pools picked")
     pm_cell = f"${pm.get('total_daily_usd', 0):,}/day across {pm.get('reward_markets', 0)} markets" if pm.get("total_daily_usd") else "UNAVAILABLE"
     hl_str = ", ".join(f"{k} {v:+.1f}% (rejected)" for k,v in funding.items()) if funding else "UNAVAILABLE"
 
@@ -317,7 +364,7 @@ def main():
     cex_monitor = '<tr><td>CeFi benchmark: Kraken Earn</td><td class="r">USDC 1.75% (custodial)</td></tr>'
     cex_monitor += '<tr><td>CeFi benchmark: Nebeus</td><td class="r">USDC 15% (custodial, Bank of Spain)</td></tr>'
     cex_monitor += '<tr><td>CeFi benchmark: Binance/OKX</td><td class="r">2.62% flexible (custodial)</td></tr>'
-    cex_monitor += '<tr><td>Self-custody premium</td><td class="r">5.11% vs 1.75% = 3x vs Kraken</td></tr>'
+    cex_monitor += f'<tr><td>Self-custody premium (top core pool vs Kraken)</td><td class="r">{cex_top}</td></tr>'
     cex_monitor += '<tr><td>HL rebate harvest (pending)</td><td class="r">~1% APY potential (non-custodial)</td></tr>'
     
     # Sparkline
@@ -360,32 +407,45 @@ def main():
     delta_bps = _num(vault_state.get("deltaApyBps"))
     vs_ts = vault_state.get("ts", "UNAVAILABLE")
 
-    # Paper position: testnet wallet HYPE balance × spot price (CoinGecko)
-    PAPER_V2 = {
-        "hype_balance": 0.386,       # testnet wallet balance at v2 deploy
-        "hype_price": 79.21,         # CoinGecko 2026-09-17
-    }
-    capital_usd = PAPER_V2["hype_balance"] * PAPER_V2["hype_price"]   # $30.58
-    yearly = capital_usd * blend / 100.0
-    monthly = yearly / 12.0
-    daily = yearly / 365.0
+    # Paper position: fixed paper notional (testnet HYPE, v2 deploy) × LIVE price (CoinGecko).
+    # Price must be live — a hardcoded price made this card fabricated data (audit fix 2026-09-19).
+    PAPER_NOTIONAL_HYPE = 0.386  # testnet paper notional, set at v2 deploy (static by design)
+    hype_price = None
+    px_raw, px_err = fetch_safe("https://api.coingecko.com/api/v3/simple/price?ids=hyperliquid&vs_currencies=usd", timeout=20)
+    if px_raw:
+        try:
+            hype_price = float(json.loads(px_raw)["hyperliquid"]["usd"])
+        except Exception:
+            hype_price = None
+    if hype_price is not None:
+        capital_usd = PAPER_NOTIONAL_HYPE * hype_price
+        yearly = capital_usd * blend / 100.0
+        monthly = yearly / 12.0
+        daily = yearly / 365.0
 
     grid_items = [
-        f'<div class="card"><div class="k">CORE (35%)</div><b>{core_apy:.2f}%</b> TVL-weighted</div>',
-        f'<div class="card"><div class="k">Fixed (10%)</div><b>{fixed_apy:.2f}%</b></div>',
+        f'<div class="card"><div class="k">CORE ({w_core:.0f}%)</div><b>{core_apy:.2f}%</b> TVL-weighted</div>',
+        f'<div class="card"><div class="k">Fixed ({w_fixed:.0f}%)</div><b>{fixed_apy:.2f}%</b></div>',
     ]
     if sat_apy > 0:
-        grid_items.append(f'<div class="card"><div class="k">Satellites (40%)</div><b>{sat_apy:.2f}%</b></div>')
+        grid_items.append(f'<div class="card"><div class="k">Satellites ({w_sat:.0f}%)</div><b>{sat_apy:.2f}%</b></div>')
     if delta_bps is not None:
-        grid_items.append(f'<div class="card"><div class="k">Delta-Neutral (15%)</div><b>{delta_bps/100:.2f}%</b> live funding</div>')
-    # Projection card — full paper position at the live blend
-    grid_items.append(f'<div class="card paper-test"><div class="k">Paper: {PAPER_V2["hype_balance"]} HYPE (${capital_usd:.2f}) → /yr @ {blend:.2f}%</div><b>${yearly:,.2f}</b><div class="sub">Daily: ${daily:.4f} | Monthly: ${monthly:.2f}</div></div>')
+        grid_items.append(f'<div class="card"><div class="k">Delta-Neutral ({w_dn:.0f}%)</div><b>{delta_bps/100:.2f}%</b> live funding</div>')
+    # Projection card — full paper position at the live blend (only when price is LIVE)
+    if hype_price is not None:
+        grid_items.append(f'<div class="card paper-test"><div class="k">Paper: {PAPER_NOTIONAL_HYPE} HYPE (${capital_usd:.2f} @ {hype_price:.2f} CoinGecko {ts}) → /yr @ {blend:.2f}%</div><b>${yearly:,.2f}</b><div class="sub">Daily: ${daily:.4f} | Monthly: ${monthly:.2f}</div></div>')
+    else:
+        grid_items.append('<div class="card paper-test"><div class="k">Paper projection</div><b>UNAVAILABLE</b><div class="sub">live HYPE price fetch failed — not synthesized</div></div>')
     # On-chain accrued card — what the testnet vault has ACTUALLY harvested
     if onchain_yield is not None:
         grid_items.append(f'<div class="card paper-test"><div class="k">On-chain paper profits (testnet vault)</div><b>${onchain_yield:.6f}</b><div class="sub">position ${onchain_assets:.2f} · 4 strategies · {vs_ts}</div></div>')
     grid_html = "\n".join(grid_items)
     
-    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="60">
+<script>try{{var _y=sessionStorage.getItem("py_scroll");if(_y!==null)window.scrollTo(0,+_y)}}catch(e){{}}
+window.addEventListener("beforeunload",function(){{try{{sessionStorage.setItem("py_scroll",window.scrollY)}}catch(e){{}}}})</script>
+<style>
 :root {{ color-scheme: light dark; }}
 body {{ font-family: var(--app-font, system-ui); color: var(--foreground, inherit); margin: 0; font-size: 14px; }}
 h2 {{ font-size: 15px; margin: 18px 0 6px; }}
@@ -405,8 +465,8 @@ th {{ font-size: 11px; text-transform: uppercase; opacity: .65; }}
 .src {{ font-size: 11px; opacity: .55; margin-top: 10px; line-height: 1.5; }}
 </style></head><body>
 <div class="hero"><span class="big">{blend:.2f}%</span><span>target blended net APY
-<span class="badge">90% core+fixed / 10% satellite</span></span>
-<span class="sub">snapshot {esc(ts)}</span></div>
+<span class="badge">{alloc_badge}</span></span>
+<span class="sub">{esc(snap_label)}</span></div>
 <div class="grid">
 {grid_html}
 </div>
@@ -437,8 +497,8 @@ th {{ font-size: 11px; text-transform: uppercase; opacity: .65; }}
 <div class="src">Sources: yields.llama.fi/pools · gamma-api.polymarket.com · api.hyperliquid.xyz/info — all fetched {esc(ts)}.
 <div style="margin:6px 0">{sparkline}</div>
 Standard: live-data-verification — no synthesized values; gaps shown as UNAVAILABLE.
-Yield is a safety trade-off: 5.11% non-custodial (STUSDS) beats 1.75% CEX (Kraken) by 3x — but CeFi will always advertise higher rates precisely because they hold your keys. 12% requires abandoning non-custodial principle or accepting 0-2/5 safety — same risk profile as the CEXes we differentiate from.
-Blend model: 80% TVL-weighted core, 10% fixed, 10% satellite. Satellites above plan weight only with decay check passed. Fee recycling pending implementation.</div>
+Yield is a safety trade-off: {prem_str} — but CeFi will always advertise higher rates precisely because they hold your keys. 12% requires abandoning non-custodial principle or accepting 0-2/5 safety — same risk profile as the CEXes we differentiate from.
+Blend model (snapshot {esc(snap_gen or 'UNAVAILABLE')}): {w_core:.0f}% core · {w_fixed:.0f}% fixed · {w_sat:.0f}% satellite · {w_dn:.0f}% delta-neutral. Satellites above plan weight only with decay check passed. Fee recycling pending implementation.</div>
 
 <h2>Service Providers & Revenue Streams</h2>
 <table>
@@ -478,7 +538,7 @@ Blend model: 80% TVL-weighted core, 10% fixed, 10% satellite. Satellites above p
     for p in sorted(dragging, key=lambda x: x.get("apy_base", 0))
 )}
 </table>
-<div class="card"><div class="k">Action</div>Remove or replace dragging assets with higher-yield alternatives. Delta-Neutral (5.85% on-chain) already removed from allocation model. Shift weights to SATELLITE (12-14%) and FIXED (14.22% Pendle) positions.</div>
+<div class="card"><div class="k">Action</div>Remove or replace dragging (non-portfolio) assets with higher-yield alternatives. Delta-neutral re-allowed 09-19 — {w_dn:.0f}% sleeve at live HL funding {dn_display_apy:.1f}%. Review FIXED (Pendle) and SATELLITE sleeves for decay before adding weight.</div>
 </body></html>"""
     
     out_path = os.path.join(HERE, "dashboard.html")
