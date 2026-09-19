@@ -55,7 +55,9 @@ def compute_blend(weights, tier_apys):
     return sum(weights.get(cat, 0) * tier_apys.get(cat, 0) for cat in weights)
 
 def get_tier_apys():
-    """Get tier APYs from the deployment engine's snapshot."""
+    """Get tier APYs from the deployment engine's snapshot.
+    UNAVAILABLE semantics: no snapshot -> empty dict (never invented numbers).
+    Consumers must treat missing keys as UNAVAILABLE, not fall back to fiction."""
     if os.path.exists(SNAPSHOT_PATH):
         try:
             with open(SNAPSHOT_PATH) as f:
@@ -63,8 +65,7 @@ def get_tier_apys():
             return snap.get("tier_apys", {})
         except Exception:
             pass
-    # Fallback to default values
-    return {"core": 5.05, "fixed": 14.30, "satellite": 13.81, "delta_neutral": 5.85, "tangible": 0.30, "monitor": 3.0}
+    return {}  # UNAVAILABLE — no plausible-looking defaults
 
 def main():
     print("=" * 60)

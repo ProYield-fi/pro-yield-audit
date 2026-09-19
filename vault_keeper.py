@@ -12,8 +12,22 @@ Every action prints tx hash + resulting on-chain state. Never mainnet.
 """
 import json, os, subprocess, sys, time, urllib.request
 
-VAULT = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-DELTA = "0x87ddE2486E6674A8A918c20747Fd48d790e26Bbb"
+def _load_addresses():
+    """Resolve deployed contract addresses from deployed_addresses.json (written
+    by deploy_v2.js). Never hardcode — every redeploy changes addresses and a
+    stale constant surfaces as BAD_DATA 0x (T-011 root cause, fixed 2026-09-19)."""
+    for p in ("/home/user/hypervault/deployed_addresses.json",
+              "/home/user/yield_scout/deployed_addresses.json"):
+        try:
+            with open(p) as f:
+                j = json.load(f)
+            if j.get("pro_yield_vault"):
+                return j["pro_yield_vault"], j.get("delta_neutral", "")
+        except Exception:
+            continue
+    raise SystemExit("FATAL: no deployed_addresses.json with pro_yield_vault — run deploy_v2.js first")
+
+VAULT, DELTA = _load_addresses()
 KEYFILE = os.path.expanduser("~/.hermes/vault_keys/hyperevm_testnet.deployer")
 
 def hl_funding():
@@ -190,9 +204,47 @@ def check_gas(min_hype=0.01):
     except Exception as e:
         print(f"Gas check failed: {e}")
         return False, 0.0
+
+ANVIL_START_CMD = "/home/user/.config/.foundry/bin/anvil --port 8545 --chain-id 998"
+
+def check_anvil():
+    """Return True if the local Anvil RPC responds. Self-heals: restarts it if down
+    (fresh chain → contracts need redeploy; keeper detects stale addresses via the
+    deployed_addresses.json manifest and reports DEPLOY_REQUIRED instead of failing
+    with BAD_DATA)."""
+    import urllib.request as _urllib
+    import json as _json
+    import subprocess as _sp
+    req = _urllib.Request("http://localhost:8545", data=_json.dumps({
+        "jsonrpc": "2.0", "id": 1, "method": "eth_blockNumber", "params": []
+    }).encode(), headers={"Content-Type": "application/json"})
+    try:
+        _urllib.urlopen(req, timeout=5)
+        return True
+    except Exception:
+        print("⚠ Anvil down — attempting auto-restart…")
+        try:
+            _sp.Popen(ANVIL_START_CMD.split(),
+                      stdout=open("/tmp/anvil_keeper.log", "a"),
+                      stderr=_sp.STDOUT)
+            import time as _t
+            for _ in range(10):
+                _t.sleep(1)
+                try:
+                    _urllib.urlopen(req, timeout=3)
+                    print("✅ Anvil restarted (FRESH CHAIN — run deploy_v2.js to redeploy)")
+                    return True
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"Anvil restart failed: {e}")
+    print("⚠ Anvil unreachable — on-chain steps will be skipped this run.")
+    return False
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     # Pre-flight: abort if wallet lacks gas for on-chain ops
+    anvil_ok = check_anvil()
     gas_ok, gas_bal = check_gas(min_hype=0.01)
     if not gas_ok:
         print(f"⚠ Keeper aborted: insufficient gas ({gas_bal:.6f} HYPE). Top up at https://www.gas.zip/faucet/hyperevm")
@@ -203,7 +255,10 @@ def main():
     if mode in ("all", "delta-neutral"):
         ok = track_referral_earnings() and ok
     if mode in ("all", "harvest"):
-        ok = harvest_and_allocate() and ok
+        if anvil_ok:
+            ok = harvest_and_allocate() and ok
+        else:
+            print("Skipping harvest/allocate — Anvil unreachable (pre-flight).")
     # Re-render the dashboard so the on-chain card reflects this run's state
     if ok:
         try:
