@@ -3,48 +3,57 @@ async function main() {
   const [owner] = await hre.ethers.getSigners();
   console.log("Deploying with:", owner.address);
   
-  // Deploy ProYieldVault
+  const MockUSDC = await hre.ethers.getContractFactory("MockUSDC");
+  const mockUSDC = await MockUSDC.deploy();
+  await mockUSDC.waitForDeployment();
+  console.log("MockUSDC:", await mockUSDC.getAddress());
+  
+  const mintTx = await mockUSDC.mint(owner.address, ethers.parseUnits("1000000", 6));
+  await mintTx.wait();
+  console.log("Minted 1,000,000 mUSDC");
+  
   const ProYieldVault = await hre.ethers.getContractFactory("ProYieldVault");
   const vault = await ProYieldVault.deploy(
-    ethers.ZeroAddress,
+    await mockUSDC.getAddress(),
     owner.address,
     owner.address
   );
   await vault.waitForDeployment();
-  console.log("ProYieldVault:", await vault.getAddress());
+  console.log("\nProYieldVault:", await vault.getAddress());
   
-  // Deploy DeltaNeutralStrategy
   const DeltaNeutral = await hre.ethers.getContractFactory("DeltaNeutralStrategy");
   const delta = await DeltaNeutral.deploy(
-    ethers.ZeroAddress,
+    await mockUSDC.getAddress(),
     owner.address,
     ethers.ZeroAddress
   );
   await delta.waitForDeployment();
   console.log("DeltaNeutral:", await delta.getAddress());
   
-  // Add strategy
-  const tx = await vault.addStrategy(await delta.getAddress());
-  await tx.wait();
+  const addTx = await vault.addStrategy(await delta.getAddress());
+  await addTx.wait();
   console.log("Strategy added");
   
-  // Test harvest and allocate
-  console.log("totalAssets:", hre.ethers.formatUnits(await vault.totalAssets(), 6), "USDC");
+  const approveTx = await mockUSDC.approve(await vault.getAddress(), ethers.parseUnits("100000", 6));
+  await approveTx.wait();
+  console.log("Approved 100,000 mUSDC");
   
-  try {
-    const h = await v.harvest();
-    await h.wait();
-    console.log("harvest SUCCESS!");
-  } catch (e) {
-    console.log("harvest error:", (e.reason || e.message).slice(0, 120));
-  }
+  const depositTx = await vault.deposit(ethers.parseUnits("100000", 6));
+  await depositTx.wait();
+  console.log("Deposited 100,000 mUSDC");
   
-  try {
-    const a = await vault.allocate();
-    await a.wait();
-    console.log("allocate SUCCESS!");
-  } catch (e) {
-    console.log("allocate error:", (e.reason || e.message).slice(0, 120));
-  }
+  const totalAssets = await vault.totalAssets();
+  console.log("\ntotalAssets:", hre.ethers.formatUnits(totalAssets, 6), "USDC");
+  
+  const h = await vault.harvest();
+  await h.wait();
+  console.log("✅ harvest():", h.hash);
+  
+  const a = await vault.allocate();
+  await a.wait();
+  console.log("✅ allocate():", a.hash);
+  
+  console.log("\nFinal totalAssets:", hre.ethers.formatUnits(await vault.totalAssets(), 6), "USDC");
+  console.log("=== ALL TESTS PASSED ===");
 }
 main().catch(console.error);
