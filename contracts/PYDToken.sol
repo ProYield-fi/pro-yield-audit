@@ -4,10 +4,10 @@ pragma solidity ^0.8.28;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract PYDToken is Ownable {
-    string public name = "ProYield";
-    string public symbol = "PYD";
-    uint8 public decimals = 18;
-    uint256 public totalSupply;
+    string public constant name = "ProYield";
+    string public constant symbol = "PYD";
+    uint8 public constant decimals = 18;
+    uint256 public immutable totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
     

@@ -51,8 +51,8 @@ async function main() {
   const delta = await DeltaNeutral.deploy(
     await mockUSDC.getAddress(),
     owner.address,
-    ethers.ZeroAddress,
-    ethers.ZeroAddress
+    owner.address,
+    owner.address
   );
   await delta.waitForDeployment();
   

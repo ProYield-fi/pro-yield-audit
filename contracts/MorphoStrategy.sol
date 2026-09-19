@@ -10,9 +10,10 @@ contract MorphoStrategy is BaseStrategy {
     address public morpho;
     uint256 public totalSupply;
 
-    constructor(address _underlying, address _owner, address _morpho)
-        BaseStrategy(_underlying, _owner, "Morpho")
+    constructor(address _underlying, address initialOwner, address _morpho)
+        BaseStrategy(_underlying, initialOwner, "Morpho")
     {
+        require(_morpho != address(0), "Morpho: zero morpho");
         morpho = _morpho;
     }
 
@@ -20,18 +21,21 @@ contract MorphoStrategy is BaseStrategy {
         return "Morpho";
     }
 
-    function setMorpho(address _morpho) external onlyOwner nonReentrant {
-        morpho = _morpho;
+    function setMorpho(address morpho_) external onlyOwner nonReentrant {
+        require(morpho_ != address(0), "Morpho: zero morpho");
+        morpho = morpho_;
     }
 
     function supply(uint256 amount) external nonReentrant {
+        require(amount > 0, "Morpho: zero amount");
         require(morpho != address(0), "Morpho: not set");
-        // Transfer underlying to Morpho
         underlying.safeTransferFrom(msg.sender, morpho, amount);
         totalSupply += amount;
     }
 
     function withdraw(uint256 amount) external override nonReentrant {
+        require(amount > 0, "Morpho: zero amount");
+        require(totalSupply >= amount, "Morpho: insufficient supply");
         totalSupply -= amount;
         underlying.safeTransfer(msg.sender, amount);
     }

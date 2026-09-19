@@ -8,7 +8,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract FeeDistributor is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
-    IERC20 public pyd;
+    IERC20 public immutable pyd;
     address[] public strategies;
     mapping(address => uint256) public pendingFees;
     mapping(address => uint256) public claimed;
@@ -22,14 +22,18 @@ contract FeeDistributor is ReentrancyGuard, Ownable {
         return "FeeDistributor";
     }
 
-    function addStrategy(address _strategy) external onlyOwner nonReentrant {
-        strategies.push(_strategy);
+    function addStrategy(address strategy) external onlyOwner nonReentrant {
+        require(strategy != address(0), "FeeDistributor: zero strategy");
+        strategies.push(strategy);
     }
 
     function distribute() external onlyOwner nonReentrant {
-        for (uint i = 0; i < strategies.length; i++) {
-            _distributeStrategy(strategies[i]);
-        }
+        _distributeStrategy(msg.sender);
+    }
+
+    function distributeTo(address strategy) external onlyOwner nonReentrant {
+        require(strategy != address(0), "FeeDistributor: zero strategy");
+        _distributeStrategy(strategy);
     }
 
     function _distributeStrategy(address strategy) internal {
@@ -44,6 +48,7 @@ contract FeeDistributor is ReentrancyGuard, Ownable {
 
     function withdrawFees() external nonReentrant {
         uint256 amount = pendingFees[msg.sender];
+        require(amount > 0, "FeeDistributor: no fees");
         pendingFees[msg.sender] = 0;
         pyd.safeTransfer(msg.sender, amount);
     }

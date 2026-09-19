@@ -8,12 +8,12 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 contract PendleStrategy is BaseStrategy {
     address public pendleMarket;
-    uint256 public maturity;
-    uint256 public pyTokenAmount;
+    uint256 public immutable maturity;
 
-    constructor(address _underlying, address _owner, address _pendleMarket)
-        BaseStrategy(_underlying, _owner, "Pendle")
+    constructor(address _underlying, address initialOwner, address _pendleMarket)
+        BaseStrategy(_underlying, initialOwner, "Pendle")
     {
+        require(_pendleMarket != address(0), "Pendle: zero market");
         pendleMarket = _pendleMarket;
         maturity = block.timestamp + 365 days;
     }
@@ -22,26 +22,23 @@ contract PendleStrategy is BaseStrategy {
         return "Pendle";
     }
 
-    function setMarket(address _market) external onlyOwner nonReentrant {
-        pendleMarket = _market;
+    function setMarket(address market) external onlyOwner nonReentrant {
+        require(market != address(0), "Pendle: zero market");
+        pendleMarket = market;
     }
 
     function harvest() external override nonReentrant {
-        if (block.timestamp > maturity) {
+        if (block.timestamp > maturity && pendleMarket != address(0)) {
             _claimRewards();
         }
     }
 
     function _claimRewards() internal nonReentrant {
-        if (pendleMarket != address(0) && address(this).balance > 0) {
+        if (address(this).balance > 0 && msg.sender == owner()) {
+            // slither-disable-next-line low-level-calls
             (bool success, ) = pendleMarket.call{value: address(this).balance}("");
             require(success, "Pendle: transfer failed");
         }
     }
 
-    function _doHarvest() internal override returns (uint256) {
-        uint256 profit = 0;
-        _claimRewards();
-        return profit;
-    }
 }

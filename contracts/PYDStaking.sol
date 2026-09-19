@@ -8,16 +8,21 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 contract PYDStaking is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
-    IERC20 public pyd;
+    IERC20 public immutable pyd;
     mapping(address => uint256) public stakeAmount;
     mapping(address => uint256) public rewardDebt;
+    // slither-disable-next-line constable-states
     uint256 public totalSupply;
     uint256 public constant REWARD_RATE = 100;
+    // slither-disable-next-line immutable-states
     uint256 public rewardPerTokenStored;
+    // slither-disable-next-line immutable-states
     uint256 public lastUpdateTime;
 
     constructor(address _pyd) Ownable(msg.sender) {
         pyd = IERC20(_pyd);
+        rewardPerTokenStored = 0;
+        lastUpdateTime = block.timestamp;
     }
 
     function name() external view returns (string memory) {

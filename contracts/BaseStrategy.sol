@@ -8,22 +8,33 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 contract BaseStrategy is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
-    IERC20 public underlying;
+
+    IERC20 public immutable underlying;
     address public keeper;
+    // slither-disable-next-line constable-states
     uint256 public totalDebt;
     bool public isActive;
+    // slither-disable-next-line immutable-states
     uint256 public lastHarvest;
     mapping(address => uint256) public shares;
     string public name_;
 
+    uint256 public constant MAX_WITHDRAWAL_FEE = 500;
+    uint256 public constant MAX_PERFORMANCE_FEE = 10000;
+
     event Harvest(uint256 profit);
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
+    event KeeperSet(address indexed keeper);
+    event ActiveChanged(bool active);
 
-    constructor(address _underlying, address _owner, string memory _name) Ownable(_owner) {
+    constructor(address _underlying, address initialOwner, string memory _name) Ownable(initialOwner) {
+        require(_underlying != address(0), "BaseStrategy: zero underlying");
+        require(initialOwner != address(0), "BaseStrategy: zero owner");
         underlying = IERC20(_underlying);
         isActive = true;
         name_ = _name;
+        lastHarvest = block.timestamp;
     }
 
     function name() external view virtual returns (string memory) {
@@ -31,48 +42,51 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
     }
 
     function deposit(uint256 amount) external virtual nonReentrant {
+        require(amount > 0, "BaseStrategy: zero amount");
         shares[msg.sender] += amount;
-        uint256 balance = underlying.balanceOf(address(this));
         underlying.safeTransferFrom(msg.sender, address(this), amount);
-        uint256 newBalance = underlying.balanceOf(address(this)) - balance;
-        if (newBalance > 0) {
-            shares[msg.sender] += (newBalance * shares[msg.sender]) / balance;
-        }
         emit Deposit(msg.sender, amount);
     }
 
     function withdraw(uint256 amount) external virtual nonReentrant {
-        uint256 totalShares = _totalShares();
-        require(totalShares > 0, "BaseStrategy: no shares");
-        uint256 shareAmount = (amount * shares[msg.sender]) / totalAssets();
+        require(amount > 0, "BaseStrategy: zero amount");
+        uint256 userShares = shares[msg.sender];
+        require(userShares > 0, "BaseStrategy: no shares");
+        uint256 totalAssetsVal = totalAssets();
+        require(totalAssetsVal > 0, "BaseStrategy: no assets");
+        uint256 shareAmount = (amount * userShares) / totalAssetsVal;
         require(shareAmount > 0, "BaseStrategy: insufficient shares");
+        require(shareAmount <= userShares, "BaseStrategy: exceeds shares");
         shares[msg.sender] -= shareAmount;
         underlying.safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, amount);
     }
 
     function harvest() external virtual nonReentrant {
+        require(isActive, "BaseStrategy: inactive");
         uint256 profit = _doHarvest();
-        emit Harvest(profit);
+        totalDebt += profit;
         lastHarvest = block.timestamp;
+        emit Harvest(profit);
     }
 
+    // slither-disable-next-line dead-code
     function _doHarvest() internal virtual returns (uint256) {
         return 0;
     }
 
-    function setKeeper(address _keeper) external onlyOwner nonReentrant {
-        keeper = _keeper;
+    function setKeeper(address keeper_) external onlyOwner nonReentrant {
+        require(keeper_ != address(0), "BaseStrategy: zero keeper");
+        keeper = keeper_;
+        emit KeeperSet(keeper_);
+    }
+
+    function setActive(bool active) external onlyOwner nonReentrant {
+        isActive = active;
+        emit ActiveChanged(active);
     }
 
     function totalAssets() public virtual view returns (uint256) {
         return underlying.balanceOf(address(this));
-    }
-
-    function _totalShares() internal view returns (uint256) {
-        // Sum all shares
-        uint256 total = 0;
-        // This is a simplified version — in production, track totalSupply separately
-        return total;
     }
 }

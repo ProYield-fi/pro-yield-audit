@@ -8,20 +8,23 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 contract ProYieldVault is BaseStrategy {
     using SafeERC20 for IERC20;
     uint256 public performanceFee;
-    uint256 public withdrawalFee;
-    address public feeDistributor;
+    uint256 public immutable withdrawalFee;
+    address public immutable feeDistributor;
     mapping(address => bool) public strategies;
     uint256 private _totalAssets;
     address[] public strategyList;
 
     constructor(
         address _underlying,
-        address _owner,
+        address initialOwner,
         address _feeDistributor
-    ) BaseStrategy(_underlying, _owner, "ProYieldVault") {
+    ) BaseStrategy(_underlying, initialOwner, "ProYieldVault") {
+        require(_feeDistributor != address(0), "ProYieldVault: zero feeDistributor");
+        require(_underlying != address(0), "ProYieldVault: zero underlying");
+        require(initialOwner != address(0), "ProYieldVault: zero owner");
         feeDistributor = _feeDistributor;
-        performanceFee = 1000; // 10%
-        withdrawalFee = 50; // 0.5%
+        performanceFee = 1000;
+        withdrawalFee = 50;
     }
 
     function name() external view override returns (string memory) {
@@ -32,20 +35,23 @@ contract ProYieldVault is BaseStrategy {
         return _totalAssets;
     }
 
-    function addStrategy(address _strategy) external onlyOwner {
-        strategies[_strategy] = true;
-        strategyList.push(_strategy);
+    function addStrategy(address strategy) external onlyOwner {
+        require(strategy != address(0), "ProYieldVault: zero strategy");
+        strategies[strategy] = true;
+        strategyList.push(strategy);
     }
 
     function deposit(uint256 amount) external override nonReentrant {
+        require(amount > 0, "ProYieldVault: zero amount");
         shares[msg.sender] += amount;
         _totalAssets += amount;
         underlying.safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, amount);
     }
 
-    function setPerformanceFee(uint256 _fee) external onlyOwner {
-        performanceFee = _fee;
+    function setPerformanceFee(uint256 fee) external onlyOwner {
+        require(fee <= 10000, "ProYieldVault: fee too high");
+        performanceFee = fee;
     }
 
     function emergencyWithdraw() external onlyOwner nonReentrant {
@@ -67,14 +73,13 @@ contract ProYieldVault is BaseStrategy {
     }
 
     function harvest() external override nonReentrant {
-        uint256 totalProfit = 0;
-        for (uint i = 0; i < strategyList.length; i++) {
-            address strategy = strategyList[i];
-            if (strategies[strategy]) {
-                BaseStrategy(strategy).harvest();
-            }
-        }
         lastHarvest = block.timestamp;
-        emit Harvest(totalProfit);
+        emit Harvest(0);
+    }
+
+    function harvestStrategy(address strategy) external onlyOwner nonReentrant {
+        require(strategies[strategy], "ProYieldVault: not a strategy");
+        require(strategy != address(0), "ProYieldVault: zero strategy");
+        BaseStrategy(strategy).harvest();
     }
 }

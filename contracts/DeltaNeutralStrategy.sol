@@ -2,10 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {BaseStrategy} from "./BaseStrategy.sol";
-using SafeERC20 for IERC20;
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-using SafeERC20 for IERC20;
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract DeltaNeutralStrategy is BaseStrategy {
     address public shortPosition;
@@ -15,9 +13,16 @@ contract DeltaNeutralStrategy is BaseStrategy {
     mapping(address => uint256) public positions;
     address public oracle;
 
-    constructor(address _underlying, address _owner, address _short, address _oracle)
-        BaseStrategy(_underlying, _owner, "DeltaNeutral")
+    event PositionOpened(address indexed user, uint256 size);
+    event PositionClosed(address indexed user, uint256 size);
+    event FundingRateUpdated(uint256 rate);
+    event ShortPositionSet(address indexed short);
+
+    constructor(address _underlying, address initialOwner, address _short, address _oracle)
+        BaseStrategy(_underlying, initialOwner, "DeltaNeutral")
     {
+        require(_short != address(0), "DeltaNeutral: zero short");
+        require(_oracle != address(0), "DeltaNeutral: zero oracle");
         shortPosition = _short;
         oracle = _oracle;
     }
@@ -26,47 +31,57 @@ contract DeltaNeutralStrategy is BaseStrategy {
         return "DeltaNeutral";
     }
 
-    function setShortPosition(address _short) external onlyOwner nonReentrant {
-        shortPosition = _short;
+    function setShortPosition(address short_) external onlyOwner nonReentrant {
+        require(short_ != address(0), "DeltaNeutral: zero short");
+        shortPosition = short_;
+        emit ShortPositionSet(short_);
     }
 
-    function setOracle(address _oracle) external onlyOwner nonReentrant {
-        oracle = _oracle;
+    function setOracle(address oracle_) external onlyOwner nonReentrant {
+        require(oracle_ != address(0), "DeltaNeutral: zero oracle");
+        oracle = oracle_;
     }
 
     function openPosition(uint256 size) external onlyOwner nonReentrant {
-        positions[msg.sender] = size;
+        require(size > 0, "DeltaNeutral: zero size");
+        positions[msg.sender] += size;
         delta += size;
+        emit PositionOpened(msg.sender, size);
     }
 
     function closePosition() external onlyOwner nonReentrant {
         uint256 size = positions[msg.sender];
+        require(size > 0, "DeltaNeutral: no position");
+        require(delta >= size, "DeltaNeutral: underflow");
         delta -= size;
         positions[msg.sender] = 0;
+        emit PositionClosed(msg.sender, size);
     }
 
     function updateFunding() external onlyOwner nonReentrant {
         fundingRate = _fetchFundingRate();
         lastUpdate = block.timestamp;
+        emit FundingRateUpdated(fundingRate);
     }
 
     function _fetchFundingRate() internal view returns (uint256) {
-        // Oracle-based funding rate — currently returns 0 for testnet
         if (oracle == address(0)) return 0;
-        // In production: return Oracle(oracle).getFundingRate();
+        // In production: return IOracle(oracle).getFundingRate();
         return 0;
     }
 
     function _doHarvest() internal override returns (uint256) {
         uint256 profit = 0;
-        if (shortPosition != address(0) && delta > 0) {
+        if (shortPosition != address(0) && delta > 0 && isActive && msg.sender == owner()) {
             uint256 balance = address(this).balance;
             if (balance > 0) {
-                (bool success, ) = shortPosition.call{value: balance}("");
+                uint256 _bal = balance;
+                bool success = payable(shortPosition).send(balance);
                 require(success, "DeltaNeutral: transfer failed");
                 profit = balance;
             }
         }
         return profit;
     }
+
 }
