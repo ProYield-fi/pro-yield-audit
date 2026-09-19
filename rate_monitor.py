@@ -140,6 +140,55 @@ def check_pools(snapshot, live_pools, threshold_bps=ALERT_THRESHOLD_BPS):
 
     return alerts, checked, all_clear
 
+
+def fetch_live_funding():
+    """Live Hyperliquid majors funding APR (hourly-paid; annualize x24x365)."""
+    try:
+        body = json.dumps({"type": "metaAndAssetCtxs"}).encode()
+        req = urllib.request.Request("https://api.hyperliquid.xyz/info", data=body,
+                                     headers={"Content-Type": "application/json", **UA})
+        meta, ctxs = json.loads(urllib.request.urlopen(req, timeout=30).read())
+        majors = {}
+        for a, ctx in zip(meta["universe"], ctxs):
+            if a["name"] in ("BTC", "ETH"):
+                majors[a["name"]] = round(float(ctx.get("funding") or 0) * 24 * 365 * 100, 1)
+        return majors
+    except Exception:
+        return {}  # UNAVAILABLE — funding check silently skipped
+
+def check_funding(snapshot, live_funding, threshold_bps=ALERT_THRESHOLD_BPS):
+    """Compare snapshot DELTA_NEUTRAL apy against live HL majors funding avg.
+    delta_neutral tier is NOT in picks.pools — tracked separately here."""
+    blend_apy = snapshot.get("blend", {}).get("blend_apy", 0)
+    weights = snapshot.get("blend", {}).get("allocation", {})
+    dn = weights.get("DELTA_NEUTRAL", {})
+    snapshot_apy = dn.get("apy", 0) or 0
+    weight = dn.get("weight", 0) or 0
+    checked = 0
+    alerts = []
+    if not live_funding or weight <= 0 or snapshot_apy <= 0:
+        return alerts, checked
+    vals = list(live_funding.values())
+    live_apy = round(sum(vals) / len(vals), 2)
+    checked = 1
+    delta_bps = (live_apy - snapshot_apy) * 100
+    if abs(delta_bps) > threshold_bps:
+        alerts.append({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "category": "delta_neutral",
+            "project": "hyperliquid-funding",
+            "symbol": "/".join(sorted(live_funding.keys())),
+            "chain": "Hyperliquid",
+            "snapshot_apy": round(snapshot_apy, 4),
+            "live_apy": round(live_apy, 4),
+            "delta_bps": round(delta_bps, 1),
+            "tvl": None,
+            "direction": "UP" if delta_bps > 0 else "DOWN",
+            "severity": "HIGH" if abs(delta_bps) > 150 else ("MEDIUM" if abs(delta_bps) > 75 else "LOW"),
+            "blend_at_snapshot": blend_apy,
+        })
+    return alerts, checked
+
 def estimate_blend_impact(alerts, snapshot):
     """Estimate how much the blend would change if we re-allocated now."""
     picks = snapshot.get("picks", {})
@@ -182,6 +231,11 @@ def run_check(quiet=False, threshold_bps=ALERT_THRESHOLD_BPS):
 
     # Check for changes
     alerts, checked, all_clear = check_pools(snapshot, live_pools, threshold_bps)
+    funding_alerts, funding_checked = check_funding(snapshot, fetch_live_funding())
+    alerts += funding_alerts
+    checked += funding_checked
+    if funding_alerts:
+        all_clear = False
 
     # Log new alerts
     for alert in alerts:

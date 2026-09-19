@@ -197,6 +197,9 @@ def main():
     majors = hf.get("majors_funding_apr", {}) if hf else {}
     vals = [v for v in majors.values() if isinstance(v, (int, float))]
     delta_apy = round(sum(vals) / len(vals), 2) if vals else float("nan")  # UNAVAILABLE if no funding data
+    btc_funding = next((v for k, v in majors.items() if k.upper() == "BTC"), float("nan"))
+    eth_funding = next((v for k, v in majors.items() if k.upper() == "ETH"), float("nan"))
+    dn_display_apy = delta_apy if isinstance(delta_apy, (int, float)) else float("nan")
     fixed_apy = fixed_pick[0]["apy_base"] if fixed_pick else 0
     sat_apy = sum(p["apy_base"] for p in sat_pick) / len(sat_pick) if sat_pick else 0
     # Blend calculation — use snapshot from scout.py when available (single source of truth)
@@ -444,7 +447,7 @@ Blend model: 80% TVL-weighted core, 10% fixed, 10% satellite. Satellites above p
 <tr><td><b>MoonPay On-Ramp</b></td><td class="good">✅ CONFIGURED</td><td class="r">Testnet</td><td>pk_test_59DnsDRRtJa40GZ2esBNJ4JvYAd3sPL. SECRET+WEBHOOK in CF Pages dashboard (Encrypt ON). Production: get live keys from MoonPay dashboard.</td></tr>
 <tr><td><b>Stripe On-Ramp</b></td><td class="bad">❌ BLOCKED</td><td class="r">2.9% + $0.30</td><td>Not supported in Bahamas. EU/US only. Requires legal entity in supported country</td></tr>
 <tr><td><b>Ramp Network</b></td><td class="bad">❌ BLOCKED</td><td class="r">N/A</td><td>Explicitly blocks Bahamas. Cannot use.</td></tr>
-<tr><td><b>Delta-Neutral Strategy</b></td><td class="ok">✅ LIVE</td><td class="r">13-14% APR</td><td>BTC 13.1%, ETH/SOL 14.0% (funding + maker rebates). Non-directional.</td></tr>
+<tr><td><b>Delta-Neutral Strategy</b></td><td class="ok">✅ LIVE</td><td class="r">{dn_display_apy:.1f}% APR</td><td>Live HL funding: BTC {btc_funding:.1f}%, ETH {eth_funding:.1f}% (re-read hourly by scout; volatile). Non-directional, hedged.</td></tr>
 <tr><td><b>Vault Performance Fees</b></td><td class="warn">⏳ PENDING</td><td class="r">TBD</td><td>Requires audit + governance. Not started.</td></tr>
 </table>
 
