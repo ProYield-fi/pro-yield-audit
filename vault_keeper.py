@@ -12,8 +12,8 @@ Every action prints tx hash + resulting on-chain state. Never mainnet.
 """
 import json, os, subprocess, sys, time, urllib.request
 
-VAULT = "0x81EA368Da3754df1aAd8712907b00748b737EE67"
-DELTA = "0x73152995E2da9e501aedeB19De0C832E46948efF"
+VAULT = "0xCd66cB7e64e22531C20497B7c6026Da33bA1C1e8"
+DELTA = "0x2F6063D70b0111A75D50742A917793ED43973071"
 KEYFILE = os.path.expanduser("~/.hermes/vault_keys/hyperevm_testnet.deployer")
 
 def hl_funding():
