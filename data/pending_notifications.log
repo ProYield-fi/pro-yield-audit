@@ -1,0 +1,1 @@
+{"timestamp": "2026-09-19T23:12:00.000000+00:00", "category": "delta_neutral", "project": "hyperliquid-funding", "symbol": "BTC/ETH", "chain": "Hyperliquid", "snapshot_apy": 11.0, "live_apy": 4.0, "delta_bps": -700.0, "tvl": null, "direction": "DOWN", "severity": "HIGH", "blend_at_snapshot": 9.06}

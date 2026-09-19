@@ -5,7 +5,7 @@
  "exchangeRate": "1.000256",
  "deltaApyBps": "1100",
  "strategies": "4",
- "ts": "2026-09-19T04:21:17Z",
- "vault": "0x73278b87e51595CC5F41B3132B595a524526Db76",
+ "ts": "2026-09-19T23:11:44Z",
+ "vault": "0x712A6AF97A6d499874161167Cb03604F7d74FfBE",
  "source": "HyperEVM testnet RPC (hardhat run)"
 }
