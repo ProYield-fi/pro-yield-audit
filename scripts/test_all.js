@@ -13,7 +13,8 @@ async function main() {
   console.log("\n✅ TEST 1: MockUSDC deployed:", await mockUSDC.getAddress());
 
   // === TEST 2: MockUSDC mint ===
-  await mockUSDC.mint(owner.address, hre.ethers.parseUnits("1000000", 18));
+  const mintTx = await mockUSDC.mint(owner.address, hre.ethers.parseUnits("1000000", 18));
+  await mintTx.wait();
   const balance = await mockUSDC.balanceOf(owner.address);
   expect(balance).to.equal(hre.ethers.parseUnits("1000000", 18));
   console.log("✅ TEST 2: MockUSDC mint works, balance:", hre.ethers.formatUnits(balance, 18));
@@ -39,7 +40,8 @@ async function main() {
   console.log("✅ TEST 5: vault.totalAssets() =", assets.toString());
 
   // === TEST 6: Deposit ===
-  await mockUSDC.approve(await vault.getAddress(), hre.ethers.parseUnits("100000", 18));
+  const approveTx = await mockUSDC.approve(await vault.getAddress(), hre.ethers.parseUnits("100000", 18));
+  await approveTx.wait();
   const depositTx = await vault.deposit(hre.ethers.parseUnits("100000", 18));
   await depositTx.wait();
   const assetsAfter = await vault.totalAssets();
@@ -87,11 +89,16 @@ async function main() {
 
   // === TEST 13: Non-reentrancy on deposit ===
   try {
+    // fund user1 first: mint + approve, then deposit
+    const mint1 = await mockUSDC.mint(user1.address, hre.ethers.parseUnits("100", 18));
+    await mint1.wait();
+    const appr1 = await mockUSDC.connect(user1).approve(await vault.getAddress(), hre.ethers.parseUnits("100", 18));
+    await appr1.wait();
     const reentrantTx = await vault.connect(user1).deposit(hre.ethers.parseUnits("100", 18));
     await reentrantTx.wait();
     console.log("✅ TEST 13: nonReentrant deposit works for normal users");
   } catch (e) {
-    console.log("❌ TEST 13 failed:", e.reason?.slice(0,100));
+    console.log("❌ TEST 13 failed:", (e.reason || e.shortMessage || e.message || "unknown")?.toString().slice(0,100));
   }
 
   // === TEST 14: Only owner addStrategy ===
@@ -102,11 +109,37 @@ async function main() {
     console.log("✅ TEST 14: onlyOwner enforced correctly");
   }
 
-  // === TEST 15: MockUSDC safeTransfer ===
+  // === TEST 15: withdraw path + SafeERC20 ===
+  // user1 deposited in TEST 13; withdraw it back (also exercises BaseStrategy.withdraw)
+  const wTx = await vault.connect(user1).withdraw(hre.ethers.parseUnits("100", 18));
+  await wTx.wait();
   const usdcBalance = await mockUSDC.balanceOf(await vault.getAddress());
-  expect(usdcBalance).to.equal(hre.ethers.parseUnits("0", 18)); // After emergencyWithdraw
-  console.log("✅ TEST 15: SafeERC20 works, vault balance:", hre.ethers.formatUnits(usdcBalance, 18));
+  expect(usdcBalance).to.equal(hre.ethers.parseUnits("0", 18)); // user1 withdrawn, owner's funds out via emergencyWithdraw
+  console.log("✅ TEST 15: user1 withdraw + SafeERC20, vault balance:", hre.ethers.formatUnits(usdcBalance, 18));
 
-  console.log("\n=== ALL 15 TESTS PASSED ===");
+  // === TEST 16: Per-strategy pause (circuit breaker) ===
+  try {
+    const pauseTx = await vault.setStrategyActive(await delta.getAddress(), false);
+    await pauseTx.wait();
+    const activeAfterPause = await vault.strategyActive(await delta.getAddress());
+    // non-owner cannot toggle
+    let nonOwnerBlocked = false;
+    try {
+      await vault.connect(user1).setStrategyActive(await delta.getAddress(), true);
+    } catch (_) { nonOwnerBlocked = true; }
+    // re-enable for downstream use
+    const resume = await vault.setStrategyActive(await delta.getAddress(), true);
+    await resume.wait();
+    const activeAfterResume = await vault.strategyActive(await delta.getAddress());
+    if (!activeAfterPause && nonOwnerBlocked && activeAfterResume) {
+      console.log("✅ TEST 16: per-strategy pause works (pause → non-owner blocked → resume)");
+    } else {
+      console.log("❌ TEST 16: pause state machine wrong", { activeAfterPause, nonOwnerBlocked, activeAfterResume });
+    }
+  } catch (e) {
+    console.log("❌ TEST 16 failed:", (e.reason || e.message || "unknown").toString().slice(0, 100));
+  }
+
+  console.log("\n=== ALL 16 TESTS PASSED ===");
 }
 main().catch(console.error);

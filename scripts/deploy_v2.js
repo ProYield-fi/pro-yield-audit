@@ -1,4 +1,7 @@
 const hre = require("hardhat");
+const fs = require("fs");
+const path = require("path");
+
 async function main() {
   const [owner] = await hre.ethers.getSigners();
   console.log("Deploying with:", owner.address);
@@ -9,6 +12,11 @@ async function main() {
   await mockUSDC.waitForDeployment();
   console.log("MockUSDC:", await mockUSDC.getAddress());
   
+  // Persist deployed addresses — single source of truth for keeper/insurance/monitor.
+  // Every redeploy on a fresh chain mints new addresses; hardcoded ones go stale.
+  const ADDRESSES_PATH = path.join(__dirname, "..", "deployed_addresses.json");
+  const deployed = { deployed_utc: new Date().toISOString(), chain_id: 998, deployer: owner.address };
+  
   // Deploy ProYieldVault
   const ProYieldVault = await hre.ethers.getContractFactory("ProYieldVault");
   const vault = await ProYieldVault.deploy(
@@ -18,6 +26,8 @@ async function main() {
   );
   await vault.waitForDeployment();
   console.log("ProYieldVault:", await vault.getAddress());
+  deployed.mock_usdc = await mockUSDC.getAddress();
+  deployed.pro_yield_vault = await vault.getAddress();
   
   // Deploy DeltaNeutralStrategy
   const DeltaNeutral = await hre.ethers.getContractFactory("DeltaNeutralStrategy");
@@ -29,6 +39,11 @@ async function main() {
   );
   await delta.waitForDeployment();
   console.log("DeltaNeutral:", await delta.getAddress());
+  deployed.delta_neutral = await delta.getAddress();
+  
+  // Persist BEFORE the tx sequence so a mid-run failure still leaves usable addresses
+  fs.writeFileSync(ADDRESSES_PATH, JSON.stringify(deployed, null, 2));
+  console.log("Addresses saved to deployed_addresses.json");
   
   // Add strategy
   const addTx = await vault.addStrategy(await delta.getAddress());

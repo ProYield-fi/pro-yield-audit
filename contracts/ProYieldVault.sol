@@ -11,6 +11,7 @@ contract ProYieldVault is BaseStrategy {
     uint256 public immutable withdrawalFee;
     address public immutable feeDistributor;
     mapping(address => bool) public strategies;
+    mapping(address => bool) public strategyActive;   // per-strategy circuit breaker
     uint256 private _totalAssets;
     address[] public strategyList;
 
@@ -38,7 +39,15 @@ contract ProYieldVault is BaseStrategy {
     function addStrategy(address strategy) external onlyOwner {
         require(strategy != address(0), "ProYieldVault: zero strategy");
         strategies[strategy] = true;
+        strategyActive[strategy] = true;   // new strategies start active
         strategyList.push(strategy);
+    }
+
+    /// @notice Quarantine one strategy without stopping the whole vault.
+    /// Inactive strategies are skipped by allocate() and cannot be harvested into.
+    function setStrategyActive(address strategy, bool active) external onlyOwner {
+        require(strategies[strategy], "ProYieldVault: not a strategy");
+        strategyActive[strategy] = active;
     }
 
     function deposit(uint256 amount) external override nonReentrant {
@@ -61,12 +70,22 @@ contract ProYieldVault is BaseStrategy {
 
     function allocate() external onlyOwner nonReentrant {
         uint256 balance = underlying.balanceOf(address(this));
-        if (balance > 0 && strategyList.length > 0) {
-            uint256 perStrategy = balance / strategyList.length;
-            for (uint i = 0; i < strategyList.length; i++) {
-                address strategy = strategyList[i];
-                if (strategies[strategy] && perStrategy > 0) {
-                    underlying.safeTransfer(strategy, perStrategy);
+        uint256 len = strategyList.length;   // cache length (slither: cache-array-length)
+        if (balance > 0 && len > 0) {
+            // Split only across ACTIVE strategies; inactive ones get nothing.
+            uint256 activeCount = 0;
+            for (uint i = 0; i < len; i++) {
+                address s = strategyList[i];
+                if (strategies[s] && strategyActive[s]) {
+                    activeCount++;
+                }
+            }
+            if (activeCount == 0) return;
+            uint256 perStrategy = balance / activeCount;
+            for (uint i = 0; i < len; i++) {
+                address s = strategyList[i];
+                if (strategies[s] && strategyActive[s] && perStrategy > 0) {
+                    underlying.safeTransfer(s, perStrategy);
                 }
             }
         }
@@ -79,6 +98,7 @@ contract ProYieldVault is BaseStrategy {
 
     function harvestStrategy(address strategy) external onlyOwner nonReentrant {
         require(strategies[strategy], "ProYieldVault: not a strategy");
+        require(strategyActive[strategy], "ProYieldVault: strategy paused");
         require(strategy != address(0), "ProYieldVault: zero strategy");
         BaseStrategy(strategy).harvest();
     }

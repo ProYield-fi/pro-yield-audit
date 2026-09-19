@@ -2,3 +2,7 @@ node_modules/
 reports/
 cache/
 tsconfig.json
+mcore_*/
+crytic-export/
+artifacts/build-info/
+scripts/mint_repro*.js

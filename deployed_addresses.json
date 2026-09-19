@@ -1,0 +1,8 @@
+{
+  "deployed_utc": "2026-09-19T23:10:45.947Z",
+  "chain_id": 998,
+  "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "mock_usdc": "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25",
+  "pro_yield_vault": "0x712A6AF97A6d499874161167Cb03604F7d74FfBE",
+  "delta_neutral": "0xbbE62EA1B63baADB39dA16DA8E57FA0465653dd5"
+}
