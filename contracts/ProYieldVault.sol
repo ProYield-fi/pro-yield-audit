@@ -29,7 +29,7 @@ contract ProYieldVault is BaseStrategy {
         performanceFee = _fee;
     }
 
-    function emergencyWithdraw() external onlyOwner {
+    function emergencyWithdraw() external onlyOwner nonReentrant {
         uint256 balance = underlying.balanceOf(address(this));
         underlying.transfer(msg.sender, balance);
     }

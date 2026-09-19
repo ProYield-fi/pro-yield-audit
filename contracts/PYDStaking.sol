@@ -3,8 +3,9 @@ pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract PYDStaking is Ownable {
+contract PYDStaking is Ownable, ReentrancyGuard {
     IERC20 public pyd;
     mapping(address => uint256) public stakeAmount;
     uint256 public totalSupply;
@@ -14,13 +15,13 @@ contract PYDStaking is Ownable {
         pyd = IERC20(_pyd);
     }
 
-    function stake(uint256 amount) external {
-        pyd.transferFrom(msg.sender, address(this), amount);
+    function stake(uint256 amount) external nonReentrant {
         stakeAmount[msg.sender] += amount;
         totalSupply += amount;
+        pyd.transferFrom(msg.sender, address(this), amount);
     }
 
-    function getReward() external {
+    function getReward() external nonReentrant {
         uint256 reward = _calculateReward(msg.sender);
         pyd.transfer(msg.sender, reward);
     }

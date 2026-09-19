@@ -23,14 +23,17 @@ contract PendleStrategy is BaseStrategy {
         pendleMarket = _market;
     }
 
-    function harvest() external override {
+    function harvest() external override nonReentrant {
         if (block.timestamp > maturity) {
             _claimRewards();
         }
     }
 
-    function _claimRewards() internal {
-        (bool success, ) = pendleMarket.call{value: address(this).balance}("");
-        require(success);
+    function _claimRewards() internal nonReentrant {
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            (bool success, ) = pendleMarket.call{value: balance}("");
+            require(success, "Pendle: transfer failed");
+        }
     }
 }

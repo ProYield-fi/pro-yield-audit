@@ -17,8 +17,10 @@ contract SkyStrategy is BaseStrategy {
         debtRatio = 5000;
     }
 
-    function harvest() external override {
-        (bool success, ) = msg.sender.call{value: address(this).balance}("");
-        totalDebt += address(this).balance;
+    function harvest() external override nonReentrant {
+        uint256 balance = address(this).balance;
+        totalDebt += balance;
+        (bool success, ) = msg.sender.call{value: balance}("");
+        require(success, "Sky: transfer failed");
     }
 }

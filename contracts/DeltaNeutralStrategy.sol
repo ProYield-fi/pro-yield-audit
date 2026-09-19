@@ -16,22 +16,22 @@ contract DeltaNeutralStrategy is BaseStrategy {
         shortPosition = _short;
     }
 
-    function setShortPosition(address _short) external onlyOwner {
+    function setShortPosition(address _short) external onlyOwner nonReentrant {
         shortPosition = _short;
     }
 
-    function openPosition(uint256 size) external {
+    function openPosition(uint256 size) external onlyOwner nonReentrant {
         positions[msg.sender] = size;
         delta += size;
     }
 
-    function closePosition() external {
+    function closePosition() external onlyOwner nonReentrant {
         uint256 size = positions[msg.sender];
         delta -= size;
         positions[msg.sender] = 0;
     }
 
-    function updateFunding() external {
+    function updateFunding() external onlyOwner nonReentrant {
         fundingRate = _fetchFundingRate();
         lastUpdate = block.timestamp;
     }
@@ -40,8 +40,10 @@ contract DeltaNeutralStrategy is BaseStrategy {
         return 0;
     }
 
-    function harvest() external override {
-        (bool success, ) = shortPosition.call{value: address(this).balance}("");
-        totalDebt += address(this).balance;
+    function harvest() external override nonReentrant {
+        uint256 balance = address(this).balance;
+        totalDebt += balance;
+        (bool success, ) = shortPosition.call{value: balance}("");
+        require(success, "DeltaNeutral: transfer failed");
     }
 }

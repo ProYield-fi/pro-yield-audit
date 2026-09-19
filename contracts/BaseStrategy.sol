@@ -22,22 +22,22 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
         isActive = true;
     }
 
-    function deposit(uint256 amount) external virtual {
-        underlying.transferFrom(msg.sender, address(this), amount);
+    function deposit(uint256 amount) external virtual nonReentrant {
         shares[msg.sender] += amount;
+        underlying.transferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) external virtual {
+    function withdraw(uint256 amount) external virtual nonReentrant {
         uint256 shareAmount = amount;
         shares[msg.sender] -= shareAmount;
         underlying.transfer(msg.sender, shareAmount);
         emit Withdraw(msg.sender, amount);
     }
 
-    function harvest() external virtual {}
+    function harvest() external virtual nonReentrant {}
 
-    function setKeeper(address _keeper) external onlyOwner {
+    function setKeeper(address _keeper) external onlyOwner nonReentrant {
         keeper = _keeper;
     }
 }

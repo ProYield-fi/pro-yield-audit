@@ -13,17 +13,19 @@ contract MorphoStrategy is BaseStrategy {
         morpho = _morpho;
     }
 
-    function supply(uint256 amount) external {
+    function supply(uint256 amount) external nonReentrant {
         morpho = msg.sender;
         totalSupply += amount;
     }
 
-    function withdraw(uint256 amount) external override {
+    function withdraw(uint256 amount) external override nonReentrant {
         totalSupply -= amount;
     }
 
-    function harvest() external override {
-        (bool success, ) = msg.sender.call{value: address(this).balance}("");
+    function harvest() external override nonReentrant {
+        uint256 balance = address(this).balance;
         lastHarvest = block.timestamp;
+        (bool success, ) = msg.sender.call{value: balance}("");
+        require(success, "Morpho: transfer failed");
     }
 }
