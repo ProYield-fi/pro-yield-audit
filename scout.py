@@ -86,7 +86,7 @@ def hl_funding():
         return {"majors_funding_apr": None, "error": f"UNAVAILABLE: {e}",
                 "source": "api.hyperliquid.xyz/info", "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
-def blend(pools):
+def blend(pools, hf_funding=None):
     """Target blend — mirrors deployment_engine.py weights EXACTLY:
        CORE 35% / FIXED 10% / SATELLITE 40% / DELTA_NEUTRAL 15% (paper) / TANGIBLE 0%.
        Any weight change MUST be applied in both files (they are verified equal by
@@ -105,9 +105,11 @@ def blend(pools):
     core_apy = sum(p["apy_base"] * p["tvl_usd"] for p in core_pick) / core_w if core_pick else None
     fixed_apy = fixed_pick[0]["apy_base"] if fixed_pick else None
     sat_apy = sum(p["apy_base"] for p in sat_pick) / len(sat_pick) if sat_pick else None
-    # DELTA_NEUTRAL: Hyperliquid majors funding — conservative floor of BTC/ETH mix
-    # (real per-asset values live in snap["hyperliquid_funding"]; 5.85% floor used here)
-    delta_apy = 5.85
+    # DELTA_NEUTRAL: live HL majors funding (hourly-paid, scout annualizes ×24×365).
+    # 5.85% floor only when funding data UNAVAILABLE.
+    majors = (hf_funding or {}).get("majors_funding_apr", {}) or {}
+    vals = [v for v in majors.values() if isinstance(v, (int, float))]
+    delta_apy = round(sum(vals) / len(vals), 2) if vals else 5.85
     parts = []
     if core_apy is not None: parts.append(("CORE", 0.35, core_apy))
     if fixed_apy is not None: parts.append(("FIXED", 0.10, fixed_apy))
@@ -128,7 +130,7 @@ def main():
         "polymarket_rewards": pm_rewards(),
         "hyperliquid_funding": hl_funding(),
     }
-    snap["blend"] = blend(snap["pools"])
+    snap["blend"] = blend(snap["pools"], snap.get("hyperliquid_funding", {}))
     path = os.path.join(DATA, "snapshot.json")
     with open(path, "w") as f:
         json.dump(snap, f, indent=1)

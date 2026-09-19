@@ -24,7 +24,7 @@ RISK_TIERS = {
     "balanced": {
         "label": "Balanced",
         "description": "Optimal risk/reward. 35% core, 10% fixed, 35% satellite. Current default.",
-        "weights": {"core": 0.35, "fixed": 0.10, "satellite": 0.35, "delta_neutral": 0.15, "tangible": 0.05, "monitor": 0.05},
+        "weights": {"core": 0.35, "fixed": 0.10, "satellite": 0.35, "delta_neutral": 0.15, "tangible": 0.05, "monitor": 0.0},
         "safety_min": 3,
         "satellite_max_apy": 0.15,
         "risk_level": "MEDIUM",
@@ -33,7 +33,7 @@ RISK_TIERS = {
     "aggressive": {
         "label": "Aggressive",
         "description": "Higher yield focus. 25% core, 10% fixed, 45% satellite. AI-managed.",
-        "weights": {"core": 0.25, "fixed": 0.10, "satellite": 0.45, "delta_neutral": 0.15, "tangible": 0.05, "monitor": 0.05},
+        "weights": {"core": 0.25, "fixed": 0.10, "satellite": 0.45, "delta_neutral": 0.15, "tangible": 0.05, "monitor": 0.0},
         "safety_min": 2,
         "satellite_max_apy": 0.18,
         "risk_level": "HIGH",
@@ -42,7 +42,7 @@ RISK_TIERS = {
     "maximum": {
         "label": "Maximum",
         "description": "Highest yield. 15% core, 5% fixed, 55% satellite, 20% delta-neutral. AI-managed.",
-        "weights": {"core": 0.15, "fixed": 0.05, "satellite": 0.55, "delta_neutral": 0.20, "tangible": 0.05, "monitor": 0.05},
+        "weights": {"core": 0.15, "fixed": 0.05, "satellite": 0.55, "delta_neutral": 0.20, "tangible": 0.05, "monitor": 0.0},
         "safety_min": 1,
         "satellite_max_apy": 0.20,
         "risk_level": "VERY_HIGH",

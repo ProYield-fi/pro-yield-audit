@@ -191,6 +191,12 @@ def main():
         return sum(p["apy_base"] * p["tvl_usd"] for p in lst) / w
     
     core_apy = calc_apy(core_pick)
+
+    # delta_apy from snapshot (single source of truth) — live HL funding avg
+    hf = standard_data.get("hyperliquid_funding", {}) if isinstance(standard_data, dict) else {}
+    majors = hf.get("majors_funding_apr", {}) if hf else {}
+    vals = [v for v in majors.values() if isinstance(v, (int, float))]
+    delta_apy = round(sum(vals) / len(vals), 2) if vals else float("nan")  # UNAVAILABLE if no funding data
     fixed_apy = fixed_pick[0]["apy_base"] if fixed_pick else 0
     sat_apy = sum(p["apy_base"] for p in sat_pick) / len(sat_pick) if sat_pick else 0
     # Blend calculation — use snapshot from scout.py when available (single source of truth)
@@ -203,7 +209,7 @@ def main():
     else:
         # Updated allocation (Sep 18): removed delta-neutral (5.85% dragged blend down)
         # Shifted to satellite/fixed for higher yield. No delta drag.
-        blend = 0.20 * core_apy + 0.30 * fixed_apy + 0.50 * sat_apy if (core_apy or fixed_apy or sat_apy) else float("nan")  # Optimal: 20% CORE / 30% FIXED / 50% SATELLITE
+        blend = 0.20 * core_apy + 0.15 * delta_apy + 0.30 * fixed_apy + 0.35 * sat_apy if (core_apy or delta_apy or fixed_apy or sat_apy) else float("nan")  # Optimal: 20% CORE / 15% DELTA / 30% FIXED / 35% SATELLITE
     
     # Identify dragging assets (below blended rate)
     dragging = []
