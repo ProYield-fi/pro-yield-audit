@@ -133,9 +133,11 @@ contract ProYieldVault is BaseStrategy {
         require(amount > 0, "ProYieldVault: zero amount");
         require(amount <= shares[msg.sender], "ProYieldVault: exceeds shares");
         require(amount <= totalAssets(), "ProYieldVault: exceeds assets");
-        _recallShortfall(amount);
+        // Effects BEFORE interactions (slither reentrancy-no-eth): burn shares
+        // and shrink liabilities before any external recall call.
         shares[msg.sender] -= amount;
         _totalAssets -= amount;
+        _recallShortfall(amount);
         underlying.safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, amount);
     }
