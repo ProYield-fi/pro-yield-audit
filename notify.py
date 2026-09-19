@@ -28,14 +28,30 @@ NOTIFY_AT_OR_ABOVE = 2  # MEDIUM+
 
 
 def creds():
+    """Telegram creds: env vars first, then ~/.hermes/secrets/telegram.json,
+    then the Hermes gateway's own ~/.hermes/.env (TELEGRAM_BOT_TOKEN +
+    TELEGRAM_HOME_CHANNEL) — reuses the user's existing bot, no double storage."""
     tok = os.environ.get("TELEGRAM_BOT_TOKEN")
-    chat = os.environ.get("TELEGRAM_CHAT_ID")
+    chat = os.environ.get("TELEGRAM_CHAT_ID") or os.environ.get("TELEGRAM_HOME_CHANNEL")
     if tok and chat:
         return tok, chat
     if os.path.exists(SECRETS):
         with open(SECRETS) as f:
             d = json.load(f)
         return d.get("bot_token"), d.get("chat_id")
+    hermes_env = os.path.expanduser("~/.hermes/.env")
+    if os.path.exists(hermes_env):
+        vals = {}
+        with open(hermes_env) as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    vals[k.strip()] = v.strip()
+        tok = vals.get("TELEGRAM_BOT_TOKEN")
+        chat = vals.get("TELEGRAM_HOME_CHANNEL")
+        if tok and chat:
+            return tok, chat
     return None, None
 
 
