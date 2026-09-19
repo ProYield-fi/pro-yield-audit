@@ -25,6 +25,13 @@ contract ProYieldVault is BaseStrategy {
         strategies[_strategy] = true;
     }
 
+    function deposit(uint256 amount) external override nonReentrant {
+        shares[msg.sender] += amount;
+        totalAssets += amount;
+        underlying.transferFrom(msg.sender, address(this), amount);
+        emit Deposit(msg.sender, amount);
+    }
+
     function setPerformanceFee(uint256 _fee) external onlyOwner {
         performanceFee = _fee;
     }
