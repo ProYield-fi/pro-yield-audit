@@ -103,18 +103,26 @@ WARNING_DETECTORS = {
 
 def run_slither() -> dict[str, Any]:
     """Execute Slither on the contracts directory and return parsed results."""
+    if not CONTRACTS_DIR.exists():
+        return {"error": f"Contracts directory not found: {CONTRACTS_DIR}"}
+
     print(f"[*] Running Slither on {CONTRACTS_DIR} ...")
 
-    cmd = [
-        SLITHERSOL,
-        str(CONTRACTS_DIR),
-        "--solc-remaps", SOLC_REMAPS,
-        "--json", "-",  # output to stdout as JSON
-    ]
+    tmpfile = str(REPORTS_DIR / "_slither_tmp.json")
+    contracts_abs = str(CONTRACTS_DIR.resolve())
+    os.makedirs(str(REPORTS_DIR), exist_ok=True)
+
+    # Use shell=True so bash handles the quoting for --solc-remaps correctly
+    cmd = (
+        f'slither {contracts_abs} '
+        f'--solc-remaps "@openzeppelin/contracts=node_modules/@openzeppelin/contracts" '
+        f'--json {tmpfile}'
+    )
 
     try:
         result = subprocess.run(
             cmd,
+            shell=True,
             capture_output=True,
             text=True,
             timeout=120,
@@ -125,13 +133,19 @@ def run_slither() -> dict[str, Any]:
     except subprocess.TimeoutExpired:
         return {"error": "Slither timed out after 120s"}
 
-    if result.returncode not in (0, 255):  # Slither returns 255 on findings
-        return {"error": f"Slither failed: {result.stderr[:500]}"}
-
+    # Read JSON from temp file
     try:
-        data = json.loads(result.stdout)
+        with open(tmpfile) as f:
+            data = json.load(f)
+        os.unlink(tmpfile)
+    except FileNotFoundError:
+        if result.stderr and ("Error" in result.stderr or "Invalid" in result.stderr):
+            return {"error": f"Solc compilation error (check imports): {result.stderr[:400]}"}
+        return {"error": f"Slither produced no output. stderr: {result.stderr[:300]}"}
     except json.JSONDecodeError as e:
-        return {"error": f"Failed to parse Slither JSON: {e}\nOutput: {result.stdout[:200]}"}
+        if os.path.exists(tmpfile):
+            os.unlink(tmpfile)
+        return {"error": f"Failed to parse Slither JSON: {e}\nstderr: {result.stderr[:300]}"}
 
     return parse_slither_results(data)
 
