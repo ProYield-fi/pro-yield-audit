@@ -9,6 +9,7 @@ contract ProYieldVault is BaseStrategy {
     using SafeERC20 for IERC20;
     uint256 public performanceFee;
     uint256 public immutable withdrawalFee;
+    uint256 public constant RESERVE_BPS = 1000; // 10% of assets kept liquid for withdrawals
     address public immutable feeDistributor;
     mapping(address => bool) public strategies;
     mapping(address => bool) public strategyActive;   // per-strategy circuit breaker
@@ -65,30 +66,78 @@ contract ProYieldVault is BaseStrategy {
 
     function emergencyWithdraw() external onlyOwner nonReentrant {
         uint256 balance = underlying.balanceOf(address(this));
+        if (balance == 0) return;
         underlying.safeTransfer(msg.sender, balance);
+        // Keep liabilities in sync: assets leaving the vault must shrink
+        // totalAssets or depositor claims exceed real backing (T-012 follow-up).
+        _totalAssets -= balance;
     }
 
     function allocate() external onlyOwner nonReentrant {
         uint256 balance = underlying.balanceOf(address(this));
-        uint256 len = strategyList.length;   // cache length (slither: cache-array-length)
-        if (balance > 0 && len > 0) {
+        // Keep a liquid reserve so withdrawals never depend on strategy recall.
+        uint256 reserve = (_totalAssets * RESERVE_BPS) / 10000;
+        uint256 deployable = balance > reserve ? balance - reserve : 0;
+        if (deployable > 0 && strategyList.length > 0) {
             // Split only across ACTIVE strategies; inactive ones get nothing.
             uint256 activeCount = 0;
-            for (uint i = 0; i < len; i++) {
-                address s = strategyList[i];
-                if (strategies[s] && strategyActive[s]) {
+            for (uint i = 0; i < strategyList.length; i++) {
+                if (strategies[strategyList[i]] && strategyActive[strategyList[i]]) {
                     activeCount++;
                 }
             }
             if (activeCount == 0) return;
-            uint256 perStrategy = balance / activeCount;
-            for (uint i = 0; i < len; i++) {
-                address s = strategyList[i];
-                if (strategies[s] && strategyActive[s] && perStrategy > 0) {
-                    underlying.safeTransfer(s, perStrategy);
+            uint256 perStrategy = deployable / activeCount;
+            for (uint i = 0; i < strategyList.length; i++) {
+                address strategy = strategyList[i];
+                if (strategies[strategy] && strategyActive[strategy] && perStrategy > 0) {
+                    underlying.safeTransfer(strategy, perStrategy);
                 }
             }
         }
+    }
+
+    /// @notice Pull funds back from strategies until `needed` is idle.
+    /// Splits the shortfall across active strategies; recall is capped at each
+    /// strategy's balance, so a shortfall larger than total recalled reverts
+    /// downstream (correct behavior — cannot pay out assets that don't exist).
+    function _recallShortfall(uint256 needed) internal {
+        uint256 idle = underlying.balanceOf(address(this));
+        if (idle >= needed) return;
+        uint256 missing = needed - idle;
+        uint256 activeCount = 0;
+        for (uint i = 0; i < strategyList.length; i++) {
+            if (strategies[strategyList[i]] && strategyActive[strategyList[i]]) {
+                activeCount++;
+            }
+        }
+        if (activeCount == 0) return; // withdraw will revert on insufficient idle
+        uint256 perStrategy = (missing / activeCount) + 1; // round up
+        for (uint i = 0; i < strategyList.length && missing > 0; i++) {
+            address strategy = strategyList[i];
+            if (strategies[strategy] && strategyActive[strategy]) {
+                BaseStrategy(strategy).recall(perStrategy);
+                uint256 got = underlying.balanceOf(address(this)) - idle;
+                idle += got;
+                missing = got >= missing ? 0 : missing - got;
+            }
+        }
+    }
+
+    /// @notice User withdrawal. Shares are 1:1 with deposited USDC.
+    /// Pays from idle; recalls from strategies to cover any shortfall.
+    /// Overrides BaseStrategy.withdraw, whose proportional share math
+    /// under-burned shares on partial withdrawals (drain vector) and which
+    /// could not honor withdrawals once allocate() had swept idle funds (T-012).
+    function withdraw(uint256 amount) external override nonReentrant {
+        require(amount > 0, "ProYieldVault: zero amount");
+        require(amount <= shares[msg.sender], "ProYieldVault: exceeds shares");
+        require(amount <= totalAssets(), "ProYieldVault: exceeds assets");
+        _recallShortfall(amount);
+        shares[msg.sender] -= amount;
+        _totalAssets -= amount;
+        underlying.safeTransfer(msg.sender, amount);
+        emit Withdraw(msg.sender, amount);
     }
 
     function harvest() external override nonReentrant {

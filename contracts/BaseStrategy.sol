@@ -11,6 +11,7 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
 
     IERC20 public immutable underlying;
     address public keeper;
+    address public vault; // authorized to recall funds for user withdrawals
     // slither-disable-next-line constable-states
     uint256 public totalDebt;
     bool public isActive;
@@ -79,6 +80,21 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
         require(keeper_ != address(0), "BaseStrategy: zero keeper");
         keeper = keeper_;
         emit KeeperSet(keeper_);
+    }
+
+    function setVault(address vault_) external onlyOwner nonReentrant {
+        require(vault_ != address(0), "BaseStrategy: zero vault");
+        vault = vault_;
+    }
+
+    /// @notice Return funds to the vault so it can honor user withdrawals.
+    /// Callable ONLY by the vault address (set via setVault). Capped at balance.
+    function recall(uint256 amount) external nonReentrant {
+        require(msg.sender == vault, "BaseStrategy: not vault");
+        uint256 bal = underlying.balanceOf(address(this));
+        if (amount > bal) amount = bal;
+        if (amount == 0) return;
+        underlying.safeTransfer(vault, amount);
     }
 
     function setActive(bool active) external onlyOwner nonReentrant {
