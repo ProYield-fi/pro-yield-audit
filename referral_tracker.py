@@ -261,3 +261,86 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# ── MoonPay Webhook Integration ──────────────────────────────
+# Processes MoonPay payment webhook events to track on-ramp deposits
+# for the ProYield referral system.
+
+MOONPAY_SECRET_KEY = "***"  # From env: MOONPAY_SECRET_KEY
+MOONPAY_WEBHOOK_SECRET = "***"  # From env: MOONPAY_WEBHOOK_SECRET
+
+def process_moonpay_webhook(event: dict, signature: str = None) -> dict:
+    """Verify and process a MoonPay webhook event.
+    
+    Args:
+        event: MoonPay webhook event payload
+        signature: HMAC signature from X-MoonPay-Signature header
+    
+    Returns:
+        dict with status and processed data
+    """
+    # Verify signature
+    if signature and MOONPAY_WEBHOOK_SECRET:
+        import hmac, hashlib
+        expected = hmac.new(
+            MOONPAY_WEBHOOK_SECRET.encode(),
+            json.dumps(event).encode(),
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected, signature):
+            return {"status": "error", "message": "Invalid webhook signature"}
+    
+    event_type = event.get("event_type", "")
+    
+    if event_type == "payment.completed":
+        # Process completed payment → deposit to vault
+        payment_data = event.get("data", {})
+        return {
+            "status": "processed",
+            "type": "deposit",
+            "amount": payment_data.get("amount", 0),
+            "currency": payment_data.get("currency", "USDC"),
+            "wallet": payment_data.get("wallet", ""),
+            "transaction_id": payment_data.get("transaction_id", ""),
+        }
+    elif event_type == "payment.failed":
+        return {"status": "failed", "reason": event.get("data", {}).get("failure_reason", "")}
+    elif event_type == "payment.refunded":
+        return {"status": "refunded", "amount": event.get("data", {}).get("amount", 0)}
+    
+    return {"status": "ignored", "event_type": event_type}
+
+
+def moonpay_onramp_url(amount: int, currency: str = "USDC", wallet: str = None) -> str:
+    """Generate a MoonPay buy URL for the ProYield onramp.
+    
+    Args:
+        amount: Amount in cents (e.g., 10000 = $100)
+        currency: Target currency (default USDC)
+        wallet: Destination wallet address
+    
+    Returns:
+        MoonPay buy URL with HMAC signature
+    """
+    if not wallet:
+        return {"status": "error", "message": "wallet required"}
+    
+    base_url = "https://buy.moonpay.com"
+    params = f"?amount={amount}&currency_code={currency}&wallet_address={wallet}"
+    
+    # HMAC sign the URL
+    if MOONPAY_SECRET_KEY:
+        import hmac, hashlib, urllib.parse
+        query_string = urllib.parse.urlencode({
+            "amount": amount,
+            "currency_code": currency,
+            "wallet_address": wallet
+        })
+        signature = hmac.new(
+            MOONPAY_SECRET_KEY.encode(),
+            query_string.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        return f"{base_url}?{query_string}&signature={signature}"
+    
+    return f"{base_url}?amount={amount}&currency_code={currency}&wallet_address={wallet}"
