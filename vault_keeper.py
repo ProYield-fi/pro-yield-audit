@@ -12,7 +12,7 @@ Every action prints tx hash + resulting on-chain state. Never mainnet.
 """
 import json, os, subprocess, sys, time, urllib.request
 
-VAULT = "0x73278b87e51595CC5F41B3132B595a524526Db76"
+VAULT = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
 DELTA = "0x87ddE2486E6674A8A918c20747Fd48d790e26Bbb"
 KEYFILE = os.path.expanduser("~/.hermes/vault_keys/hyperevm_testnet.deployer")
 
