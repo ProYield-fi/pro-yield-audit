@@ -964,5 +964,61 @@
     "direction": "DOWN",
     "severity": "HIGH",
     "blend_at_snapshot": 7.92
+  },
+  {
+    "timestamp": "2026-09-19T07:45:02.243536+00:00",
+    "category": "fixed",
+    "project": "pendle-v2",
+    "symbol": "USDAI",
+    "chain": "Arbitrum",
+    "snapshot_apy": 9.7973,
+    "live_apy": 2.1551,
+    "delta_bps": -764.2,
+    "tvl": 50321609,
+    "direction": "DOWN",
+    "severity": "HIGH",
+    "blend_at_snapshot": 7.92
+  },
+  {
+    "timestamp": "2026-09-19T07:50:02.462569+00:00",
+    "category": "fixed",
+    "project": "pendle-v2",
+    "symbol": "USDAI",
+    "chain": "Arbitrum",
+    "snapshot_apy": 9.7973,
+    "live_apy": 2.1551,
+    "delta_bps": -764.2,
+    "tvl": 50321609,
+    "direction": "DOWN",
+    "severity": "HIGH",
+    "blend_at_snapshot": 7.92
+  },
+  {
+    "timestamp": "2026-09-19T07:55:02.032730+00:00",
+    "category": "fixed",
+    "project": "pendle-v2",
+    "symbol": "USDAI",
+    "chain": "Arbitrum",
+    "snapshot_apy": 9.7973,
+    "live_apy": 2.1551,
+    "delta_bps": -764.2,
+    "tvl": 50321609,
+    "direction": "DOWN",
+    "severity": "HIGH",
+    "blend_at_snapshot": 7.92
+  },
+  {
+    "timestamp": "2026-09-19T08:00:02.352134+00:00",
+    "category": "fixed",
+    "project": "pendle-v2",
+    "symbol": "USDAI",
+    "chain": "Arbitrum",
+    "snapshot_apy": 9.7973,
+    "live_apy": 2.1551,
+    "delta_bps": -764.2,
+    "tvl": 50321609,
+    "direction": "DOWN",
+    "severity": "HIGH",
+    "blend_at_snapshot": 7.92
   }
 ]

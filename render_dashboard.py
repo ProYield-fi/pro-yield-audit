@@ -186,7 +186,7 @@ def main():
     sat_pick = sorted([p for p in strategy_pools if p.get("tag") == "SATELLITE" and (p.get("safety") or 0) >= 2], key=lambda p: -p["apy_base"])[:2]
     
     def calc_apy(lst):
-        if not lst: return 0
+        if not lst: return float("nan")  # UNAVAILABLE — no pools found
         w = sum(p["tvl_usd"] for p in lst) or 1
         return sum(p["apy_base"] * p["tvl_usd"] for p in lst) / w
     
@@ -194,7 +194,7 @@ def main():
     fixed_apy = fixed_pick[0]["apy_base"] if fixed_pick else 0
     sat_apy = sum(p["apy_base"] for p in sat_pick) / len(sat_pick) if sat_pick else 0
     # Blend calculation — use snapshot from scout.py when available (single source of truth)
-    if snapshot_blend is not None:
+    if snapshot_blend is not None and snapshot_blend > 0:
         blend = snapshot_blend
         # Still compute components for display, but from snapshot picks
         core_apy = standard_data["blend"]["allocation"].get("CORE", {}).get("apy", 0) or core_apy
@@ -203,7 +203,7 @@ def main():
     else:
         # Updated allocation (Sep 18): removed delta-neutral (5.85% dragged blend down)
         # Shifted to satellite/fixed for higher yield. No delta drag.
-        blend = 0.25 * core_apy + 0.20 * fixed_apy + 0.55 * sat_apy if (core_apy or fixed_apy or sat_apy) else 0
+        blend = 0.20 * core_apy + 0.30 * fixed_apy + 0.50 * sat_apy if (core_apy or fixed_apy or sat_apy) else float("nan")  # Optimal: 20% CORE / 30% FIXED / 50% SATELLITE
     
     # Identify dragging assets (below blended rate)
     dragging = []
