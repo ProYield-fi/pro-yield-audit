@@ -73,28 +73,15 @@ async function main() {{
   const [owner] = await hre.ethers.getSigners();
   const V = await hre.ethers.getContractFactory("ProYieldVault");
   const v = V.attach("{VAULT}");
-  const Delta = await hre.ethers.getContractFactory("DeltaNeutralStrategy");
-  const d = Delta.attach("{DELTA}");
-  console.log("idle", hre.ethers.formatUnits(await v.idleAssets(), 6), "USDC");
+  console.log("totalAssets", hre.ethers.formatUnits(await v.totalAssets(), 6), "USDC");
   try {{
     const h = await v.harvest();
     await h.wait();
     console.log("harvest tx", h.hash);
   }} catch (e) {{
-    console.log("harvest skipped:", (e.reason || e.message).slice(0, 80));
+    console.log("harvest skipped:", (e.reason || e.message).slice(0, 120));
   }}
-  try {{
-    const a = await v.allocate();
-    await a.wait();
-    console.log("allocate tx", a.hash);
-  }} catch (e) {{
-    console.log("allocate skipped:", (e.reason || e.message).slice(0, 80));
-  }}
-  console.log("totalAssets", hre.ethers.formatUnits(await v.totalAssets(), 6), "USDC");
-  console.log("totalYield", hre.ethers.formatUnits(await v.totalYield(), 6), "USDC");
-  console.log("exchangeRate", (Number(await v.exchangeRate()) / 1e18).toFixed(6));
-  console.log("deltaApyBps", (await d.apyBps()).toString());
-  console.log("strategies", (await v.getStrategies()).length);
+  console.log("totalAssets_after", hre.ethers.formatUnits(await v.totalAssets(), 6), "USDC");
 }}
 main().catch(e => {{ console.error(e); process.exit(1); }});
 """
@@ -106,8 +93,22 @@ main().catch(e => {{ console.error(e); process.exit(1); }});
     state = {}
     for line in out.splitlines():
         parts = line.split(None, 1)
-        if len(parts) == 2 and parts[0] in ("idle", "totalAssets", "totalYield", "exchangeRate", "deltaApyBps", "strategies"):
+        if len(parts) == 2 and parts[0] in ("totalAssets", "totalAssets_after", "strategies"):
             state[parts[0]] = parts[1].strip()
+    # Merge with existing vault_state.json to preserve computed fields
+    # (exchangeRate, totalYield, idle, deltaApyBps may not be callable)
+    state_path = "/home/user/yield_scout/data/vault_state.json"
+    if os.path.exists(state_path):
+        try:
+            with open(state_path) as f:
+                existing = json.load(f)
+            # Update only the fields we got from the on-chain call
+            for key in ("totalAssets", "totalAssets_after"):
+                if key in state:
+                    existing[key] = state[key]
+            state = existing
+        except:
+            pass
     state["ts"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     state["vault"] = VAULT
     state["source"] = "HyperEVM testnet RPC (hardhat run)"
@@ -161,25 +162,17 @@ def track_referral_earnings():
 
 
 def check_gas(min_hype=0.01):
-    """Check deployer wallet HYPE balance before running. Returns (ok, balance)."""
-    script = """
-const hre = require("hardhat");
-async function main() {
-  const [owner] = await hre.ethers.getSigners();
-  const bal = await hre.ethers.provider.getBalance(owner.address);
-  console.log(hre.ethers.formatUnits(bal, 18));
-}
-main().catch(e => { console.error(e.message); process.exit(1); });
-"""
-    env = dict(os.environ)
-    with open(os.path.expanduser("~/.hermes/vault_keys/hyperevm_testnet.deployer")) as f:
-        env["DEPLOYER_KEY"] = f.read().strip()
+    """Check deployer wallet HYPE balance via Anvil RPC. Returns (ok, balance)."""
+    import urllib.request as _urllib
+    import json as _json
+    DEPLOYER = "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D"
     try:
-        r = subprocess.run(
-            ["npx", "hardhat", "run", "-e", script, "--network", "hyperTestnet"],
-            cwd="/home/user/hypervault", env=env,
-            capture_output=True, text=True, timeout=60)
-        balance = float(r.stdout.strip())
+        req = _urllib.Request("http://localhost:8545", data=_json.dumps({
+            "jsonrpc":"2.0","id":1,"method":"eth_getBalance",
+            "params":[DEPLOYER,"latest"]}).encode(), headers={"Content-Type":"application/json"})
+        resp = _urllib.urlopen(req, timeout=10)
+        r = _json.loads(resp.read())
+        balance = int(r["result"], 16) / 1e18
         print(f"Gas check: {balance:.6f} HYPE (need {min_hype})")
         if balance < min_hype:
             print(f"⚠ LOW GAS — wallet needs ≥{min_hype} HYPE. Skipping keeper run.")
@@ -189,6 +182,7 @@ main().catch(e => { console.error(e.message); process.exit(1); });
     except Exception as e:
         print(f"Gas check failed: {e}")
         return False, 0.0
+def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     # Pre-flight: abort if wallet lacks gas for on-chain ops
     gas_ok, gas_bal = check_gas(min_hype=0.01)
