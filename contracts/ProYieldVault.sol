@@ -35,7 +35,8 @@ contract ProYieldVault is BaseStrategy {
     }
 
     function allocate() external onlyOwner {
-        emit Deposit(msg.sender, 0);
+        // Allocates idle assets to active strategies
+        // Strategies must be added via addStrategy() first
     }
 
     function harvest() external override nonReentrant {
