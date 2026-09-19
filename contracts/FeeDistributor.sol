@@ -3,18 +3,17 @@ pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract FeeDistributor is ReentrancyGuard {
+contract FeeDistributor is ReentrancyGuard, Ownable {
     IERC20 public pyd;
     address[] public strategies;
     mapping(address => uint256) public pendingFees;
     mapping(address => uint256) public claimed;
     uint256 public totalFees;
-    address public owner;
     
-    constructor(address _pyd) {
+    constructor(address _pyd) Ownable(msg.sender) {
         pyd = IERC20(_pyd);
-        owner = msg.sender;
     }
 
     function addStrategy(address _strategy) external onlyOwner nonReentrant {
@@ -23,12 +22,16 @@ contract FeeDistributor is ReentrancyGuard {
 
     function distribute() external onlyOwner nonReentrant {
         for (uint i = 0; i < strategies.length; i++) {
-            uint256 fee = pendingFees[strategies[i]];
-            pendingFees[strategies[i]] = 0;
-            claimed[strategies[i]] += fee;
-            totalFees -= fee;
-            pyd.transfer(strategies[i], fee);
+            _distributeStrategy(strategies[i]);
         }
+    }
+
+    function _distributeStrategy(address strategy) internal {
+        uint256 fee = pendingFees[strategy];
+        claimed[strategy] += fee;
+        totalFees -= fee;
+        pendingFees[strategy] = 0;
+        pyd.transfer(strategy, fee);
     }
 
     function withdrawFees() external nonReentrant {
