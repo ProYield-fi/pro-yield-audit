@@ -12,8 +12,8 @@ Every action prints tx hash + resulting on-chain state. Never mainnet.
 """
 import json, os, subprocess, sys, time, urllib.request
 
-VAULT = "0x42237e98aD8918401F898cb453ef714B64e5B3Bf"
-DELTA = "0xB59226930edeF5bAFA8E802B03AEd03feA726DE2"
+VAULT = "0x81EA368Da3754df1aAd8712907b00748b737EE67"
+DELTA = "0x73152995E2da9e501aedeB19De0C832E46948efF"
 KEYFILE = os.path.expanduser("~/.hermes/vault_keys/hyperevm_testnet.deployer")
 
 def hl_funding():
@@ -39,7 +39,7 @@ def run_node(script_body, label):
     with open(KEYFILE) as f:
         env["DEPLOYER_KEY"] = f.read().strip()
     r = subprocess.run(
-        ["npx", "hardhat", "run", path, "--network", "hyperTestnet"],
+        ["node", "/home/user/hypervault/node_modules/.bin/hardhat", "run", path, "--network", "hyperTestnet"],
         cwd="/home/user/hypervault", env=env,
         capture_output=True, text=True, timeout=180)
     print(f"[{label}]")
@@ -81,6 +81,13 @@ async function main() {{
   }} catch (e) {{
     console.log("harvest skipped:", (e.reason || e.message).slice(0, 120));
   }}
+  try {{
+    const a = await v.allocate();
+    await a.wait();
+    console.log("allocate tx", a.hash);
+  }} catch (e) {{
+    console.log("allocate skipped:", (e.reason || e.message).slice(0, 120));
+  }}
   console.log("totalAssets_after", hre.ethers.formatUnits(await v.totalAssets(), 6), "USDC");
 }}
 main().catch(e => {{ console.error(e); process.exit(1); }});
@@ -94,7 +101,8 @@ main().catch(e => {{ console.error(e); process.exit(1); }});
     for line in out.splitlines():
         parts = line.split(None, 1)
         if len(parts) == 2 and parts[0] in ("totalAssets", "totalAssets_after", "strategies"):
-            state[parts[0]] = parts[1].strip()
+            key = "totalAssets" if parts[0] == "totalAssets_after" else parts[0]
+            state[key] = parts[1].strip()
     # Merge with existing vault_state.json to preserve computed fields
     # (exchangeRate, totalYield, idle, deltaApyBps may not be callable)
     state_path = "/home/user/yield_scout/data/vault_state.json"
@@ -103,7 +111,7 @@ main().catch(e => {{ console.error(e); process.exit(1); }});
             with open(state_path) as f:
                 existing = json.load(f)
             # Update only the fields we got from the on-chain call
-            for key in ("totalAssets", "totalAssets_after"):
+            for key in ("totalAssets", "strategies"):
                 if key in state:
                     existing[key] = state[key]
             state = existing
