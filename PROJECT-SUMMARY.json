@@ -330,5 +330,18 @@
     },
     "deployed_to_production": false,
     "deploy_target": "Cloudflare Pages pyd.fi"
+  },
+  "strategy_rejections": {
+    "YT/LP/leverage": {
+      "status": "REJECTED",
+      "date": "2026-09-17",
+      "reason": "ProYield Web is a non-custodial stablecoin LENDING product (NOT a trading bot). Lending protocols: Aave, Sky, Morpho (+ potentially Pendle). No trading, no leverage, no custody. YT/LP/leverage strategies violate the lending-only mandate.",
+      "approved_strategies": [
+        "maker/taker",
+        "delta-neutral",
+        "arb",
+        "fixed yield"
+      ]
+    }
   }
 }
