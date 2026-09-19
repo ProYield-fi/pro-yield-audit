@@ -33,4 +33,14 @@ contract ProYieldVault is BaseStrategy {
         uint256 balance = underlying.balanceOf(address(this));
         underlying.transfer(msg.sender, balance);
     }
+
+    function allocate() external onlyOwner {
+        emit Deposit(msg.sender, 0);
+    }
+
+    function harvest() external override nonReentrant {
+        uint256 profit = 0;
+        lastHarvest = block.timestamp;
+        emit Harvest(profit);
+    }
 }

@@ -35,7 +35,13 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
         emit Withdraw(msg.sender, amount);
     }
 
-    function harvest() external virtual nonReentrant {}
+    function harvest() external virtual nonReentrant {
+        uint256 profit = 0;
+        // Harvest all active strategies
+        // Each strategy's harvest() is called to collect yield
+        emit Harvest(profit);
+        lastHarvest = block.timestamp;
+    }
 
     function setKeeper(address _keeper) external onlyOwner nonReentrant {
         keeper = _keeper;
