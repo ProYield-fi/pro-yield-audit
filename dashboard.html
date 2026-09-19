@@ -106,7 +106,7 @@ Blend model: 80% TVL-weighted core, 10% fixed, 10% satellite. Satellites above p
 <table>
 <tr><th>Stream</th><th>Status</th><th>Commission</th><th>Notes</th></tr>
 <tr><td><b>HL Referral (PROYIELD)</b></td><td class="ok">✅ ACTIVE</td><td class="r">10% of fees</td><td>Code active via API. Claim at app.hyperliquid.xyz/referrals (>$1)</td></tr>
-<tr><td><b>MoonPay On-Ramp</b></td><td class="bad">❌ BROKEN</td><td class="r">0%</td><td>No API keys. 4.5% card + 1% bank. Only on-ramp supporting Bahamas (200+ countries)</td></tr>
+<tr><td><b>MoonPay On-Ramp</b></td><td class="good">✅ CONFIGURED</td><td class="r">Testnet</td><td>pk_test_59DnsDRRtJa40GZ2esBNJ4JvYAd3sPL. SECRET+WEBHOOK in CF Pages dashboard (Encrypt ON). Production: get live keys from MoonPay dashboard.</td></tr>
 <tr><td><b>Stripe On-Ramp</b></td><td class="bad">❌ BLOCKED</td><td class="r">2.9% + $0.30</td><td>Not supported in Bahamas. EU/US only. Requires legal entity in supported country</td></tr>
 <tr><td><b>Ramp Network</b></td><td class="bad">❌ BLOCKED</td><td class="r">N/A</td><td>Explicitly blocks Bahamas. Cannot use.</td></tr>
 <tr><td><b>Delta-Neutral Strategy</b></td><td class="ok">✅ LIVE</td><td class="r">13-14% APR</td><td>BTC 13.1%, ETH/SOL 14.0% (funding + maker rebates). Non-directional.</td></tr>
@@ -115,8 +115,8 @@ Blend model: 80% TVL-weighted core, 10% fixed, 10% satellite. Satellites above p
 
 <h2>On-Ramp Situation — Bahamas</h2>
 <div class="card"><div class="k">Problem</div>Stripe does not support the Bahamas. Ramp Network explicitly blocks the Bahamas. The embedded onramp is EU/US only.</div>
-<div class="card"><div class="k">Viable Options</div><b>1. MoonPay</b> — 200+ countries, likely supports Bahamas. But NO KEYS configured. Needs MOONPAY_SECRET_KEY + VITE_MOONPAY_KEY from MoonPay dashboard.<br/><br/><b>2. Transak</b> — 150+ countries, registered in USA/UK/Canada/Australia/Hong Kong. May support Bahamas. Need to check Transak country list and get API keys.<br/><br/><b>3. Canadian entity</b> — User is an Engineer in Toronto ET. Could register a Canadian entity for Stripe (Stripe supports Canada). Bahamas is tax base via wife's citizenship.</div>
-<div class="card"><div class="k">Action Required</div>Apply for <b>Transak</b> onramp (check transak.com/global-coverage for Bahamas support), OR get <b>MoonPay API keys</b> from MoonPay dashboard and configure MOONPAY_SECRET_KEY. Stripe requires a legal entity in a supported country (Canada is possible given Toronto residency).</div>
+<div class="card"><div class="k">Viable Options</div><b>1. MoonPay</b> — 200+ countries, likely supports Bahamas. Keys configured: VITE_MOONPAY_KEY=pk_test_59DnsDRRtJa40GZ2esBNJ4JvYAd3sPL (testnet). MOONPAY_SECRET_KEY and MOONPAY_WEBHOOK_SECRET set in CF Pages dashboard.<br/><br/><b>2. Transak</b> — 150+ countries, registered in USA/UK/Canada/Australia/Hong Kong. May support Bahamas. Need to check Transak country list and get API keys.<br/><br/><b>3. Canadian entity</b> — User is an Engineer in Toronto ET. Could register a Canadian entity for Stripe (Stripe supports Canada). Bahamas is tax base via wife's citizenship.</div>
+<div class="card"><div class="k">Action Required</div>MoonPay keys configured for testnet. For production: get <b>MOONPAY_SECRET_KEY</b> and <b>MOONPAY_WEBHOOK_SECRET</b> from MoonPay dashboard, set in CF Pages dashboard with Encrypt ON. Stripe alternative requires Canadian entity.</div>
 
 <h2>Referral Program — PROYIELD</h2>
 <table>
