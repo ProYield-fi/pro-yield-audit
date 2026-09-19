@@ -8,7 +8,7 @@ async function main() {
   await mockUSDC.waitForDeployment();
   console.log("MockUSDC:", await mockUSDC.getAddress());
   
-  const mintTx = await mockUSDC.mint(owner.address, ethers.parseUnits("1000000", 6));
+  const mintTx = await mockUSDC.mint(owner.address, ethers.parseUnits("1000000", 18));
   await mintTx.wait();
   console.log("Minted 1,000,000 mUSDC");
   
@@ -34,11 +34,11 @@ async function main() {
   await addTx.wait();
   console.log("Strategy added");
   
-  const approveTx = await mockUSDC.approve(await vault.getAddress(), ethers.parseUnits("100000", 6));
+  const approveTx = await mockUSDC.approve(await vault.getAddress(), ethers.parseUnits("100000", 18));
   await approveTx.wait();
   console.log("Approved 100,000 mUSDC");
   
-  const depositTx = await vault.deposit(ethers.parseUnits("100000", 6));
+  const depositTx = await vault.deposit(ethers.parseUnits("100000", 18));
   await depositTx.wait();
   console.log("Deposited 100,000 mUSDC");
   
