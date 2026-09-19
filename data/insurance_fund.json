@@ -1,30 +1,30 @@
 {
   "created_utc": "2026-09-17T03:25:55.932128+00:00",
-  "updated_utc": "2026-09-18T13:00:56.749096+00:00",
-  "total_reserves_usd": 54455.1,
+  "updated_utc": "2026-09-19T13:00:39.320311+00:00",
+  "total_reserves_usd": 106052.1,
   "total_user_deposits_usd": 0.0,
   "coverage_ratio": 0,
   "reserve_status": "INSUFFICIENT",
   "cold_storage": {
-    "balance_usd": 43564.08,
+    "balance_usd": 84841.68000000001,
     "wallet_type": "hardware_wallet",
     "security": "multi-sig_cold_storage",
     "description": "Offline reserves \u2014 hardware wallets, multi-sig, no network access"
   },
   "active_deployment": {
-    "balance_usd": 10891.02,
+    "balance_usd": 21210.420000000002,
     "tier": "Maximum",
     "apy": 9.2,
     "protocols": [],
     "description": "Active reserves deployed on Maximum tier for yield",
-    "weekly_yield_usd": 19.268727692307692
+    "weekly_yield_usd": 37.526127692307696
   },
   "fee_accumulation": {
-    "pm_rewards_7d": 84637,
+    "pm_rewards_7d": 257985,
     "performance_fees": 0,
     "referral_fees": 0,
-    "total_collected": 54455.1,
-    "last_collection": "2026-09-18T13:00:56.749093+00:00"
+    "total_collected": 106052.1,
+    "last_collection": "2026-09-19T13:00:39.320308+00:00"
   },
   "coverage_history": [
     {
@@ -121,6 +121,34 @@
     {
       "timestamp": "2026-09-18T13:00:56.749096+00:00",
       "reserves_usd": 54455.1,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-19T13:00:37.103155+00:00",
+      "reserves_usd": 67354.35,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-19T13:00:37.103176+00:00",
+      "reserves_usd": 80253.6,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-19T13:00:39.320296+00:00",
+      "reserves_usd": 93152.85,
+      "deposits_usd": 0.0,
+      "coverage_ratio": 0,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "timestamp": "2026-09-19T13:00:39.320311+00:00",
+      "reserves_usd": 106052.1,
       "deposits_usd": 0.0,
       "coverage_ratio": 0,
       "status": "INSUFFICIENT"

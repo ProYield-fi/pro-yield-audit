@@ -2671,3 +2671,229 @@
 {"ts": "2026-09-18T13:00:53Z", "symbol": "XAUT", "project": "aave-v4", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 8924450, "poolMeta": "Core", "stablecoin": false}
 {"ts": "2026-09-18T13:00:53Z", "symbol": "XAUT", "project": "morpho-blue", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 7413912, "poolMeta": "", "stablecoin": false}
 {"ts": "2026-09-18T13:00:53Z", "symbol": "XAUT", "project": "lista-lending", "chain": "BSC", "apy": 0.60943, "apy_mean_30d": 3.78587, "tvl": 6497822, "poolMeta": "", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDS", "project": "sky-lending", "chain": "Ethereum", "apy": 3.6, "apy_mean_30d": 3.56233, "tvl": 4382477297, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "maple", "chain": "Ethereum", "apy": 5.06687, "apy_mean_30d": 4.95328, "tvl": 2876729459, "poolMeta": "Syrup USDC", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USYC", "project": "circle-usyc", "chain": "BSC", "apy": 3.19757, "apy_mean_30d": 3.17919, "tvl": 2463806962, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "ethena-usde", "chain": "Ethereum", "apy": 4.94356, "apy_mean_30d": 4.6647, "tvl": 1330197845, "poolMeta": "7 days unstaking", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDY", "project": "ondo-yield-assets", "chain": "Ethereum", "apy": 3.58, "apy_mean_30d": 3.56053, "tvl": 1183834443, "poolMeta": "US Dollar Yield", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Solana", "apy": 3.74601, "apy_mean_30d": 3.56572, "tvl": 993183967, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Aptos", "apy": 3.43562, "apy_mean_30d": 3.25557, "tvl": 967304624, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "maple", "chain": "Ethereum", "apy": 4.70167, "apy_mean_30d": 4.60724, "tvl": 695531039, "poolMeta": "Syrup USDT", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USTB", "project": "invesco-ustb", "chain": "Ethereum", "apy": 3.54159, "apy_mean_30d": 3.50709, "tvl": 539033576, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDY", "project": "ondo-yield-assets", "chain": "Stellar", "apy": 3.58, "apy_mean_30d": 3.5605, "tvl": 536105432, "poolMeta": "US Dollar Yield", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "aave-v3", "chain": "Ethereum", "apy": 0.65218, "apy_mean_30d": 3.24988, "tvl": 524565457, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "aave-v3", "chain": "Plasma", "apy": 0.39849, "apy_mean_30d": 3.55184, "tvl": 503611276, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDAI", "project": "usd-ai", "chain": "Arbitrum", "apy": 6.93, "apy_mean_30d": 7.21592, "tvl": 493588817, "poolMeta": "30d unlock", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Avalanche", "apy": 3.74639, "apy_mean_30d": 3.56594, "tvl": 493490437, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDG", "project": "morpho-blue", "chain": "Robinhood Chain", "apy": 3.80415, "apy_mean_30d": 6.99938, "tvl": 482816210, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDS", "project": "sparklend", "chain": "Ethereum", "apy": 2.31839, "apy_mean_30d": 2.20113, "tvl": 478354978, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "jupiter-lend", "chain": "Solana", "apy": 4.52931, "apy_mean_30d": 4.84453, "tvl": 469774059, "poolMeta": "Earn", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USAT", "project": "centrifuge-protocol", "chain": "Ethereum", "apy": 3.82381, "apy_mean_30d": 4.8458, "tvl": 450064955, "poolMeta": "Janus Henderson AAA CLO Fund", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SENPYUSDMAIN", "project": "morpho-blue", "chain": "Ethereum", "apy": 3.3137, "apy_mean_30d": 5.73317, "tvl": 441273902, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDG", "project": "maple", "chain": "Ethereum", "apy": 4.93562, "apy_mean_30d": 4.99674, "tvl": 432694768, "poolMeta": "syrupUSDG", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDC", "project": "morpho-blue", "chain": "Base", "apy": 4.36333, "apy_mean_30d": 4.30935, "tvl": 427884604, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SIRLOINUSDC", "project": "morpho-blue", "chain": "Base", "apy": 2.85741, "apy_mean_30d": 5.67761, "tvl": 421448592, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "GTUSDCP", "project": "morpho-blue", "chain": "Base", "apy": 4.37692, "apy_mean_30d": 4.31111, "tvl": 419621390, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDD", "project": "justlend-v1", "chain": "Tron", "apy": 0.00085, "apy_mean_30d": 4.00734, "tvl": 398459132, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "spark-savings", "chain": "Ethereum", "apy": 3.5, "apy_mean_30d": 3.29109, "tvl": 397329566, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SENRLUSDV2", "project": "morpho-blue", "chain": "Ethereum", "apy": 2.57171, "apy_mean_30d": 6.17587, "tvl": 373521211, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDS", "project": "sky-lending", "chain": "Arbitrum", "apy": 3.6, "apy_mean_30d": 3.56233, "tvl": 363643023, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDS", "project": "spark-savings", "chain": "Arbitrum", "apy": 3.6, "apy_mean_30d": 3.56234, "tvl": 363643023, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "morpho-blue", "chain": "Base", "apy": 0, "apy_mean_30d": 4.68325, "tvl": 360581299, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDS", "project": "centrifuge-protocol", "chain": "Ethereum", "apy": 2.86259, "apy_mean_30d": 3.22039, "tvl": 350216081, "poolMeta": "Janus Henderson Treasury Fund", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "morpho-blue", "chain": "Robinhood Chain", "apy": 0, "apy_mean_30d": 4.68659, "tvl": 345051323, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "spark-savings", "chain": "Ethereum", "apy": 3.6, "apy_mean_30d": 3.56234, "tvl": 308878499, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SPARKUSDC", "project": "morpho-blue", "chain": "Base", "apy": 3.92551, "apy_mean_30d": 3.86996, "tvl": 281455910, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Ethereum", "apy": 3.77707, "apy_mean_30d": 3.59679, "tvl": 264540656, "poolMeta": "Institutional", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "centrifuge-protocol", "chain": "Avalanche", "apy": 3.82381, "apy_mean_30d": 5.05175, "tvl": 262408849, "poolMeta": "Janus Henderson AAA CLO Fund", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "REUSD", "project": "re", "chain": "Ethereum", "apy": 6.78387, "apy_mean_30d": 6.53442, "tvl": 261913066, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDY", "project": "ondo-yield-assets", "chain": "Sei", "apy": 3.58, "apy_mean_30d": 3.56053, "tvl": 259005937, "poolMeta": "US Dollar Yield", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDG", "project": "jupiter-lend", "chain": "Solana", "apy": 3.6654, "apy_mean_30d": 3.65268, "tvl": 253071432, "poolMeta": "Earn (Ethena Market)", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "kamino-lend", "chain": "Solana", "apy": 0, "apy_mean_30d": 0, "tvl": 250976695, "poolMeta": "Ethena Market", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SXSRLUSD", "project": "morpho-blue", "chain": "Ethereum", "apy": 0.03149, "apy_mean_30d": 0.03067, "tvl": 250007740, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "aave-v3", "chain": "Ethereum", "apy": 3.62834, "apy_mean_30d": 3.3976, "tvl": 225434062, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "aave-v3", "chain": "Plasma", "apy": 0, "apy_mean_30d": 1.85868, "tvl": 212133255, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "aave-v3", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 1.24941, "tvl": 211910590, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Ethereum", "apy": 3.43562, "apy_mean_30d": 3.25557, "tvl": 210200005, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SDAI", "project": "sky-lending", "chain": "Ethereum", "apy": 1.25, "apy_mean_30d": 1.25, "tvl": 202388693, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STUSDS", "project": "sky-lending", "chain": "Ethereum", "apy": 5.11, "apy_mean_30d": 5.4065, "tvl": 193040150, "poolMeta": "Expert Mode", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SENPYUSDPRIMEV2", "project": "morpho-blue", "chain": "Ethereum", "apy": 3.51806, "apy_mean_30d": 6.11818, "tvl": 185186222, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDY", "project": "ondo-yield-assets", "chain": "Solana", "apy": 3.58, "apy_mean_30d": 3.56054, "tvl": 180285677, "poolMeta": "US Dollar Yield", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "aave-v3", "chain": "Ethereum", "apy": 3.60452, "apy_mean_30d": 3.9219, "tvl": 178605830, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "APXUSD", "project": "apyx-protocol", "chain": "Ethereum", "apy": 12.72869, "apy_mean_30d": 12.39931, "tvl": 170815521, "poolMeta": "apyUSD vault", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "GTUSDCP", "project": "morpho-blue", "chain": "Base", "apy": 4.36417, "apy_mean_30d": 4.30967, "tvl": 167630330, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SGHO", "project": "aave-v3", "chain": "Ethereum", "apy": 4.5, "apy_mean_30d": 4.39578, "tvl": 163199243, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "DAI-USDC-USDT", "project": "curve-dex", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 2e-05, "tvl": 160445291, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "pareto-credit", "chain": "Ethereum", "apy": 7.81568, "apy_mean_30d": 7.89845, "tvl": 154602030, "poolMeta": "FalconX", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "fluid-lending", "chain": "Ethereum", "apy": 3.87, "apy_mean_30d": 4.73605, "tvl": 148711640, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "BSC", "apy": 3.43562, "apy_mean_30d": 3.25557, "tvl": 146440410, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKEURCV", "project": "morpho-blue", "chain": "Ethereum", "apy": 3, "apy_mean_30d": 3, "tvl": 142288885, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USD1", "project": "lista-lending", "chain": "BSC", "apy": 1.2095, "apy_mean_30d": 1.45295, "tvl": 138175616, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "PYUSD", "project": "sentora-curator", "chain": "Solana", "apy": 3.2664, "apy_mean_30d": 5.86244, "tvl": 136881931, "poolMeta": "Kamino Sentora PYUSD", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDC", "project": "aave-v3", "chain": "Monad", "apy": 0, "apy_mean_30d": 0.7106, "tvl": 135303848, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDC", "project": "morpho-blue", "chain": "Base", "apy": 3.26193, "apy_mean_30d": 3.21533, "tvl": 129965507, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "fluid-lending", "chain": "Ethereum", "apy": 4.83, "apy_mean_30d": 4.8438, "tvl": 127455026, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDC", "project": "morpho-blue", "chain": "Ethereum", "apy": 4.09541, "apy_mean_30d": 4.26209, "tvl": 123175157, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDG", "project": "morpho-blue", "chain": "Robinhood Chain", "apy": 0, "apy_mean_30d": 0, "tvl": 122538020, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "PYUSD", "project": "sparklend", "chain": "Ethereum", "apy": 0.86048, "apy_mean_30d": 0.56071, "tvl": 118294198, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDT", "project": "aave-v3", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 114086106, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "morpho-blue", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 107367397, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SAVUSD", "project": "avant-avusd", "chain": "Avalanche", "apy": 7.63619, "apy_mean_30d": 8.15893, "tvl": 103316526, "poolMeta": "ERC-4626: savUSD \u2192 avUSD", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "GTUSDCP", "project": "morpho-blue", "chain": "Ethereum", "apy": 4.09775, "apy_mean_30d": 4.26576, "tvl": 102510086, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "AUSD", "project": "accountable", "chain": "Monad", "apy": 6.5475, "apy_mean_30d": 6.82077, "tvl": 100618279, "poolMeta": "Earn ACC Points", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "PYUSD-USDS", "project": "uniswap-v4", "chain": "Ethereum", "apy": 0.07754, "apy_mean_30d": 0.10419, "tvl": 100134384, "poolMeta": "0.00%", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "DAI", "project": "sparklend", "chain": "Ethereum", "apy": 2.45918, "apy_mean_30d": 2.33904, "tvl": 100073305, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USD1", "project": "dolomite", "chain": "Ethereum", "apy": 2.38578, "apy_mean_30d": 8.47119, "tvl": 97277795, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "aave-v3", "chain": "Mantle", "apy": 0, "apy_mean_30d": 2.65635, "tvl": 96667063, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDT", "project": "morpho-blue", "chain": "Ethereum", "apy": 2.40955, "apy_mean_30d": 2.89586, "tvl": 86149673, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USCC", "project": "bitwise-uscc", "chain": "Ethereum", "apy": 7.70287, "apy_mean_30d": 6.35089, "tvl": 81686162, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "MSUSD", "project": "mainstreet", "chain": "Ethereum", "apy": 6.59079, "apy_mean_30d": 6.58826, "tvl": 75221837, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "accountable", "chain": "Monad", "apy": 11.4, "apy_mean_30d": 11.99346, "tvl": 74981496, "poolMeta": "Earn ACC Points", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "sentora-curator", "chain": "Ethereum", "apy": 6.26574, "apy_mean_30d": 6.56316, "tvl": 74360632, "poolMeta": "Sentora USD", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDC", "project": "kamino-lend", "chain": "Solana", "apy": 0, "apy_mean_30d": 0, "tvl": 74176029, "poolMeta": "Maple Market", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "justlend-v1", "chain": "Tron", "apy": 2.3848, "apy_mean_30d": 2.3338, "tvl": 72836659, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "midas-rwa", "chain": "Ethereum", "apy": 3.41, "apy_mean_30d": 3.39144, "tvl": 72607939, "poolMeta": "mTBILL", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USD3", "project": "3jane-lending", "chain": "Ethereum", "apy": 6.76567, "apy_mean_30d": 6.81766, "tvl": 72384881, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "aave-v3", "chain": "Monad", "apy": 0.20223, "apy_mean_30d": 5.18175, "tvl": 70807550, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDAT", "project": "saturn", "chain": "Ethereum", "apy": 13.78127, "apy_mean_30d": 15.24235, "tvl": 69822729, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "aave-v3", "chain": "Ethereum", "apy": 3.62834, "apy_mean_30d": 4.84121, "tvl": 69441738, "poolMeta": "Umbrella", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDC", "project": "morpho-blue", "chain": "Ethereum", "apy": 3.90435, "apy_mean_30d": 4.04287, "tvl": 67748000, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "RLUSD", "project": "aave-v3", "chain": "Ethereum", "apy": 1.72994, "apy_mean_30d": 4.9855, "tvl": 67618779, "poolMeta": "Aave Horizon Market", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDT", "project": "morpho-blue", "chain": "Ethereum", "apy": 2.5102, "apy_mean_30d": 3.0618, "tvl": 67579175, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "midas-rwa", "chain": "Ethereum", "apy": 7.13, "apy_mean_30d": 7.13, "tvl": 67337941, "poolMeta": "mGLOBAL", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "aave-v3", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 67107652, "poolMeta": "", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "midas-rwa", "chain": "Ethereum", "apy": 7.51, "apy_mean_30d": 7.6878, "tvl": 65469289, "poolMeta": "mFONE", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SFRAX", "project": "frax", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0.36147, "tvl": 65181542, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDF", "project": "falcon-finance", "chain": "Ethereum", "apy": 5.22824, "apy_mean_30d": 4.89074, "tvl": 64890372, "poolMeta": "ERC-4626: USDf \u2192 sUSDf", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC-RLUSD", "project": "curve-dex", "chain": "Ethereum", "apy": 0.09, "apy_mean_30d": 6.18559, "tvl": 63887606, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "PENDLEUSDC", "project": "morpho-blue", "chain": "Ethereum", "apy": 5.26636, "apy_mean_30d": 6.78309, "tvl": 63505111, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "centrifuge-protocol", "chain": "Base", "apy": 3.82381, "apy_mean_30d": 5.05482, "tvl": 62599683, "poolMeta": "Janus Henderson AAA CLO Fund", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDC", "project": "morpho-blue", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 62571234, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "DOLA-SUSDE", "project": "curve-dex", "chain": "Ethereum", "apy": 1.18, "apy_mean_30d": 3.95539, "tvl": 62536607, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SKYMONEYUSDTSAVINGS", "project": "morpho-blue", "chain": "Ethereum", "apy": 2.45333, "apy_mean_30d": 3.76172, "tvl": 62393856, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "fluid-lending", "chain": "Arbitrum", "apy": 4.43, "apy_mean_30d": 4.19392, "tvl": 62174974, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDS", "project": "morpho-blue", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 61844065, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USCC", "project": "aave-v3", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 60686986, "poolMeta": "Aave Horizon Market", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "venus-core-pool", "chain": "BSC", "apy": 2.72982, "apy_mean_30d": 2.62335, "tvl": 60513556, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "aave-v3", "chain": "Ethereum", "apy": 3.60452, "apy_mean_30d": 5.4916, "tvl": 58386920, "poolMeta": "Umbrella", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "JUPUSD", "project": "jupiter-lend", "chain": "Solana", "apy": 4.31005, "apy_mean_30d": 5.6391, "tvl": 56747125, "poolMeta": "Earn", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STRUSD", "project": "tori-finance", "chain": "Ethereum", "apy": 10.62677, "apy_mean_30d": 10.56767, "tvl": 51135991, "poolMeta": "7 days unstaking", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "DOLA-SUSDE", "project": "convex-finance", "chain": "Ethereum", "apy": 1.18, "apy_mean_30d": 5.33979, "tvl": 50523563, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDAI", "project": "pendle-v2", "chain": "Arbitrum", "apy": 9.79717, "apy_mean_30d": 8.22055, "tvl": 50319485, "poolMeta": "For buying PT-USDai-15OCT2026", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "termmax", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 25594438, "poolMeta": "XAUE XAUt Vault", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "aave-v4", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 8928867, "poolMeta": "Core", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "morpho-blue", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 7432819, "poolMeta": "", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "lista-lending", "chain": "BSC", "apy": 0.64855, "apy_mean_30d": 3.50452, "tvl": 6472365, "poolMeta": "", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDS", "project": "sky-lending", "chain": "Ethereum", "apy": 3.6, "apy_mean_30d": 3.56233, "tvl": 4382477297, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "maple", "chain": "Ethereum", "apy": 5.06687, "apy_mean_30d": 4.95328, "tvl": 2876729459, "poolMeta": "Syrup USDC", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USYC", "project": "circle-usyc", "chain": "BSC", "apy": 3.19757, "apy_mean_30d": 3.17919, "tvl": 2463806962, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "ethena-usde", "chain": "Ethereum", "apy": 4.94356, "apy_mean_30d": 4.6647, "tvl": 1330197845, "poolMeta": "7 days unstaking", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDY", "project": "ondo-yield-assets", "chain": "Ethereum", "apy": 3.58, "apy_mean_30d": 3.56053, "tvl": 1183834443, "poolMeta": "US Dollar Yield", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Solana", "apy": 3.74601, "apy_mean_30d": 3.56572, "tvl": 993183967, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Aptos", "apy": 3.43562, "apy_mean_30d": 3.25557, "tvl": 967304624, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "maple", "chain": "Ethereum", "apy": 4.70167, "apy_mean_30d": 4.60724, "tvl": 695531039, "poolMeta": "Syrup USDT", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USTB", "project": "invesco-ustb", "chain": "Ethereum", "apy": 3.54159, "apy_mean_30d": 3.50709, "tvl": 539033576, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDY", "project": "ondo-yield-assets", "chain": "Stellar", "apy": 3.58, "apy_mean_30d": 3.5605, "tvl": 536105432, "poolMeta": "US Dollar Yield", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "aave-v3", "chain": "Ethereum", "apy": 0.65218, "apy_mean_30d": 3.24988, "tvl": 524565457, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "aave-v3", "chain": "Plasma", "apy": 0.39849, "apy_mean_30d": 3.55184, "tvl": 503611276, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDAI", "project": "usd-ai", "chain": "Arbitrum", "apy": 6.93, "apy_mean_30d": 7.21592, "tvl": 493588817, "poolMeta": "30d unlock", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Avalanche", "apy": 3.74639, "apy_mean_30d": 3.56594, "tvl": 493490437, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDG", "project": "morpho-blue", "chain": "Robinhood Chain", "apy": 3.80415, "apy_mean_30d": 6.99938, "tvl": 482816210, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDS", "project": "sparklend", "chain": "Ethereum", "apy": 2.31839, "apy_mean_30d": 2.20113, "tvl": 478354978, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "jupiter-lend", "chain": "Solana", "apy": 4.52931, "apy_mean_30d": 4.84453, "tvl": 469774059, "poolMeta": "Earn", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USAT", "project": "centrifuge-protocol", "chain": "Ethereum", "apy": 3.82381, "apy_mean_30d": 4.8458, "tvl": 450064955, "poolMeta": "Janus Henderson AAA CLO Fund", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SENPYUSDMAIN", "project": "morpho-blue", "chain": "Ethereum", "apy": 3.3137, "apy_mean_30d": 5.73317, "tvl": 441273902, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDG", "project": "maple", "chain": "Ethereum", "apy": 4.93562, "apy_mean_30d": 4.99674, "tvl": 432694768, "poolMeta": "syrupUSDG", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDC", "project": "morpho-blue", "chain": "Base", "apy": 4.36333, "apy_mean_30d": 4.30935, "tvl": 427884604, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SIRLOINUSDC", "project": "morpho-blue", "chain": "Base", "apy": 2.85741, "apy_mean_30d": 5.67761, "tvl": 421448592, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "GTUSDCP", "project": "morpho-blue", "chain": "Base", "apy": 4.37692, "apy_mean_30d": 4.31111, "tvl": 419621390, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDD", "project": "justlend-v1", "chain": "Tron", "apy": 0.00085, "apy_mean_30d": 4.00734, "tvl": 398459132, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "spark-savings", "chain": "Ethereum", "apy": 3.5, "apy_mean_30d": 3.29109, "tvl": 397329566, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SENRLUSDV2", "project": "morpho-blue", "chain": "Ethereum", "apy": 2.57171, "apy_mean_30d": 6.17587, "tvl": 373521211, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDS", "project": "sky-lending", "chain": "Arbitrum", "apy": 3.6, "apy_mean_30d": 3.56233, "tvl": 363643023, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDS", "project": "spark-savings", "chain": "Arbitrum", "apy": 3.6, "apy_mean_30d": 3.56234, "tvl": 363643023, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "morpho-blue", "chain": "Base", "apy": 0, "apy_mean_30d": 4.68325, "tvl": 360581299, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDS", "project": "centrifuge-protocol", "chain": "Ethereum", "apy": 2.86259, "apy_mean_30d": 3.22039, "tvl": 350216081, "poolMeta": "Janus Henderson Treasury Fund", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "morpho-blue", "chain": "Robinhood Chain", "apy": 0, "apy_mean_30d": 4.68659, "tvl": 345051323, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "spark-savings", "chain": "Ethereum", "apy": 3.6, "apy_mean_30d": 3.56234, "tvl": 308878499, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SPARKUSDC", "project": "morpho-blue", "chain": "Base", "apy": 3.92551, "apy_mean_30d": 3.86996, "tvl": 281455910, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Ethereum", "apy": 3.77707, "apy_mean_30d": 3.59679, "tvl": 264540656, "poolMeta": "Institutional", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "centrifuge-protocol", "chain": "Avalanche", "apy": 3.82381, "apy_mean_30d": 5.05175, "tvl": 262408849, "poolMeta": "Janus Henderson AAA CLO Fund", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "REUSD", "project": "re", "chain": "Ethereum", "apy": 6.78387, "apy_mean_30d": 6.53442, "tvl": 261913066, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDY", "project": "ondo-yield-assets", "chain": "Sei", "apy": 3.58, "apy_mean_30d": 3.56053, "tvl": 259005937, "poolMeta": "US Dollar Yield", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDG", "project": "jupiter-lend", "chain": "Solana", "apy": 3.6654, "apy_mean_30d": 3.65268, "tvl": 253071432, "poolMeta": "Earn (Ethena Market)", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "kamino-lend", "chain": "Solana", "apy": 0, "apy_mean_30d": 0, "tvl": 250976695, "poolMeta": "Ethena Market", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SXSRLUSD", "project": "morpho-blue", "chain": "Ethereum", "apy": 0.03149, "apy_mean_30d": 0.03067, "tvl": 250007740, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "aave-v3", "chain": "Ethereum", "apy": 3.62834, "apy_mean_30d": 3.3976, "tvl": 225434062, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "aave-v3", "chain": "Plasma", "apy": 0, "apy_mean_30d": 1.85868, "tvl": 212133255, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "aave-v3", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 1.24941, "tvl": 211910590, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "Ethereum", "apy": 3.43562, "apy_mean_30d": 3.25557, "tvl": 210200005, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SDAI", "project": "sky-lending", "chain": "Ethereum", "apy": 1.25, "apy_mean_30d": 1.25, "tvl": 202388693, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STUSDS", "project": "sky-lending", "chain": "Ethereum", "apy": 5.11, "apy_mean_30d": 5.4065, "tvl": 193040150, "poolMeta": "Expert Mode", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SENPYUSDPRIMEV2", "project": "morpho-blue", "chain": "Ethereum", "apy": 3.51806, "apy_mean_30d": 6.11818, "tvl": 185186222, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDY", "project": "ondo-yield-assets", "chain": "Solana", "apy": 3.58, "apy_mean_30d": 3.56054, "tvl": 180285677, "poolMeta": "US Dollar Yield", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "aave-v3", "chain": "Ethereum", "apy": 3.60452, "apy_mean_30d": 3.9219, "tvl": 178605830, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "APXUSD", "project": "apyx-protocol", "chain": "Ethereum", "apy": 12.72869, "apy_mean_30d": 12.39931, "tvl": 170815521, "poolMeta": "apyUSD vault", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "GTUSDCP", "project": "morpho-blue", "chain": "Base", "apy": 4.36417, "apy_mean_30d": 4.30967, "tvl": 167630330, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SGHO", "project": "aave-v3", "chain": "Ethereum", "apy": 4.5, "apy_mean_30d": 4.39578, "tvl": 163199243, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "DAI-USDC-USDT", "project": "curve-dex", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 2e-05, "tvl": 160445291, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "pareto-credit", "chain": "Ethereum", "apy": 7.81568, "apy_mean_30d": 7.89845, "tvl": 154602030, "poolMeta": "FalconX", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "fluid-lending", "chain": "Ethereum", "apy": 3.87, "apy_mean_30d": 4.73605, "tvl": 148711640, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "BUIDL", "project": "blackrock-buidl", "chain": "BSC", "apy": 3.43562, "apy_mean_30d": 3.25557, "tvl": 146440410, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKEURCV", "project": "morpho-blue", "chain": "Ethereum", "apy": 3, "apy_mean_30d": 3, "tvl": 142288885, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USD1", "project": "lista-lending", "chain": "BSC", "apy": 1.2095, "apy_mean_30d": 1.45295, "tvl": 138175616, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "PYUSD", "project": "sentora-curator", "chain": "Solana", "apy": 3.2664, "apy_mean_30d": 5.86244, "tvl": 136881931, "poolMeta": "Kamino Sentora PYUSD", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDC", "project": "aave-v3", "chain": "Monad", "apy": 0, "apy_mean_30d": 0.7106, "tvl": 135303848, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDC", "project": "morpho-blue", "chain": "Base", "apy": 3.26193, "apy_mean_30d": 3.21533, "tvl": 129965507, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "fluid-lending", "chain": "Ethereum", "apy": 4.83, "apy_mean_30d": 4.8438, "tvl": 127455026, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDC", "project": "morpho-blue", "chain": "Ethereum", "apy": 4.09541, "apy_mean_30d": 4.26209, "tvl": 123175157, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDG", "project": "morpho-blue", "chain": "Robinhood Chain", "apy": 0, "apy_mean_30d": 0, "tvl": 122538020, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "PYUSD", "project": "sparklend", "chain": "Ethereum", "apy": 0.86048, "apy_mean_30d": 0.56071, "tvl": 118294198, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDT", "project": "aave-v3", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 114086106, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "morpho-blue", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 107367397, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SAVUSD", "project": "avant-avusd", "chain": "Avalanche", "apy": 7.63619, "apy_mean_30d": 8.15893, "tvl": 103316526, "poolMeta": "ERC-4626: savUSD \u2192 avUSD", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "GTUSDCP", "project": "morpho-blue", "chain": "Ethereum", "apy": 4.09775, "apy_mean_30d": 4.26576, "tvl": 102510086, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "AUSD", "project": "accountable", "chain": "Monad", "apy": 6.5475, "apy_mean_30d": 6.82077, "tvl": 100618279, "poolMeta": "Earn ACC Points", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "PYUSD-USDS", "project": "uniswap-v4", "chain": "Ethereum", "apy": 0.07754, "apy_mean_30d": 0.10419, "tvl": 100134384, "poolMeta": "0.00%", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "DAI", "project": "sparklend", "chain": "Ethereum", "apy": 2.45918, "apy_mean_30d": 2.33904, "tvl": 100073305, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USD1", "project": "dolomite", "chain": "Ethereum", "apy": 2.38578, "apy_mean_30d": 8.47119, "tvl": 97277795, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDE", "project": "aave-v3", "chain": "Mantle", "apy": 0, "apy_mean_30d": 2.65635, "tvl": 96667063, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDT", "project": "morpho-blue", "chain": "Ethereum", "apy": 2.40955, "apy_mean_30d": 2.89586, "tvl": 86149673, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USCC", "project": "bitwise-uscc", "chain": "Ethereum", "apy": 7.70287, "apy_mean_30d": 6.35089, "tvl": 81686162, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "MSUSD", "project": "mainstreet", "chain": "Ethereum", "apy": 6.59079, "apy_mean_30d": 6.58826, "tvl": 75221837, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "accountable", "chain": "Monad", "apy": 11.4, "apy_mean_30d": 11.99346, "tvl": 74981496, "poolMeta": "Earn ACC Points", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "sentora-curator", "chain": "Ethereum", "apy": 6.26574, "apy_mean_30d": 6.56316, "tvl": 74360632, "poolMeta": "Sentora USD", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDC", "project": "kamino-lend", "chain": "Solana", "apy": 0, "apy_mean_30d": 0, "tvl": 74176029, "poolMeta": "Maple Market", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "justlend-v1", "chain": "Tron", "apy": 2.3848, "apy_mean_30d": 2.3338, "tvl": 72836659, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "midas-rwa", "chain": "Ethereum", "apy": 3.41, "apy_mean_30d": 3.39144, "tvl": 72607939, "poolMeta": "mTBILL", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USD3", "project": "3jane-lending", "chain": "Ethereum", "apy": 6.76567, "apy_mean_30d": 6.81766, "tvl": 72384881, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDE", "project": "aave-v3", "chain": "Monad", "apy": 0.20223, "apy_mean_30d": 5.18175, "tvl": 70807550, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDAT", "project": "saturn", "chain": "Ethereum", "apy": 13.78127, "apy_mean_30d": 15.24235, "tvl": 69822729, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "aave-v3", "chain": "Ethereum", "apy": 3.62834, "apy_mean_30d": 4.84121, "tvl": 69441738, "poolMeta": "Umbrella", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDC", "project": "morpho-blue", "chain": "Ethereum", "apy": 3.90435, "apy_mean_30d": 4.04287, "tvl": 67748000, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "RLUSD", "project": "aave-v3", "chain": "Ethereum", "apy": 1.72994, "apy_mean_30d": 4.9855, "tvl": 67618779, "poolMeta": "Aave Horizon Market", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STEAKUSDT", "project": "morpho-blue", "chain": "Ethereum", "apy": 2.5102, "apy_mean_30d": 3.0618, "tvl": 67579175, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "midas-rwa", "chain": "Ethereum", "apy": 7.13, "apy_mean_30d": 7.13, "tvl": 67337941, "poolMeta": "mGLOBAL", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "aave-v3", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 67107652, "poolMeta": "", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "midas-rwa", "chain": "Ethereum", "apy": 7.51, "apy_mean_30d": 7.6878, "tvl": 65469289, "poolMeta": "mFONE", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SFRAX", "project": "frax", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0.36147, "tvl": 65181542, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDF", "project": "falcon-finance", "chain": "Ethereum", "apy": 5.22824, "apy_mean_30d": 4.89074, "tvl": 64890372, "poolMeta": "ERC-4626: USDf \u2192 sUSDf", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC-RLUSD", "project": "curve-dex", "chain": "Ethereum", "apy": 0.09, "apy_mean_30d": 6.18559, "tvl": 63887606, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "PENDLEUSDC", "project": "morpho-blue", "chain": "Ethereum", "apy": 5.26636, "apy_mean_30d": 6.78309, "tvl": 63505111, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "centrifuge-protocol", "chain": "Base", "apy": 3.82381, "apy_mean_30d": 5.05482, "tvl": 62599683, "poolMeta": "Janus Henderson AAA CLO Fund", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SYRUPUSDC", "project": "morpho-blue", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 62571234, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "DOLA-SUSDE", "project": "curve-dex", "chain": "Ethereum", "apy": 1.18, "apy_mean_30d": 3.95539, "tvl": 62536607, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SKYMONEYUSDTSAVINGS", "project": "morpho-blue", "chain": "Ethereum", "apy": 2.45333, "apy_mean_30d": 3.76172, "tvl": 62393856, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "fluid-lending", "chain": "Arbitrum", "apy": 4.43, "apy_mean_30d": 4.19392, "tvl": 62174974, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "SUSDS", "project": "morpho-blue", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 61844065, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USCC", "project": "aave-v3", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 60686986, "poolMeta": "Aave Horizon Market", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDT", "project": "venus-core-pool", "chain": "BSC", "apy": 2.72982, "apy_mean_30d": 2.62335, "tvl": 60513556, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDC", "project": "aave-v3", "chain": "Ethereum", "apy": 3.60452, "apy_mean_30d": 5.4916, "tvl": 58386920, "poolMeta": "Umbrella", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "JUPUSD", "project": "jupiter-lend", "chain": "Solana", "apy": 4.31005, "apy_mean_30d": 5.6391, "tvl": 56747125, "poolMeta": "Earn", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "STRUSD", "project": "tori-finance", "chain": "Ethereum", "apy": 10.62677, "apy_mean_30d": 10.56767, "tvl": 51135991, "poolMeta": "7 days unstaking", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "DOLA-SUSDE", "project": "convex-finance", "chain": "Ethereum", "apy": 1.18, "apy_mean_30d": 5.33979, "tvl": 50523563, "poolMeta": "", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "USDAI", "project": "pendle-v2", "chain": "Arbitrum", "apy": 9.79717, "apy_mean_30d": 8.22055, "tvl": 50319485, "poolMeta": "For buying PT-USDai-15OCT2026", "stablecoin": true}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "termmax", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 25594438, "poolMeta": "XAUE XAUt Vault", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "aave-v4", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 8928867, "poolMeta": "Core", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "morpho-blue", "chain": "Ethereum", "apy": 0, "apy_mean_30d": 0, "tvl": 7432819, "poolMeta": "", "stablecoin": false}
+{"ts": "2026-09-19T13:00:34Z", "symbol": "XAUT", "project": "lista-lending", "chain": "BSC", "apy": 0.64855, "apy_mean_30d": 3.50452, "tvl": 6472365, "poolMeta": "", "stablecoin": false}

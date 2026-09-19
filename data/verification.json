@@ -1106,5 +1106,315 @@
       }
     ],
     "auto_corrections": []
+  },
+  {
+    "timestamp": "2026-09-19T13:00:37.061594+00:00",
+    "snapshot_blend": 7.81,
+    "pools_checked": 13,
+    "high_drift": 0,
+    "medium_drift": 0,
+    "low_drift": 13,
+    "corrections": 0,
+    "drift_observations": [
+      {
+        "category": "core",
+        "project": "morpho-blue",
+        "symbol": "PENDLEUSDC",
+        "snapshot_apy": 5.2664,
+        "live_apy": 5.2664,
+        "drift_pct": 0.0,
+        "tvl": 63505111,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061497+00:00"
+      },
+      {
+        "category": "core",
+        "project": "sky-lending",
+        "symbol": "STUSDS",
+        "snapshot_apy": 5.11,
+        "live_apy": 5.11,
+        "drift_pct": 0.0,
+        "tvl": 193040150,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061518+00:00"
+      },
+      {
+        "category": "core",
+        "project": "aave-v3",
+        "symbol": "SGHO",
+        "snapshot_apy": 4.5,
+        "live_apy": 4.5,
+        "drift_pct": 0.0,
+        "tvl": 163199243,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061523+00:00"
+      },
+      {
+        "category": "core",
+        "project": "morpho-blue",
+        "symbol": "GTUSDCP",
+        "snapshot_apy": 4.3769,
+        "live_apy": 4.3769,
+        "drift_pct": 0.0,
+        "tvl": 419621390,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061527+00:00"
+      },
+      {
+        "category": "fixed",
+        "project": "pendle-v2",
+        "symbol": "USDAI",
+        "snapshot_apy": 9.7972,
+        "live_apy": 9.7972,
+        "drift_pct": 0.0,
+        "tvl": 50319485,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061531+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "saturn",
+        "symbol": "SUSDAT",
+        "snapshot_apy": 13.7813,
+        "live_apy": 13.7813,
+        "drift_pct": 0.0,
+        "tvl": 69822729,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061535+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "apyx-protocol",
+        "symbol": "APXUSD",
+        "snapshot_apy": 12.7287,
+        "live_apy": 12.7287,
+        "drift_pct": 0.0,
+        "tvl": 170815521,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061538+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "accountable",
+        "symbol": "USDC",
+        "snapshot_apy": 11.4,
+        "live_apy": 11.4,
+        "drift_pct": 0.0,
+        "tvl": 74981496,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061541+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "tori-finance",
+        "symbol": "STRUSD",
+        "snapshot_apy": 10.6268,
+        "live_apy": 10.6268,
+        "drift_pct": 0.0,
+        "tvl": 51135991,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061544+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "pareto-credit",
+        "symbol": "USDC",
+        "snapshot_apy": 7.8157,
+        "live_apy": 7.8157,
+        "drift_pct": 0.0,
+        "tvl": 154602030,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061546+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "bitwise-uscc",
+        "symbol": "USCC",
+        "snapshot_apy": 7.7029,
+        "live_apy": 7.7029,
+        "drift_pct": 0.0,
+        "tvl": 81686162,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061548+00:00"
+      },
+      {
+        "category": "delta_neutral",
+        "project": "re",
+        "symbol": "REUSD",
+        "snapshot_apy": 6.7839,
+        "live_apy": 6.7839,
+        "drift_pct": 0.0,
+        "tvl": 261913066,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061551+00:00"
+      },
+      {
+        "category": "delta_neutral",
+        "project": "ethena-usde",
+        "symbol": "SUSDE",
+        "snapshot_apy": 4.9436,
+        "live_apy": 4.9436,
+        "drift_pct": 0.0,
+        "tvl": 1330197845,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:37.061553+00:00"
+      }
+    ],
+    "auto_corrections": []
+  },
+  {
+    "timestamp": "2026-09-19T13:00:39.287928+00:00",
+    "snapshot_blend": 7.81,
+    "pools_checked": 13,
+    "high_drift": 0,
+    "medium_drift": 0,
+    "low_drift": 13,
+    "corrections": 0,
+    "drift_observations": [
+      {
+        "category": "core",
+        "project": "morpho-blue",
+        "symbol": "PENDLEUSDC",
+        "snapshot_apy": 5.2664,
+        "live_apy": 5.2664,
+        "drift_pct": 0.0,
+        "tvl": 63505111,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287845+00:00"
+      },
+      {
+        "category": "core",
+        "project": "sky-lending",
+        "symbol": "STUSDS",
+        "snapshot_apy": 5.11,
+        "live_apy": 5.11,
+        "drift_pct": 0.0,
+        "tvl": 193040150,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287863+00:00"
+      },
+      {
+        "category": "core",
+        "project": "aave-v3",
+        "symbol": "SGHO",
+        "snapshot_apy": 4.5,
+        "live_apy": 4.5,
+        "drift_pct": 0.0,
+        "tvl": 163199243,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287866+00:00"
+      },
+      {
+        "category": "core",
+        "project": "morpho-blue",
+        "symbol": "GTUSDCP",
+        "snapshot_apy": 4.3769,
+        "live_apy": 4.3769,
+        "drift_pct": 0.0,
+        "tvl": 419621390,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287870+00:00"
+      },
+      {
+        "category": "fixed",
+        "project": "pendle-v2",
+        "symbol": "USDAI",
+        "snapshot_apy": 9.7972,
+        "live_apy": 9.7972,
+        "drift_pct": 0.0,
+        "tvl": 50319485,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287873+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "saturn",
+        "symbol": "SUSDAT",
+        "snapshot_apy": 13.7813,
+        "live_apy": 13.7813,
+        "drift_pct": 0.0,
+        "tvl": 69822729,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287876+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "apyx-protocol",
+        "symbol": "APXUSD",
+        "snapshot_apy": 12.7287,
+        "live_apy": 12.7287,
+        "drift_pct": 0.0,
+        "tvl": 170815521,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287879+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "accountable",
+        "symbol": "USDC",
+        "snapshot_apy": 11.4,
+        "live_apy": 11.4,
+        "drift_pct": 0.0,
+        "tvl": 74981496,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287881+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "tori-finance",
+        "symbol": "STRUSD",
+        "snapshot_apy": 10.6268,
+        "live_apy": 10.6268,
+        "drift_pct": 0.0,
+        "tvl": 51135991,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287884+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "pareto-credit",
+        "symbol": "USDC",
+        "snapshot_apy": 7.8157,
+        "live_apy": 7.8157,
+        "drift_pct": 0.0,
+        "tvl": 154602030,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287886+00:00"
+      },
+      {
+        "category": "satellite",
+        "project": "bitwise-uscc",
+        "symbol": "USCC",
+        "snapshot_apy": 7.7029,
+        "live_apy": 7.7029,
+        "drift_pct": 0.0,
+        "tvl": 81686162,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287888+00:00"
+      },
+      {
+        "category": "delta_neutral",
+        "project": "re",
+        "symbol": "REUSD",
+        "snapshot_apy": 6.7839,
+        "live_apy": 6.7839,
+        "drift_pct": 0.0,
+        "tvl": 261913066,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287891+00:00"
+      },
+      {
+        "category": "delta_neutral",
+        "project": "ethena-usde",
+        "symbol": "SUSDE",
+        "snapshot_apy": 4.9436,
+        "live_apy": 4.9436,
+        "drift_pct": 0.0,
+        "tvl": 1330197845,
+        "severity": "LOW",
+        "timestamp": "2026-09-19T13:00:39.287893+00:00"
+      }
+    ],
+    "auto_corrections": []
   }
 ]

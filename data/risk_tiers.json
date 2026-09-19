@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-09-18T13:00:53Z",
+  "generated_utc": "2026-09-19T13:00:35Z",
   "tiers": {
     "conservative": {
       "label": "Conservative",
@@ -15,7 +15,7 @@
         "monitor": 0.05
       },
       "safety_min": 4,
-      "expected_apy": 6.13,
+      "expected_apy": 5.98,
       "satellite_max_apy": 0.08
     },
     "balanced": {
@@ -32,7 +32,7 @@
         "monitor": 0.05
       },
       "safety_min": 3,
-      "expected_apy": 7.4,
+      "expected_apy": 7.3,
       "satellite_max_apy": 0.15
     },
     "aggressive": {
@@ -49,7 +49,7 @@
         "monitor": 0.05
       },
       "safety_min": 2,
-      "expected_apy": 7.97,
+      "expected_apy": 7.88,
       "satellite_max_apy": 0.18
     },
     "maximum": {
@@ -66,16 +66,16 @@
         "monitor": 0.05
       },
       "safety_min": 1,
-      "expected_apy": 8.33,
+      "expected_apy": 8.27,
       "satellite_max_apy": 0.2
     }
   },
   "default_tier": "balanced",
   "tier_apys": {
-    "core": 5.08,
+    "core": 4.81,
     "fixed": 9.8,
-    "satellite": 10.77,
-    "delta_neutral": 5.72,
-    "tangible": 0.3
+    "satellite": 10.68,
+    "delta_neutral": 5.86,
+    "tangible": 0.32
   }
 }
