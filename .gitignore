@@ -7,3 +7,5 @@ crytic-export/
 artifacts/build-info/
 scripts/mint_repro*.js
 scripts/repro_open*.js
+__pycache__/
+*.pyc
