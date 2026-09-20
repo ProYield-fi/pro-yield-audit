@@ -95,9 +95,25 @@ contract PYDStaking is Ownable, ReentrancyGuard {
         }
     }
 
-    function exit() external {
-        this.withdraw(stakeAmount[msg.sender]);
-        this.getReward();
+    /// Compound exit: principal + rewards in one tx. Inlined (NOT this.withdraw/
+    /// this.getReward — external self-call makes msg.sender the contract itself,
+    /// breaking every msg.sender-keyed lookup).
+    function exit() external nonReentrant {
+        _updatePeriod();
+        _updateReward(msg.sender);
+        uint256 amt = stakeAmount[msg.sender];
+        if (amt > 0) {
+            stakeAmount[msg.sender] = 0;
+            totalSupply -= amt;
+            pyd.safeTransfer(msg.sender, amt);
+            emit Withdraw(msg.sender, amt);
+        }
+        uint256 reward = rewards[msg.sender];
+        if (reward > 0) {
+            rewards[msg.sender] = 0;
+            pyd.safeTransfer(msg.sender, reward);
+            emit Reward(msg.sender, reward);
+        }
     }
 
     // ── Views ───────────────────────────────────────────────────────

@@ -56,6 +56,11 @@ contract ProYieldVault is BaseStrategy {
         return _toAssets(sharesAmt); // named sharesAmt — does not shadow BaseStrategy.shares
     }
 
+    /// Max assets `account` can withdraw right now (frontend helper).
+    function maxWithdraw(address account) external view returns (uint256) {
+        return _toAssets(shares[account]);
+    }
+
     function _toShares(uint256 assets) internal view returns (uint256) {
         if (_totalShares == 0) return assets; // first depositor: 1:1
         return (assets * (_totalShares + SHARE_OFFSET)) / (_totalAssets + SHARE_OFFSET);
