@@ -1,8 +1,8 @@
 {
-  "deployed_utc": "2026-09-19T23:15:14.239Z",
+  "deployed_utc": "2026-09-19T23:59:24.391Z",
   "chain_id": 998,
   "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
-  "mock_usdc": "0x5D868de86AbDb193172cc65B5Ce6dCd071Eec53F",
-  "pro_yield_vault": "0x5345448000F2C3ADaE3b7A6945E7E4676fe1D2d6",
-  "delta_neutral": "0xC5dF0f0A8A6D3129956131e349A3B8Cf339e20A6"
+  "mock_usdc": "0xAa67940672047EcE44db2876378b182C1Fc4217C",
+  "pro_yield_vault": "0xadaE15e23b0007de2A85b1F3874332762Bc23bb0",
+  "delta_neutral": "0x29c7032A9d9971d2C33e2b991922A1af155EB392"
 }
