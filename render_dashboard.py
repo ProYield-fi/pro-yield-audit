@@ -168,12 +168,7 @@ def main():
     pm = pm_rewards()
     funding_full = hl_funding() or {}
     funding = funding_full.get("majors_funding_apr") or {}
-    # Prefer snapshot opportunities — they carry 30d empirical verification
-    carry_opps = []
-    if isinstance(standard_data, dict):
-        carry_opps = (standard_data.get("hyperliquid_funding") or {}).get("opportunities") or []
-    if not carry_opps:
-        carry_opps = funding_full.get("opportunities") or []
+    carry_opps = funding_full.get("opportunities") or []
     
     # Load history
     hist_path = os.path.join(DATA, "history.jsonl")
@@ -398,6 +393,10 @@ def main():
     dnsus = None
     if isinstance(standard_data, dict):
         dnsus = (standard_data.get("blend") or {}).get("delta_neutral_sUSDe")
+        # Snapshot opportunities carry 30d empirical verification — prefer them
+        snap_opps = (standard_data.get("hyperliquid_funding") or {}).get("opportunities")
+        if snap_opps:
+            carry_opps = snap_opps
     dn_alt_row = ""
     if dnsus:
         dn_alt_row = (f'<tr><td>Delta-neutral ALT sleeve — {esc(dnsus.get("project",""))} {esc(dnsus.get("symbol",""))}'
