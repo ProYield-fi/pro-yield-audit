@@ -35,6 +35,12 @@ def llama_pools():
             tag = "CORE"
         elif p["project"] == "morpho-blue" and p["symbol"] in ("STEAKUSDC", "GTUSDCP") and p["chain"] in ("Ethereum", "Base"):
             tag = "CORE"
+        # Home-chain lending venue (HyperLend — audited, non-custodial, leading
+        # Aave-style market on Hyperliquid L1). Pool-level floor stays $50M per
+        # mandate: USDC pool was $33M on 2026-09-20, so this rule activates
+        # automatically once the pool qualifies. Points program upside.
+        elif p["project"] == "hyperlend" and p["chain"] == "Hyperliquid L1" and p.get("stablecoin") and p["symbol"] == "USDC" and tvl >= 50_000_000:
+            tag = "CORE"
         elif p["project"] == "pendle-v2" and p.get("stablecoin") and tvl >= 20_000_000 and not is_lp:
             tag = "FIXED"
         elif p.get("stablecoin") and apy >= 10 and tvl >= 50_000_000 and p["project"] in ("accountable", "saturn", "apyx-protocol", "unitas-usdu", "tori-finance"):

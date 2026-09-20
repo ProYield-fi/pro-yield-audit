@@ -44,7 +44,7 @@ def score_safety(project, symbol, chain, tvl, stablecoin):
     # Tier 2: Medium protocols
     MEDIUM = ("re", "ethena", "accountable", "saturn", "apyx", "tori",
               "bitwise", "unitas", "lista", "kamino", "kamino-lend",
-              "marginfi", "savings", "jupiter-lend")
+              "marginfi", "savings", "jupiter-lend", "hyperlend")
 
     # Blue-chip protocols (all audited, non-custodial, high TVL)
     if any(a in proj for a in BLUE_CHIP):
