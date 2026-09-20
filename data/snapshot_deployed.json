@@ -1,30 +1,30 @@
 {
-  "generated_utc": "2026-09-19T13:00:35Z",
+  "generated_utc": "2026-09-20T17:28:55Z",
   "blend": {
-    "blend_apy": 7.81,
-    "core_apy": 4.81332,
-    "sat_apy": 10.67588,
-    "fixed_apy": 9.79717,
-    "tangible_apy": 0.324275,
+    "blend_apy": 7.89,
+    "core_apy": 5.0272575,
+    "sat_apy": 10.674631666666668,
+    "fixed_apy": 9.96148,
+    "tangible_apy": 0.32644,
     "allocation": {
       "CORE": {
-        "apy": 4.81332,
+        "apy": 5.0272575,
         "weight": 0.35
       },
       "FIXED": {
-        "apy": 9.79717,
+        "apy": 9.96148,
         "weight": 0.1
       },
       "SATELLITE": {
-        "apy": 10.67588,
+        "apy": 10.674631666666668,
         "weight": 0.4
       },
       "DELTA_NEUTRAL": {
-        "apy": 5.863715,
+        "apy": 5.742885,
         "weight": 0.15
       },
       "TANGIBLE": {
-        "apy": 0.324275,
+        "apy": 0.32644,
         "weight": 0.0
       }
     }
@@ -35,11 +35,11 @@
         "symbol": "PENDLEUSDC",
         "project": "morpho-blue",
         "chain": "Ethereum",
-        "apy": 5.26636,
-        "apy_30d": 6.78309,
-        "tvl": 63505111,
+        "apy": 6.16052,
+        "apy_30d": 6.76994,
+        "tvl": 63662571,
         "safety": 5,
-        "gap": -1.52,
+        "gap": -0.61,
         "poolMeta": "",
         "category": "core"
       },
@@ -48,10 +48,10 @@
         "project": "sky-lending",
         "chain": "Ethereum",
         "apy": 5.11,
-        "apy_30d": 5.4065,
-        "tvl": 193040150,
+        "apy_30d": 5.38918,
+        "tvl": 192897896,
         "safety": 5,
-        "gap": -0.3,
+        "gap": -0.28,
         "poolMeta": "Expert Mode",
         "category": "core"
       },
@@ -60,10 +60,10 @@
         "project": "aave-v3",
         "chain": "Ethereum",
         "apy": 4.5,
-        "apy_30d": 4.39578,
-        "tvl": 163199243,
+        "apy_30d": 4.40651,
+        "tvl": 163452037,
         "safety": 5,
-        "gap": 0.1,
+        "gap": 0.09,
         "poolMeta": "",
         "category": "core"
       },
@@ -71,11 +71,11 @@
         "symbol": "GTUSDCP",
         "project": "morpho-blue",
         "chain": "Base",
-        "apy": 4.37692,
-        "apy_30d": 4.31111,
-        "tvl": 419621390,
+        "apy": 4.33851,
+        "apy_30d": 4.32048,
+        "tvl": 419476036,
         "safety": 5,
-        "gap": 0.07,
+        "gap": 0.02,
         "poolMeta": "",
         "category": "core"
       }
@@ -85,11 +85,11 @@
         "symbol": "USDAI",
         "project": "pendle-v2",
         "chain": "Arbitrum",
-        "apy": 9.79717,
-        "apy_30d": 8.22055,
-        "tvl": 50319485,
+        "apy": 9.96148,
+        "apy_30d": 8.3399,
+        "tvl": 50319147,
         "safety": 2,
-        "gap": 1.58,
+        "gap": 1.62,
         "poolMeta": "For buying PT-USDai-15OCT2026",
         "category": "fixed"
       }
@@ -99,11 +99,11 @@
         "symbol": "SUSDAT",
         "project": "saturn",
         "chain": "Ethereum",
-        "apy": 13.78127,
-        "apy_30d": 15.24235,
-        "tvl": 69822729,
+        "apy": 13.78171,
+        "apy_30d": 15.12432,
+        "tvl": 69833901,
         "safety": 5,
-        "gap": -1.46,
+        "gap": -1.34,
         "poolMeta": "",
         "category": "satellite"
       },
@@ -111,9 +111,9 @@
         "symbol": "APXUSD",
         "project": "apyx-protocol",
         "chain": "Ethereum",
-        "apy": 12.72869,
-        "apy_30d": 12.39931,
-        "tvl": 170815521,
+        "apy": 12.73376,
+        "apy_30d": 12.39901,
+        "tvl": 170745932,
         "safety": 5,
         "gap": 0.33,
         "poolMeta": "apyUSD vault",
@@ -124,10 +124,10 @@
         "project": "accountable",
         "chain": "Monad",
         "apy": 11.4,
-        "apy_30d": 11.99346,
-        "tvl": 74981496,
+        "apy_30d": 11.89289,
+        "tvl": 74975820,
         "safety": 5,
-        "gap": -0.59,
+        "gap": -0.49,
         "poolMeta": "Earn ACC Points",
         "category": "satellite"
       },
@@ -135,11 +135,11 @@
         "symbol": "STRUSD",
         "project": "tori-finance",
         "chain": "Ethereum",
-        "apy": 10.62677,
-        "apy_30d": 10.56767,
-        "tvl": 51135991,
+        "apy": 10.62305,
+        "apy_30d": 10.54796,
+        "tvl": 51153024,
         "safety": 5,
-        "gap": 0.06,
+        "gap": 0.08,
         "poolMeta": "7 days unstaking",
         "category": "satellite"
       },
@@ -148,23 +148,23 @@
         "project": "pareto-credit",
         "chain": "Ethereum",
         "apy": 7.81568,
-        "apy_30d": 7.89845,
-        "tvl": 154602030,
+        "apy_30d": 7.8902,
+        "tvl": 154598500,
         "safety": 5,
-        "gap": -0.08,
+        "gap": -0.07,
         "poolMeta": "FalconX",
         "category": "satellite"
       },
       {
-        "symbol": "USCC",
-        "project": "bitwise-uscc",
-        "chain": "Ethereum",
-        "apy": 7.70287,
-        "apy_30d": 6.35089,
-        "tvl": 81686162,
-        "safety": 5,
-        "gap": 1.35,
-        "poolMeta": "",
+        "symbol": "SAVUSD",
+        "project": "avant-avusd",
+        "chain": "Avalanche",
+        "apy": 7.69359,
+        "apy_30d": 8.07862,
+        "tvl": 103369349,
+        "safety": 2,
+        "gap": -0.39,
+        "poolMeta": "ERC-4626: savUSD \u2192 avUSD",
         "category": "satellite"
       }
     ],
@@ -173,11 +173,11 @@
         "symbol": "REUSD",
         "project": "re",
         "chain": "Ethereum",
-        "apy": 6.78387,
-        "apy_30d": 6.53442,
-        "tvl": 261913066,
+        "apy": 6.81604,
+        "apy_30d": 6.55222,
+        "tvl": 264567663,
         "safety": 5,
-        "gap": 0.25,
+        "gap": 0.26,
         "poolMeta": "",
         "category": "delta-neutral"
       },
@@ -185,11 +185,11 @@
         "symbol": "SUSDE",
         "project": "ethena-usde",
         "chain": "Ethereum",
-        "apy": 4.94356,
-        "apy_30d": 4.6647,
-        "tvl": 1330197845,
+        "apy": 4.66973,
+        "apy_30d": 4.67408,
+        "tvl": 1331231477,
         "safety": 5,
-        "gap": 0.28,
+        "gap": -0.0,
         "poolMeta": "7 days unstaking",
         "category": "delta-neutral"
       }
@@ -199,11 +199,11 @@
         "symbol": "XAUT",
         "project": "lista-lending",
         "chain": "BSC",
-        "apy": 0.64855,
-        "apy_30d": 3.50452,
-        "tvl": 6472365,
+        "apy": 0.65288,
+        "apy_30d": 3.11294,
+        "tvl": 6437164,
         "safety": 5,
-        "gap": -2.86,
+        "gap": -2.46,
         "poolMeta": "",
         "category": "tangible"
       },
@@ -213,7 +213,7 @@
         "chain": "Ethereum",
         "apy": 0,
         "apy_30d": 0,
-        "tvl": 67107652,
+        "tvl": 67127472,
         "safety": 5,
         "gap": 0,
         "poolMeta": "",
@@ -222,11 +222,11 @@
     ]
   },
   "tier_apys": {
-    "core": 4.81332,
-    "fixed": 9.79717,
-    "satellite": 10.67588,
-    "delta_neutral": 5.863715,
-    "tangible": 0.324275
+    "core": 5.0272575,
+    "fixed": 9.96148,
+    "satellite": 10.674631666666668,
+    "delta_neutral": 5.742885,
+    "tangible": 0.32644
   },
   "deployment": {
     "weights": {
@@ -236,11 +236,11 @@
       "delta_neutral": 0.15,
       "tangible": 0.0
     },
-    "total_evaluated": 106,
+    "total_evaluated": 109,
     "categories": {
-      "core": 24,
+      "core": 23,
       "fixed": 1,
-      "satellite": 15,
+      "satellite": 16,
       "delta-neutral": 2,
       "tangible": 5,
       "monitor": 19
@@ -254,43 +254,54 @@
       "symbol": "SUSDS",
       "chain": "Ethereum",
       "apy_base": 3.6,
-      "apy_30d": 3.56,
-      "tvl_usd": 4382477297,
+      "apy_30d": 3.57,
+      "tvl_usd": 4402543405,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
+    },
+    {
+      "tag": "DN_STABLE",
+      "project": "ethena-usde",
+      "symbol": "SUSDE",
+      "chain": "Ethereum",
+      "apy_base": 4.67,
+      "apy_30d": 4.67,
+      "tvl_usd": 1331231477,
+      "source": "yields.llama.fi/pools",
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "aave-v3",
       "symbol": "USDE",
       "chain": "Ethereum",
-      "apy_base": 0.65,
-      "apy_30d": 3.25,
-      "tvl_usd": 524565457,
+      "apy_base": 0.64,
+      "apy_30d": 3.2,
+      "tvl_usd": 522289839,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "morpho-blue",
       "symbol": "STEAKUSDC",
       "chain": "Base",
-      "apy_base": 4.36,
-      "apy_30d": 4.31,
-      "tvl_usd": 427884604,
+      "apy_base": 4.34,
+      "apy_30d": 4.32,
+      "tvl_usd": 427080247,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "morpho-blue",
       "symbol": "GTUSDCP",
       "chain": "Base",
-      "apy_base": 4.38,
-      "apy_30d": 4.31,
-      "tvl_usd": 419621390,
+      "apy_base": 4.34,
+      "apy_30d": 4.32,
+      "tvl_usd": 419476036,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
@@ -298,21 +309,10 @@
       "symbol": "SUSDS",
       "chain": "Arbitrum",
       "apy_base": 3.6,
-      "apy_30d": 3.56,
-      "tvl_usd": 363643023,
+      "apy_30d": 3.57,
+      "tvl_usd": 363122530,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
-    },
-    {
-      "tag": "CORE",
-      "project": "aave-v3",
-      "symbol": "USDT",
-      "chain": "Ethereum",
-      "apy_base": 3.63,
-      "apy_30d": 3.4,
-      "tvl_usd": 225434062,
-      "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
@@ -320,10 +320,21 @@
       "symbol": "SUSDE",
       "chain": "Ethereum",
       "apy_base": 0,
-      "apy_30d": 1.25,
-      "tvl_usd": 211910590,
+      "apy_30d": 1.22,
+      "tvl_usd": 211602034,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
+    },
+    {
+      "tag": "CORE",
+      "project": "aave-v3",
+      "symbol": "USDT",
+      "chain": "Ethereum",
+      "apy_base": 3.98,
+      "apy_30d": 3.43,
+      "tvl_usd": 196090588,
+      "source": "yields.llama.fi/pools",
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
@@ -331,21 +342,21 @@
       "symbol": "STUSDS",
       "chain": "Ethereum",
       "apy_base": 5.11,
-      "apy_30d": 5.41,
-      "tvl_usd": 193040150,
+      "apy_30d": 5.39,
+      "tvl_usd": 192897896,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "aave-v3",
       "symbol": "USDC",
       "chain": "Ethereum",
-      "apy_base": 3.6,
-      "apy_30d": 3.92,
-      "tvl_usd": 178605830,
+      "apy_base": 3.61,
+      "apy_30d": 3.93,
+      "tvl_usd": 176214163,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "SATELLITE",
@@ -354,20 +365,20 @@
       "chain": "Ethereum",
       "apy_base": 12.73,
       "apy_30d": 12.4,
-      "tvl_usd": 170815521,
+      "tvl_usd": 170745932,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "morpho-blue",
       "symbol": "GTUSDCP",
       "chain": "Base",
-      "apy_base": 4.36,
-      "apy_30d": 4.31,
-      "tvl_usd": 167630330,
+      "apy_base": 4.34,
+      "apy_30d": 4.32,
+      "tvl_usd": 170473600,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
@@ -375,32 +386,32 @@
       "symbol": "SGHO",
       "chain": "Ethereum",
       "apy_base": 4.5,
-      "apy_30d": 4.4,
-      "tvl_usd": 163199243,
+      "apy_30d": 4.41,
+      "tvl_usd": 163452037,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "morpho-blue",
       "symbol": "STEAKUSDC",
       "chain": "Base",
-      "apy_base": 3.26,
+      "apy_base": 3.23,
       "apy_30d": 3.22,
-      "tvl_usd": 129965507,
+      "tvl_usd": 129929062,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "morpho-blue",
       "symbol": "STEAKUSDC",
       "chain": "Ethereum",
-      "apy_base": 4.1,
-      "apy_30d": 4.26,
-      "tvl_usd": 123175157,
+      "apy_base": 4.02,
+      "apy_30d": 4.24,
+      "tvl_usd": 124069075,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
@@ -409,20 +420,20 @@
       "chain": "Ethereum",
       "apy_base": 0,
       "apy_30d": 0,
-      "tvl_usd": 114086106,
+      "tvl_usd": 114201932,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "morpho-blue",
       "symbol": "GTUSDCP",
       "chain": "Ethereum",
-      "apy_base": 4.1,
-      "apy_30d": 4.27,
-      "tvl_usd": 102510086,
+      "apy_base": 4.02,
+      "apy_30d": 4.25,
+      "tvl_usd": 99850044,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "SATELLITE",
@@ -430,10 +441,10 @@
       "symbol": "USDC",
       "chain": "Monad",
       "apy_base": 11.4,
-      "apy_30d": 11.99,
-      "tvl_usd": 74981496,
+      "apy_30d": 11.89,
+      "tvl_usd": 74975820,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "SATELLITE",
@@ -441,65 +452,76 @@
       "symbol": "SUSDAT",
       "chain": "Ethereum",
       "apy_base": 13.78,
-      "apy_30d": 15.24,
-      "tvl_usd": 69822729,
+      "apy_30d": 15.12,
+      "tvl_usd": 69833901,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "morpho-blue",
       "symbol": "STEAKUSDC",
       "chain": "Ethereum",
-      "apy_base": 3.9,
+      "apy_base": 3.84,
       "apy_30d": 4.04,
-      "tvl_usd": 67748000,
+      "tvl_usd": 66553404,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "SATELLITE",
       "project": "tori-finance",
       "symbol": "STRUSD",
       "chain": "Ethereum",
-      "apy_base": 10.63,
-      "apy_30d": 10.57,
-      "tvl_usd": 51135991,
+      "apy_base": 10.62,
+      "apy_30d": 10.55,
+      "tvl_usd": 51153024,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "FIXED",
       "project": "pendle-v2",
       "symbol": "USDAI",
       "chain": "Arbitrum",
-      "apy_base": 9.8,
-      "apy_30d": 8.22,
-      "tvl_usd": 50319485,
+      "apy_base": 9.96,
+      "apy_30d": 8.34,
+      "tvl_usd": 50319147,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
+    },
+    {
+      "tag": "CORE",
+      "project": "hyperlend-pooled",
+      "symbol": "USDC",
+      "chain": "Hyperliquid L1",
+      "apy_base": 3.97,
+      "apy_30d": 5.46,
+      "tvl_usd": 28837857,
+      "source": "yields.llama.fi/pools",
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "FIXED",
       "project": "pendle-v2",
       "symbol": "SUSDE",
       "chain": "Monad",
-      "apy_base": 5.1,
-      "apy_30d": 5.02,
-      "tvl_usd": 20780586,
+      "apy_base": 5.18,
+      "apy_30d": 5.04,
+      "tvl_usd": 20783317,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
       "project": "morpho-blue",
       "symbol": "STEAKUSDC",
       "chain": "Base",
-      "apy_base": 4.15,
-      "apy_30d": 4.09,
-      "tvl_usd": 20519260,
+      "apy_base": 4.12,
+      "apy_30d": 4.1,
+      "tvl_usd": 20347314,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     },
     {
       "tag": "CORE",
@@ -507,24 +529,115 @@
       "symbol": "SUSDS",
       "chain": "OP Mainnet",
       "apy_base": 3.6,
-      "apy_30d": 3.56,
-      "tvl_usd": 5139750,
+      "apy_30d": 3.57,
+      "tvl_usd": 5132394,
       "source": "yields.llama.fi/pools",
-      "ts": "2026-09-19T13:00:33Z"
+      "ts": "2026-09-20T17:28:48Z"
     }
   ],
   "polymarket_rewards": {
-    "total_daily_usd": 36855,
-    "reward_markets": 84,
+    "total_daily_usd": 272847,
+    "reward_markets": 93,
     "source": "gamma-api.polymarket.com",
-    "ts": "2026-09-19T13:00:33Z"
+    "ts": "2026-09-20T17:28:49Z"
   },
   "hyperliquid_funding": {
     "majors_funding_apr": {
       "BTC": 11.0,
       "ETH": 11.0
     },
+    "opportunities": [
+      {
+        "name": "para:ANSEM",
+        "funding_apr": 441.6,
+        "oi_usd": 1001793,
+        "cap_usd": 50090,
+        "capacity_limited": true,
+        "mean_30d_apr": 269.9,
+        "pos_30d_pct": 82.3,
+        "verified": true
+      },
+      {
+        "name": "xyz:BMNR",
+        "funding_apr": 294.0,
+        "oi_usd": 605496,
+        "cap_usd": 30275,
+        "capacity_limited": true
+      },
+      {
+        "name": "para:GLW",
+        "funding_apr": 193.6,
+        "oi_usd": 308673,
+        "cap_usd": 15434,
+        "capacity_limited": true
+      },
+      {
+        "name": "para:COHR",
+        "funding_apr": 178.0,
+        "oi_usd": 449379,
+        "cap_usd": 22469,
+        "capacity_limited": true
+      },
+      {
+        "name": "para:IREN",
+        "funding_apr": 166.3,
+        "oi_usd": 730829,
+        "cap_usd": 36541,
+        "capacity_limited": true
+      },
+      {
+        "name": "xyz:PURRDAT",
+        "funding_apr": 157.6,
+        "oi_usd": 10876708,
+        "cap_usd": 543835,
+        "capacity_limited": false,
+        "mean_30d_apr": -1.5,
+        "pos_30d_pct": 50.7,
+        "verified": false
+      },
+      {
+        "name": "GOAT",
+        "funding_apr": 150.1,
+        "oi_usd": 765002,
+        "cap_usd": 38250,
+        "capacity_limited": true,
+        "mean_30d_apr": 27.5,
+        "pos_30d_pct": 100.0,
+        "verified": true
+      },
+      {
+        "name": "APEX",
+        "funding_apr": 144.4,
+        "oi_usd": 2580546,
+        "cap_usd": 129027,
+        "capacity_limited": true,
+        "mean_30d_apr": 51.5,
+        "pos_30d_pct": 100.0,
+        "verified": true
+      },
+      {
+        "name": "xyz:GIGADEV",
+        "funding_apr": 129.5,
+        "oi_usd": 960072,
+        "cap_usd": 48004,
+        "capacity_limited": true,
+        "mean_30d_apr": 20.3,
+        "pos_30d_pct": 60.6,
+        "verified": true
+      },
+      {
+        "name": "xyz:SOXL",
+        "funding_apr": 129.0,
+        "oi_usd": 17879520,
+        "cap_usd": 893976,
+        "capacity_limited": false,
+        "mean_30d_apr": 6.5,
+        "pos_30d_pct": 79.3,
+        "verified": true
+      }
+    ],
+    "capacity_rule": "deployable per name <= 5% of OI; verified = 30d mean funding > 0",
     "source": "api.hyperliquid.xyz/info",
-    "ts": "2026-09-19T13:00:33Z"
+    "ts": "2026-09-20T17:28:55Z"
   }
 }

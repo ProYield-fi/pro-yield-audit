@@ -8,7 +8,8 @@ Replaces the manual satellite selection with an automated deployment engine that
 4. Updates snapshot.json with the new picks
 5. Outputs the recommended allocation
 
-Safety criteria: non-custodial, audited, no leverage, TVL >= $50M (except tangible: $5M)
+Safety criteria: non-custodial, audited, no leverage, TVL >= $50M
+(except tangible: $5M; hyperlend USDC: $25M home-chain carve-in, mandate amended 2026-09-20)
 """
 import json, os, sys, urllib.request
 from datetime import datetime, timezone
@@ -102,7 +103,13 @@ def evaluate_pool(p):
         return None
     
     # Determine minimum TVL requirement
-    tvl_min = 5_000_000 if symbol in ('PAXG', 'XAUT') else 50_000_000
+    # MANDATE AMENDED 2026-09-20 (owner): home-chain carve-in — HyperLend USDC
+    # qualifies at a $25M pool floor (venue TVL $444M+, audited; pool $33M).
+    # DL project slug: hyperlend-pooled.
+    if project.startswith('hyperlend') and symbol == 'USDC':
+        tvl_min = 25_000_000
+    else:
+        tvl_min = 5_000_000 if symbol in ('PAXG', 'XAUT') else 50_000_000
     
     # Basic filters
     if apy is None or tvl < tvl_min or not stablecoin and symbol not in ('PAXG', 'XAUT'):
