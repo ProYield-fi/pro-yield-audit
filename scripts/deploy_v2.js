@@ -40,6 +40,27 @@ async function main() {
   await delta.waitForDeployment();
   console.log("DeltaNeutral:", await delta.getAddress());
   deployed.delta_neutral = await delta.getAddress();
+
+  // Funding infrastructure: testnet oracle + venue stand-in (prod swaps adapters)
+  const MockFundingOracle = await hre.ethers.getContractFactory("MockFundingOracle");
+  const fundingOracle = await MockFundingOracle.deploy(1100); // 11% APR annualized bps
+  await fundingOracle.waitForDeployment();
+  const MockFundingSource = await hre.ethers.getContractFactory("MockFundingSource");
+  const fundingSource = await MockFundingSource.deploy(await mockUSDC.getAddress());
+  await fundingSource.waitForDeployment();
+  await (await delta.setOracle(await fundingOracle.getAddress())).wait();
+  await (await delta.setFundingSource(await fundingSource.getAddress())).wait();
+  // pre-fund the venue with 1M USDC so funding accrual pays real tokens
+  await (await mockUSDC.mint(owner.address, ethers.parseUnits("1000000", 18))).wait();
+  await (await mockUSDC.approve(await fundingSource.getAddress(), ethers.parseUnits("1000000", 18))).wait();
+  await (await fundingSource.fund(ethers.parseUnits("1000000", 18))).wait();
+  // open a position so accrual has a notional
+  await (await delta.openPosition(ethers.parseUnits("30000", 18))).wait();
+  await (await delta.updateFunding()).wait();
+  console.log("FundingOracle:", await fundingOracle.getAddress());
+  console.log("FundingSource:", await fundingSource.getAddress());
+  deployed.funding_oracle = await fundingOracle.getAddress();
+  deployed.funding_source = await fundingSource.getAddress();
   
   // Persist BEFORE the tx sequence so a mid-run failure still leaves usable addresses
   fs.writeFileSync(ADDRESSES_PATH, JSON.stringify(deployed, null, 2));

@@ -50,16 +50,20 @@ async function main() {
 
   // === TEST 7: Add strategy ===
   const DeltaNeutral = await hre.ethers.getContractFactory("DeltaNeutralStrategy");
+  const MockFundingOracle = await hre.ethers.getContractFactory("MockFundingOracle");
+  const testOracle = await MockFundingOracle.deploy(0); await testOracle.waitForDeployment();
   const delta = await DeltaNeutral.deploy(
     await mockUSDC.getAddress(),
     owner.address,
     owner.address,
-    owner.address
+    await testOracle.getAddress()
   );
   await delta.waitForDeployment();
   
   const addTx = await vault.addStrategy(await delta.getAddress());
   await addTx.wait();
+  const setV = await delta.setVault(await vault.getAddress()); // authorize vault sweep/recall
+  await setV.wait();
   console.log("✅ TEST 7: addStrategy works");
 
   // === TEST 8: allocate() ===

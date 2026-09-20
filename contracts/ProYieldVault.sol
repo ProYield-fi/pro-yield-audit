@@ -12,6 +12,7 @@ contract ProYieldVault is BaseStrategy {
     uint256 public constant RESERVE_BPS = 1000; // 10% of assets kept liquid for withdrawals
     address public immutable feeDistributor;
     mapping(address => bool) public strategies;
+    event PerformanceFeeSet(uint256 fee);
     mapping(address => bool) public strategyActive;   // per-strategy circuit breaker
     uint256 private _totalAssets;
     address[] public strategyList;
@@ -62,6 +63,7 @@ contract ProYieldVault is BaseStrategy {
     function setPerformanceFee(uint256 fee) external onlyOwner {
         require(fee <= 10000, "ProYieldVault: fee too high");
         performanceFee = fee;
+        emit PerformanceFeeSet(fee);
     }
 
     function emergencyWithdraw() external onlyOwner nonReentrant {
@@ -143,8 +145,23 @@ contract ProYieldVault is BaseStrategy {
     }
 
     function harvest() external override nonReentrant {
+        // Sweep accrued profit from every active strategy, then take the
+        // performance fee on what actually landed (no modeled yield).
+        uint256 idleBefore = underlying.balanceOf(address(this));
+        uint256 len = strategyList.length;
+        for (uint256 i = 0; i < len; i++) {  // calls-loop: vault-authorized strategies only
+            address s = strategyList[i];
+            if (strategies[s] && strategyActive[s]) {
+                BaseStrategy(s).harvest(); // strategies authorized to sweep to vault
+            }
+        }
+        uint256 totalProfit = underlying.balanceOf(address(this)) - idleBefore;
+        if (totalProfit > 0 && performanceFee > 0) {
+            uint256 fee = (totalProfit * performanceFee) / 10000;
+            if (fee > 0) underlying.safeTransfer(feeDistributor, fee);
+        }
         lastHarvest = block.timestamp;
-        emit Harvest(0);
+        emit Harvest(totalProfit);
     }
 
     function harvestStrategy(address strategy) external onlyOwner nonReentrant {

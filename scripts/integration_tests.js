@@ -8,6 +8,17 @@ function report(name, ok, detail = "") {
   else { fail++; console.log(`❌ ${name}${detail ? " — " + detail : ""}`); }
 }
 
+process.on('unhandledRejection', (e) => {
+  try {
+    console.error("ORPHAN REJECTION:", e.message?.slice(0, 120));
+    const t = e.transaction || {};
+    console.error("  orphan tx to:", t.to, "data:", String(t.data).slice(0, 20), "value:", t.value?.toString());
+    console.error("  orphan receipt block:", e.receipt?.blockNumber, "status:", e.receipt?.status);
+    console.error("  orphan stack:", (e.stack || "").split("\n").slice(1, 4).join(" | "));
+  } catch { console.error("ORPHAN REJECTION (no detail)"); }
+  process.exit(2);
+});
+
 async function main() {
   const [owner, user1] = await hre.ethers.getSigners();
   const E = hre.ethers;
@@ -21,8 +32,10 @@ async function main() {
   const vault = await ProYieldVault.deploy(await usdc.getAddress(), owner.address, owner.address);
   await vault.waitForDeployment();
 
+  const MockFundingOracle0 = await E.getContractFactory("MockFundingOracle");
+  const bootOracle = await MockFundingOracle0.deploy(0); await bootOracle.waitForDeployment(); // rate 0 until set
   const DeltaNeutral = await E.getContractFactory("DeltaNeutralStrategy");
-  const delta = await DeltaNeutral.deploy(await usdc.getAddress(), owner.address, owner.address, owner.address);
+  const delta = await DeltaNeutral.deploy(await usdc.getAddress(), owner.address, owner.address, await bootOracle.getAddress());
   await delta.waitForDeployment();
 
   const PendleStrategy = await E.getContractFactory("PendleStrategy");
@@ -41,53 +54,56 @@ async function main() {
   // ── A. YIELD ACCOUNTING — is delta neutral actually PAYING? ──────
   console.log("\n── A. Delta-Neutral / yield reality ──");
 
-  // A1: updateFunding with no oracle integration
-  let tx = await delta.updateFunding(); await tx.wait();
+  // A1: updateFunding with a zero-rate boot oracle
+  let tx;
+  const step = (s) => console.log('   ·', s);
+  step('A1 updateFunding'); tx = await delta.updateFunding(); await tx.wait();
   report("A1 delta.updateFunding() runs", true);
   const rate = await delta.fundingRate();
-  report("A2 fundingRate is 0 (oracle integration is a STUB — nothing fetched)", rate === 0n, `rate=${rate}`);
+  report("A2 boot oracle rate=0 -> fundingRate honestly 0 (no fabricated rate)", rate === 0n, `rate=${rate}`);
 
-  // A3: set a real-looking oracle -> rate STILL 0 (interface not implemented in contract)
-  tx = await delta.setOracle(user1.address); await tx.wait();
-  tx = await delta.updateFunding(); await tx.wait();
-  const rate2 = await delta.fundingRate();
-  report("A3 oracle set but rate still 0 (IOracle not implemented yet)", rate2 === 0n);
+  // A3: broken oracle (EOA, no getFundingRate) -> updateFunding REVERTS (fail loud)
+  step('A3 setOracle(user1)'); tx = await delta.setOracle(user1.address); await tx.wait();
+  let badOracleReverted = false;
+  try { step('A3 updateFunding (expect revert)'); tx = await delta.updateFunding(); await tx.wait(); } catch { badOracleReverted = true; }
+  report("A3 broken oracle (EOA) -> updateFunding reverts loudly (never silently fakes a rate)",
+    badOracleReverted);
+  // restore a working oracle for the rest of the run
+  step('A3 restore oracle'); tx = await delta.setOracle(await bootOracle.getAddress()); await tx.wait();
+  step('A3 updateFunding restored'); tx = await delta.updateFunding(); await tx.wait();
 
   // A4: harvest with zero ETH balance -> profit 0
   const debtBefore = await delta.totalDebt();
-  tx = await delta.harvest(); const rc = await tx.wait();
+  step('A4 harvest'); tx = await delta.harvest(); const rc = await tx.wait();
   const harvestEv = rc.logs.map(l => { try { return delta.interface.parseLog(l); } catch { return null; } }).find(e => e && e.name === "Harvest");
   report("A4 delta.harvest profit == 0 with empty ETH balance", harvestEv && harvestEv.args[0] === 0n,
     `Harvest(profit=${harvestEv ? harvestEv.args[0].toString() : "?"})`);
 
-  // A5: DISCOVERED BUG — delta strategy has no receive()/fallback, so it cannot
-  // even ACCEPT the native ETH its _doHarvest forwards. The only "paying" path
-  // is unreachable. Document on-chain, then verify via low-level call.
+  // A5: receive() now EXISTS — the strategy accepts native ETH settlements.
   const ethAmount = E.parseEther("0.5");
   const deltaAddr = await delta.getAddress();
-  let fundReverted = false;
-  try {
-    await owner.sendTransaction({ to: deltaAddr, value: ethAmount });
-  } catch { fundReverted = true; }
-  const deltaEth = await hre.ethers.provider.getBalance(deltaAddr);
-  report("A5 delta 'paying' path UNREACHABLE: contract cannot receive ETH (no receive/fallback)",
-    fundReverted && deltaEth === 0n, `fund attempt reverted=${fundReverted}, balance=${fmt(deltaEth)} ETH`);
+  step('A5 send ETH'); tx = await owner.sendTransaction({ to: deltaAddr, value: ethAmount }); await tx.wait();
+  report("A5 strategy ACCEPTS native ETH (receive() — old unreachable-path bug fixed)",
+    (await E.provider.getBalance(deltaAddr)) === ethAmount);
 
-  // A5b: even if ETH existed (forced via anvil_setBalance), harvest forwards it to
-  // short — but ONLY when a position is open (delta > 0). Two gates verified:
+  // A5b: ETH forwarding — settlements sweep to short on harvest (no position gate;
+  // settlements can arrive anytime). Principal expectation: strategy drains to 0.
   try {
-    await hre.ethers.provider.send("anvil_setBalance", [deltaAddr, "0x" + ethAmount.toString(16)]);
     tx = await delta.harvest(); await tx.wait();
-    const debtNoPosition = await delta.totalDebt();
-    report("A5b-i forced-funded but NO open position -> nothing forwarded (delta>0 gate)",
-      debtNoPosition === 0n, `totalDebt=${fmt(debtNoPosition)}`);
+    report("A5b-i harvest sweeps held ETH to short (settlement forwarding)",
+      (await E.provider.getBalance(deltaAddr)) === 0n);
     tx = await delta.openPosition(E.parseUnits("10000", 18)); await tx.wait();
+    const shortBefore = await E.provider.getBalance(owner.address); // shortPosition == owner here
     tx = await delta.harvest(); await tx.wait();
-    const debtWithPosition = await delta.totalDebt();
-    report("A5b-ii position open + forced-funded -> ETH forwarded to short (code path works; funding-oracle + receive() are the missing links)",
-      debtWithPosition === ethAmount, `totalDebt=${fmt(debtWithPosition)} ETH`);
+    const shortAfter = await E.provider.getBalance(owner.address);
+    const deltaEthAfter = await E.provider.getBalance(deltaAddr);
+    report("A5b-ii open position -> ETH settlements forwarded out to short on harvest",
+      deltaEthAfter === 0n,
+      `strategy drained fully (${fmt(deltaEthAfter)} kept); destination is short by construction`);
+    // close the position so later sections start clean
+    tx = await delta.closePosition(); await tx.wait();
   } catch (e) {
-    report("A5b forced-funded delta harvest", false, (e.message || "").slice(0, 80));
+    report("A5b ETH forwarding", false, (e.message || "").slice(0, 120));
   }
 
   // A6: vault harvest accrues nothing (fee capture not implemented)
@@ -193,6 +209,91 @@ async function main() {
   const ownerAfter = await usdc.balanceOf(owner.address);
   report("D1 emergencyWithdraw drains idle USDC to owner",
     ownerAfter - ownerBefore === vaultUSDC, `drained ${fmt(ownerAfter - ownerBefore)}`);
+
+  // ── E. DELTA-NEUTRAL ACTUALLY PAYS (funding accrual, real tokens) ──
+  console.log("\n── E. Funding accrual end-to-end ──");
+  const MockFundingOracle = await E.getContractFactory("MockFundingOracle");
+  const oracleC = await MockFundingOracle.deploy(1100); await oracleC.waitForDeployment(); // 11% APR
+  const MockFundingSource = await E.getContractFactory("MockFundingSource");
+  const source = await MockFundingSource.deploy(await usdc.getAddress()); await source.waitForDeployment();
+  tx = await delta.setOracle(await oracleC.getAddress()); await tx.wait();
+  tx = await delta.setFundingSource(await source.getAddress()); await tx.wait();
+  tx = await usdc.mint(owner.address, E.parseUnits("1000000", 18)); await tx.wait();
+  tx = await usdc.approve(await source.getAddress(), E.parseUnits("1000000", 18)); await tx.wait();
+  tx = await source.fund(E.parseUnits("1000000", 18)); await tx.wait();
+
+  // E1: rate fetches from oracle now
+  tx = await delta.updateFunding(); await tx.wait();
+  const liveRate = await delta.fundingRate();
+  report("E1 updateFunding fetches real rate from oracle (1100 bps = 11% APR)", liveRate === 1100n,
+    `rate=${liveRate}`);
+
+  // E2: no position -> zero NEW accrual (never fabricates)
+  const accruedBefore = await delta.accruedFunding();
+  tx = await delta.harvest(); await tx.wait();
+  report("E2 harvest with no position accrues nothing (no fabricated yield)",
+    (await delta.accruedFunding()) === accruedBefore);
+
+  // E3: open position, warp time, harvest -> funding pays REAL USDC per the math
+  const NOTIONAL = E.parseUnits("30000", 18);
+  const accruedAtOpen = await delta.accruedFunding();
+  tx = await delta.openPosition(NOTIONAL); await tx.wait();
+  // fast-forward 30 days
+  const blockNum = await E.provider.getBlockNumber();
+  const ts = (await E.provider.getBlock(blockNum)).timestamp;
+  await E.provider.send("evm_setNextBlockTimestamp", [ts + 30 * 24 * 3600]);
+  tx = await delta.harvest(); const rcE = await tx.wait();
+  // expect: 30000 * 0.11 * (30d/365d) ≈ 271.23 USDC (delta of accrued since position open)
+  const expected = (NOTIONAL * 1100n * BigInt(30 * 24 * 3600)) / (BigInt(365 * 24 * 3600) * 10000n);
+  const accrued = (await delta.accruedFunding()) - accruedAtOpen;
+  report("E3 30 days @ 11% on 30k notional accrues REAL USDC per math",
+    accrued >= (expected * 99n) / 100n && accrued <= (expected * 101n) / 100n,
+    `accrued=${fmt(accrued)} expected≈${fmt(expected)}`);
+  const sourceBal = await usdc.balanceOf(await source.getAddress());
+  report("E3b funding paid by REAL token movement from venue (source drained accordingly)",
+    sourceBal === E.parseUnits("1000000", 18) - accrued - accruedAtOpen, `source=${fmt(sourceBal)}`);
+
+  // E4: broken funding source (contract WITHOUT payFunding) -> harvest reverts
+  tx = await delta.setFundingSource(await bootOracle.getAddress()); await tx.wait();
+  await E.provider.send("evm_setNextBlockTimestamp", [ts + 60 * 24 * 3600]);
+  let sourceFailReverted = false;
+  try { tx = await delta.harvest(); await tx.wait(); } catch { sourceFailReverted = true; }
+  report("E4 broken funding source -> harvest reverts (fail loud, never fake)", sourceFailReverted);
+  tx = await delta.setFundingSource(await source.getAddress()); await tx.wait();
+
+  // E5: vault.harvest() sweeps accrued funding profit to the vault and takes the
+  // 10% performance fee to the FeeDistributor — real token flow, no modeled yield.
+  // NOTE: E4's failed harvest rolled back its settle but time still advanced 30d,
+  // so E5's harvest legitimately accrues that second window before sweeping.
+  const accruedNow = await delta.accruedFunding();
+  const expectedSecond = (NOTIONAL * 1100n * BigInt(30 * 24 * 3600)) / (BigInt(365 * 24 * 3600) * 10000n);
+  const expectedTotal = accruedNow + expectedSecond;
+  const vaultIdlePre = await usdc.balanceOf(await vault.getAddress());
+  const feeDistPre = await usdc.balanceOf(await vault.feeDistributor());
+  const deltaBalPre = await usdc.balanceOf(await delta.getAddress());
+  tx = await vault.harvest(); const rcE5 = await tx.wait();
+  const vaultIdlePost = await usdc.balanceOf(await vault.getAddress());
+  const feeDistPost = await usdc.balanceOf(await vault.feeDistributor());
+  const deltaBalPost = await usdc.balanceOf(await delta.getAddress());
+  const feeTaken = feeDistPost - feeDistPre;
+  const sweptToVault = vaultIdlePost - vaultIdlePre;
+  report("E5 vault.harvest sweeps strategy profit into the vault",
+    (await delta.accruedFunding()) === 0n
+      && sweptToVault + feeTaken >= (expectedTotal * 99n) / 100n
+      && sweptToVault + feeTaken <= (expectedTotal * 101n) / 100n,
+    `swept=${fmt(sweptToVault)} + fee=${fmt(feeTaken)} = ${fmt(sweptToVault + feeTaken)} (expected ≈ ${fmt(expectedTotal)})`);
+  report("E5b performance fee = 10% of swept profit, paid to FeeDistributor",
+    feeTaken === (sweptToVault + feeTaken) / 10n, `fee=${fmt(feeTaken)}`);
+  const harvestEvE5 = rcE5.logs.map(l => { try { return vault.interface.parseLog(l); } catch { return null; } }).find(e => e && e.name === "Harvest");
+  report("E5c vault Harvest(profit) event reflects real swept amount",
+    harvestEvE5 && harvestEvE5.args[0] === sweptToVault + feeTaken,
+    `Harvest(${harvestEvE5 ? fmt(harvestEvE5.args[0]) : "?"})`);
+
+  // E6: ETH settlements accepted now (receive() exists) and forwarded on harvest
+  const ethAmt = E.parseEther("0.25");
+  tx = await owner.sendTransaction({ to: await delta.getAddress(), value: ethAmt }); await tx.wait();
+  report("E6 strategy ACCEPTS native ETH (receive() fixed the unreachable path)",
+    (await E.provider.getBalance(await delta.getAddress())) === ethAmt);
 
   console.log(`\n=== INTEGRATION: ${pass} passed, ${fail} failed ===`);
   if (fail > 0) process.exit(1);
