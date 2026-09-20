@@ -4,20 +4,25 @@ const path = require("path");
 
 async function main() {
   const [owner] = await hre.ethers.getSigners();
-  console.log("Deploying with:", owner.address);
-  // OOG-flake killer: pad writes 3x (persistent-anvil estimation drift)
-  for (const s of await hre.ethers.getSigners()) {
-    const origSend = s.sendTransaction.bind(s);
-    s.sendTransaction = async (tx) => {
+  // OOG-flake killer (prototype-level): pad every signer's gas 3x — getSigners()
+  // returns fresh instances per call, so per-instance patches miss factory calls.
+  {
+    const { HardhatEthersSigner } = require("@nomicfoundation/hardhat-ethers/signers");
+    const origSend = HardhatEthersSigner.prototype.sendTransaction;
+    HardhatEthersSigner.prototype.sendTransaction = async function (tx) {
       if (tx.gasLimit == null) {
         try {
-          const est = await hre.ethers.provider.estimateGas({ ...tx, from: s.address });
+          const est = await hre.ethers.provider.estimateGas({ ...tx, from: this.address });
           tx = { ...tx, gasLimit: (est * 3n) + 21000n };
-        } catch {}
+        } catch {
+          tx = { ...tx, gasLimit: 1_000_000n };
+        }
       }
-      return origSend(tx);
+      return origSend.call(this, tx);
     };
   }
+
+  console.log("Deploying with:", owner.address);
   
   // Deploy MockUSDC
   const MockUSDC = await hre.ethers.getContractFactory("MockUSDC");

@@ -6,19 +6,25 @@ const path = require("path");
 
 async function main() {
   const deployed = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployed_addresses.json"), "utf8"));
-  const customer = (await hre.ethers.getSigners())[3]; // separate wallet = "customer"
-  for (const s of await hre.ethers.getSigners()) {
-    const origSend = s.sendTransaction.bind(s);
-    s.sendTransaction = async (tx) => {
+  const customer = (await hre.ethers.getSigners())[3];
+  // OOG-flake killer (prototype-level): pad every signer's gas 3x — getSigners()
+  // returns fresh instances per call, so per-instance patches miss factory calls.
+  {
+    const { HardhatEthersSigner } = require("@nomicfoundation/hardhat-ethers/signers");
+    const origSend = HardhatEthersSigner.prototype.sendTransaction;
+    HardhatEthersSigner.prototype.sendTransaction = async function (tx) {
       if (tx.gasLimit == null) {
         try {
-          const est = await hre.ethers.provider.estimateGas({ ...tx, from: s.address });
+          const est = await hre.ethers.provider.estimateGas({ ...tx, from: this.address });
           tx = { ...tx, gasLimit: (est * 3n) + 21000n };
-        } catch {}
+        } catch {
+          tx = { ...tx, gasLimit: 1_000_000n };
+        }
       }
-      return origSend(tx);
+      return origSend.call(this, tx);
     };
   }
+ // separate wallet = "customer"
 
   const usdc = await hre.ethers.getContractAt("MockUSDC", deployed.mock_usdc);
   const vault = await hre.ethers.getContractAt("ProYieldVault", deployed.pro_yield_vault);

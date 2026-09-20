@@ -221,6 +221,21 @@ contract ProYieldVault is BaseStrategy {
         return (profit * performanceFee) / 10000;
     }
 
+    /// @notice Credit EXTERNAL yield (fee recycling, rebates, grants) to
+    /// depositors by raising the share price. Flow: the recycler routes X
+    /// USDC into this vault (FeeDistributor.route), then calls creditYield(X).
+    /// The balance check makes crediting more than actually sits in the vault
+    /// impossible; the recycler's route+credit pairing keeps accounting ==
+    /// real assets (credit only NEW arrivals, never re-count idle).
+    event YieldCredited(uint256 amount);
+
+    function creditYield(uint256 amount) external onlyOwner nonReentrant {
+        require(amount > 0, "ProYieldVault: zero amount");
+        require(underlying.balanceOf(address(this)) >= amount, "ProYieldVault: exceeds balance");
+        _totalAssets += amount;
+        emit YieldCredited(amount);
+    }
+
     function harvestStrategy(address strategy) external onlyOwner nonReentrant {
         require(strategies[strategy], "ProYieldVault: not a strategy");
         require(strategyActive[strategy], "ProYieldVault: strategy paused");

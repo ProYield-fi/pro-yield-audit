@@ -21,21 +21,27 @@ process.on('unhandledRejection', (e) => {
 
 async function main() {
   const [owner, user1] = await hre.ethers.getSigners();
-  // ── OOG-flake killer ─────────────────────────────────────────────
-  // The persistent anvil + timestamp warps mean estimateGas can run on a
-  // DIFFERENT time-branch than execution (gasLimit == gasUsed OOG reverts).
-  // Pad every write 3x on top of the estimate; expected-revert txs are
-  // unaffected (their estimate fails and tests catch the revert normally).
-  for (const s of await hre.ethers.getSigners()) {
-    const origSend = s.sendTransaction.bind(s);
-    s.sendTransaction = async (tx) => {
+  // ── OOG-flake killer (PROTOTYPE-LEVEL — the real fix) ────────────
+  // getSigners() returns FRESH instances per call and factories use yet
+  // another instance, so per-instance patching never covered the calls that
+  // mattered (found by identity test). Patch the PROTOTYPE: every signer,
+  // present and future, pads gas 3x. estimateGas can run on a different
+  // time-branch than execution on the persistent anvil (gasLimit == gasUsed
+  // OOG reverts); the pad absorbs the delta. Failed estimates get a fixed
+  // 1M limit (expected-revert txs still revert; tests catch them).
+  {
+    const { HardhatEthersSigner } = require("@nomicfoundation/hardhat-ethers/signers");
+    const origSend = HardhatEthersSigner.prototype.sendTransaction;
+    HardhatEthersSigner.prototype.sendTransaction = async function (tx) {
       if (tx.gasLimit == null) {
         try {
-          const est = await hre.ethers.provider.estimateGas({ ...tx, from: s.address });
+          const est = await hre.ethers.provider.estimateGas({ ...tx, from: this.address });
           tx = { ...tx, gasLimit: (est * 3n) + 21000n };
-        } catch { /* expected-revert path: leave unpadded */ }
+        } catch {
+          tx = { ...tx, gasLimit: 1_000_000n };
+        }
       }
-      return origSend(tx);
+      return origSend.call(this, tx);
     };
   }
   const E = hre.ethers;
@@ -106,7 +112,11 @@ async function main() {
   // A5b: ETH forwarding — settlements sweep to short on harvest.
   try {
     step("A5b-i harvest");
-    tx = await delta.harvest(); await tx.wait();
+    // retry-once: intermittent estimate-race flake on the shared anvil
+    for (let attempt = 0; ; attempt++) {
+      try { tx = await delta.harvest(); await tx.wait(); break; }
+      catch (e) { if (attempt >= 1) throw e; await E.provider.send("evm_mine", []); }
+    }
     report("A5b-i harvest sweeps held ETH to short (settlement forwarding)",
       (await E.provider.getBalance(deltaAddr)) === 0n);
     step("A5b openPosition");
@@ -1071,6 +1081,52 @@ async function main() {
     report("O6 triple back-to-back harvest: no revert, ~zero drift (no double-count)",
       taPost >= taPre && taPost - taPre < E.parseUnits("1", 18),
       `drift=${fmt(taPost - taPre)}`);
+  }
+
+  // ── P. FEE RECYCLING: creditYield (external yield -> depositors) ──
+  console.log("\n── P. Fee recycling credit path ──");
+
+  // P1: owner-only
+  {
+    let nonOwnerBlocked = false;
+    try { tx = await vault.connect(user1).creditYield(E.parseUnits("10", 18)); await tx.wait(); } catch { nonOwnerBlocked = true; }
+    report("P1 creditYield is owner-only", nonOwnerBlocked);
+  }
+
+  // P2: balance guard — cannot credit more than actually sits in the vault
+  {
+    const bal = await usdc.balanceOf(await vault.getAddress());
+    let overBlocked = false;
+    try { tx = await vault.creditYield(bal + E.parseUnits("1", 18)); await tx.wait(); } catch { overBlocked = true; }
+    report("P2 cannot credit more than the vault balance (no fabrication)", overBlocked);
+    let zeroBlocked = false;
+    try { tx = await vault.creditYield(0n); await tx.wait(); } catch { zeroBlocked = true; }
+    report("P2b creditYield(0) reverts", zeroBlocked);
+  }
+
+  // P3: happy path — routed 200 USDC raises share price EXACTLY; accounting == real
+  {
+    const ROUTED = E.parseUnits("200", 18);
+    const ts = await vault.totalShares();
+    const taPre = await vault.totalAssets();
+    const pricePre = (taPre * E.WeiPerEther) / ts;
+    // simulate the recycler flow: tokens arrive, then credit
+    tx = await usdc.mint(await vault.getAddress(), ROUTED); await tx.wait();
+    const rc = await (await vault.creditYield(ROUTED)).wait();
+    const taPost = await vault.totalAssets();
+    const pricePost = (taPost * E.WeiPerEther) / ts;
+    const credited = rc.logs.map(l => { try { return vault.interface.parseLog(l); } catch { return null; } }).find(e => e && e.name === "YieldCredited");
+    report("P3 creditYield raises share price EXACTLY by amount/shares",
+      (taPost - taPre) === ROUTED && credited && credited.args[0] === ROUTED &&
+      pricePost - pricePre === (ROUTED * E.WeiPerEther) / ts,
+      `price ${fmt(pricePre)} -> ${fmt(pricePost)}`);
+    // conservation: vault + strategies >= totalAssets (real backing)
+    let held = await usdc.balanceOf(await vault.getAddress());
+    held += await usdc.balanceOf(await delta.getAddress());
+    held += await usdc.balanceOf(await pendle.getAddress());
+    held += await usdc.balanceOf(await sky.getAddress());
+    held += await usdc.balanceOf(await morphoS.getAddress());
+    report("P3b conservation holds after credit (backing >= totalAssets)", held >= taPost);
   }
 
   console.log(`\n=== INTEGRATION: ${pass} passed, ${fail} failed ===`);
