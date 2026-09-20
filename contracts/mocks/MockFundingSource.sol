@@ -13,7 +13,7 @@ contract MockFundingSource {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable usdc;
-    address public owner;
+    address public immutable owner;
 
     event FundingPaid(address indexed to, uint256 amount);
 

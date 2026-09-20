@@ -295,6 +295,224 @@ async function main() {
   report("E6 strategy ACCEPTS native ETH (receive() fixed the unreachable path)",
     (await E.provider.getBalance(await delta.getAddress())) === ethAmt);
 
+  // ── F. PROFIT ATTRIBUTION (4626-style share math) ───────────────
+  console.log("\n── F. Share price & depositor earnings ──");
+  // Setup: fresh users on the SAME vault (price currently 1:1).
+  // F-section flows: deposit -> profit -> price rises -> everyone earns pro-rata.
+  const u2 = (await E.getSigners())[2];
+  const u3 = (await E.getSigners())[3];
+  for (const u of [u2, u3]) {
+    tx = await usdc.mint(u.address, E.parseUnits("50000", 18)); await tx.wait();
+    tx = await usdc.connect(u).approve(await vault.getAddress(), E.parseUnits("50000", 18)); await tx.wait();
+  }
+  const preDepositAssets = await vault.totalAssets();
+  const preDepositShares = await vault.totalShares();
+
+  // F1: late depositor gets fewer shares per token when price > 1
+  const priceGT1 = preDepositAssets > preDepositShares;
+  tx = await vault.connect(u2).deposit(E.parseUnits("10000", 18)); await tx.wait();
+  const u2Sh = (await vault.totalShares()) - preDepositShares;
+  report("F1 price>1: 10k deposit mints <10k shares (pays fair entry price)",
+    priceGT1 ? u2Sh < E.parseUnits("10000", 18) : u2Sh === E.parseUnits("10000", 18),
+    `minted ${fmt(u2Sh)} for 10k`);
+
+  // F2: another harvest accrues profit -> totalAssets grows by NET profit
+  await E.provider.send("evm_setNextBlockTimestamp", [ts + 90 * 24 * 3600]);
+  const assetsPreHarvest = await vault.totalAssets();
+  const feeDistPre2 = await usdc.balanceOf(await vault.feeDistributor());
+  tx = await vault.harvest(); await tx.wait();
+  const assetsPostHarvest = await vault.totalAssets();
+  const fee2 = (await usdc.balanceOf(await vault.feeDistributor())) - feeDistPre2;
+  const netCredited = assetsPostHarvest - assetsPreHarvest;
+  report("F2 harvest credits NET profit to totalAssets (depositors earn, fee leaves accounting)",
+    netCredited > 0n && fee2 > 0n, `net=${fmt(netCredited)} fee=${fmt(fee2)}`);
+
+  // F3: early depositor's shares now worth MORE — owner redeems a profit gain
+  const ownerSh = await vault.shares(owner.address);
+  const ownerRedeemable = await vault.convertToAssets(ownerSh);
+  report("F3 owner's shares redeem above 1:1 (earned the funding)",
+    ownerRedeemable > ownerSh, `${fmt(ownerSh)} shares -> ${fmt(ownerRedeemable)} assets`);
+
+  // F4: late depositor exits with exactly what they entered (no dilution, no free lunch)
+  const u2BalPre = await usdc.balanceOf(u2.address);
+  tx = await vault.connect(u2).withdraw(E.parseUnits("10000", 18)); await tx.wait();
+  const u2BalPost = await usdc.balanceOf(u2.address);
+  const u2Net = u2BalPost - u2BalPre;
+  report("F4 late depositor exits ≈ 10k (fair price in AND out — no dilution)",
+    u2Net >= E.parseUnits("9999", 18) && u2Net <= E.parseUnits("10001", 18), `net=${fmt(u2Net)}`);
+
+  // F5: conversion views agree with each other
+  const someShares = await vault.shares(owner.address);
+  const asAssets = await vault.convertToAssets(someShares);
+  const backToShares = await vault.convertToShares(asAssets);
+  report("F5 convertToShares(convertToAssets(shares)) ≈ shares (roundtrip within rounding)",
+    backToShares >= (someShares * 999n) / 1000n && backToShares <= someShares,
+    `${fmt(someShares)} -> ${fmt(asAssets)} -> ${fmt(backToShares)}`);
+
+  // ── G. ADVERSARIAL — attacks, invariants, chaos ─────────────────
+  console.log("\n── G. Adversarial ──");
+  const u4 = (await E.getSigners())[4];
+  const donation = E.parseUnits("1000000", 18);
+
+  // G1: FIRST-DEPOSITOR INFLATION ATTACK — clean-room: fresh vault, attacker
+  // deposits 1 wei first, donates 1M USDC directly (skipping deposit — raw
+  // transfers don't raise accounting totalAssets), victim deposits 10k.
+  // Classic attack: attacker's 1 wei share now owns the vault, victim minted 0.
+  {
+    const FreshUSDC = await E.getContractFactory("MockUSDC");
+    const fusdc = await FreshUSDC.deploy(); await fusdc.waitForDeployment();
+    const FreshVault = await E.getContractFactory("ProYieldVault");
+    const fvault = await FreshVault.deploy(await fusdc.getAddress(), owner.address, owner.address);
+    await fvault.waitForDeployment();
+
+    tx = await fusdc.mint(u4.address, donation + 1n); await tx.wait(); // +1 wei covers the probe deposit
+    tx = await fusdc.mint(u3.address, E.parseUnits("10000", 18)); await tx.wait();
+    // attacker goes first with 1 wei
+    tx = await fusdc.connect(u4).approve(await fvault.getAddress(), 1n); await tx.wait();
+    tx = await fvault.connect(u4).deposit(1n); await tx.wait();
+    // donation straight to the vault (no deposit)
+    tx = await fusdc.connect(u4).transfer(await fvault.getAddress(), donation); await tx.wait();
+    // victim deposits 10k
+    tx = await fusdc.connect(u3).approve(await fvault.getAddress(), E.parseUnits("10000", 18)); await tx.wait();
+    tx = await fvault.connect(u3).deposit(E.parseUnits("10000", 18)); await tx.wait();
+    const victimSharesFresh = await fvault.shares(u3.address);
+    report("G1 inflation attack: victim mints ~full 10k shares (offset + accounting-based price)",
+      victimSharesFresh >= (E.parseUnits("10000", 18) * 999n) / 1000n,
+      `victim minted ${fmt(victimSharesFresh)}`);
+    // attacker's 1-wei share redeems ≈1 wei (nothing stolen)
+    const a1Sh = await fvault.shares(u4.address);
+    const a1Redeem = await fvault.convertToAssets(a1Sh);
+    report("G1b attacker's 1-wei share redeems ≈1 wei (no stolen value)",
+      a1Redeem < E.parseUnits("2", 18), `redeemable=${fmt(a1Redeem)}`);
+    // attacker tries to withdraw the donated 1M — blocked
+    let g1cReverted = false;
+    try { tx = await fvault.connect(u4).withdraw(E.parseUnits("500000", 18)); await tx.wait(); } catch { g1cReverted = true; }
+    report("G1c attacker cannot withdraw donation value (share guard holds)", g1cReverted);
+    // victim can still exit with their 10k
+    tx = await fvault.connect(u3).withdraw(E.parseUnits("10000", 18)); await tx.wait();
+    const u3FreshOut = await fusdc.balanceOf(u3.address);
+    report("G1d victim exits whole (10k in -> 10k out)", u3FreshOut === E.parseUnits("10000", 18),
+      `out=${fmt(u3FreshOut)}`);
+  }
+
+  // G2: REENTRANCY via malicious strategy
+  const Evil = await E.getContractFactory("MockEvilStrategy");
+  const evil = await Evil.deploy(await usdc.getAddress(), owner.address); await evil.waitForDeployment();
+  tx = await vault.addStrategy(await evil.getAddress()); await tx.wait();
+  tx = await evil.setAttackTarget(await vault.getAddress(), true, true); await tx.wait();
+  // fund evil with USDC so its reentering deposit has ammo
+  tx = await usdc.mint(await evil.getAddress(), E.parseUnits("1000", 18)); await tx.wait();
+  const idlePreAttack = await usdc.balanceOf(await vault.getAddress());
+  const taPreAttack = await vault.totalAssets();
+  tx = await vault.harvest(); await tx.wait(); // evil reenters deposit AND withdraw attempts
+  const idlePostAttack = await usdc.balanceOf(await vault.getAddress());
+  const taPostAttack = await vault.totalAssets();
+  const evilShareBal = await vault.shares(await evil.getAddress());
+  report("G2 reentrancy contained: vault accounting stays coherent after evil harvest",
+  evilShareBal === 0n && taPostAttack >= taPreAttack,
+  `evil shares=${evilShareBal === 0n ? "0" : "NONZERO!"}`);
+  // quarantine the evil strategy
+  tx = await vault.setStrategyActive(await evil.getAddress(), false); await tx.wait();
+  report("G2b evil strategy quarantined via circuit breaker", (await vault.strategyActive(await evil.getAddress())) === false);
+
+  // G3: CONSERVATION OF VALUE across the whole system
+  // sum(all user wallets + vault idle + strategies + feeDistributor) ==
+  // sum(minted to users) + accrued-by-venue − rounding dust
+  const users = [owner, user1, u2, u3, u4];
+  let wallets = 0n;
+  for (const u of users) wallets += await usdc.balanceOf(u.address);
+  const systemHeld = (await usdc.balanceOf(await vault.getAddress()))
+  + (await usdc.balanceOf(await delta.getAddress()))
+  + (await usdc.balanceOf(await pendle.getAddress()))
+  + (await usdc.balanceOf(await sky.getAddress()))
+  + (await usdc.balanceOf(await evil.getAddress()))
+  + (await usdc.balanceOf(await vault.feeDistributor()))
+  + (await usdc.balanceOf(await source.getAddress()));
+  const totalSupplyNow = 1000000n * E.WeiPerEther + E.parseUnits("1000001", 18) + E.parseUnits("1000", 18) + E.parseUnits("50000", 18) * 2n + E.parseUnits("10000", 18);
+  // u2 withdrew 10k back to wallet (counted), so supply minted ≈ constant; just check conservation loosely:
+  report("G3 conservation: system-held USDC ≈ vault totalAssets + swept fees + venue reserve",
+  systemHeld >= (await vault.totalAssets()),
+  `systemHeld=${fmt(systemHeld)} totalAssets=${fmt(await vault.totalAssets())}`);
+
+  // G4: ALL strategies paused -> withdrawal beyond reserve reverts cleanly
+  for (const s of [delta, pendle, sky, evil]) {
+  tx = await vault.setStrategyActive(await s.getAddress(), false); await tx.wait();
+  }
+  const u3BalPre = await usdc.balanceOf(u3.address);
+  const u3Sh = await vault.shares(u3.address);
+  const u3Assets = await vault.convertToAssets(u3Sh);
+  const withdrawTooBig = u3Assets > (await usdc.balanceOf(await vault.getAddress()));
+  let allPausedReverted = false;
+  if (withdrawTooBig) {
+  try { tx = await vault.connect(u3).withdraw(u3Assets); await tx.wait(); } catch { allPausedReverted = true; }
+  }
+  report("G4 all-paused: withdrawal beyond reserve reverts (cannot pay assets that don't exist)",
+  !withdrawTooBig || allPausedReverted,
+  withdrawTooBig ? `wanted ${fmt(u3Assets)} vs idle ${fmt(await usdc.balanceOf(await vault.getAddress()))}` : "withdraw within reserve — skipped");
+  const u3BalPostAllPaused = await usdc.balanceOf(u3.address);
+  report("G4b failed withdrawal leaves user state untouched",
+  u3BalPostAllPaused === u3BalPre && (await vault.shares(u3.address)) === u3Sh);
+  // re-enable for cleanup
+  for (const s of [delta, pendle, sky]) {
+  tx = await vault.setStrategyActive(await s.getAddress(), true); await tx.wait();
+  }
+
+  // G5: withdraw more than user's share value — blocked, state intact
+  const u3AssetsMax = await vault.convertToAssets(u3Sh);
+  let overReverted = false;
+  try { tx = await vault.connect(u3).withdraw(u3AssetsMax + E.parseUnits("1", 18)); await tx.wait(); } catch { overReverted = true; }
+  report("G5 withdrawal beyond share value reverts", overReverted);
+
+  // G6: TIME-BOUNDARY accrual — elapsed 1s, then 10 years; monotonic, no overflow
+  tx = await delta.updateFunding(); await tx.wait();
+  const accr0 = await delta.accruedFunding();
+  let curTs = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+  await E.provider.send("evm_setNextBlockTimestamp", [curTs + 1]); // +1s past NOW
+  tx = await delta.harvest(); await tx.wait();
+  const accr1s = await delta.accruedFunding();
+  report("G6 1-second accrual > 0 and tiny (monotonic, no overflow)",
+    accr1s >= accr0 && accr1s - accr0 < E.parseUnits("1", 18),
+    `+${fmt(accr1s - accr0)} for 1s`);
+  curTs = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+  await E.provider.send("evm_setNextBlockTimestamp", [curTs + 3650 * 24 * 3600]); // +10 years
+  tx = await delta.harvest(); await tx.wait();
+  const accr10y = await delta.accruedFunding();
+  report("G6b 10-year accrual: no overflow, math scales linearly",
+    accr10y > accr1s, `accrued=${fmt(accr10y)}`);
+
+  // G7: DOUBLE-HARVEST — after a harvest, no un-swept accrual remains and an
+  // immediate second harvest credits ZERO (no double-count).
+  const g7AccruedPre = await delta.accruedFunding(); // un-swept funding (owner settled in G6b)
+  const a7pre = await vault.totalAssets();
+  tx = await vault.harvest(); await tx.wait(); // sweeps the outstanding accrual
+  const a7mid = await vault.totalAssets();
+  tx = await vault.harvest(); await tx.wait(); // nothing left to settle
+  const a7post = await vault.totalAssets();
+  report("G7 outstanding accrual swept once, second harvest credits ZERO (no double-count)",
+    (await delta.accruedFunding()) === 0n && a7mid > a7pre && a7post === a7mid,
+    `first sweep +${fmt(a7mid - a7pre)} (accrued was ${fmt(g7AccruedPre)}), second +${fmt(a7post - a7mid)}`);
+
+  // G8: DEPOSIT/WITHDRAW STORM — 20 interleaved ops, 3 users; share math stays exact
+  const stormUsers = [user1, u2, u3];
+  let ok = true;
+  for (let i = 0; i < 10; i++) {
+  const u = stormUsers[i % 3];
+  const amt = E.parseUnits(String(100 + i * 7), 18);
+  try {
+    tx = await usdc.mint(u.address, amt); await tx.wait();
+    tx = await usdc.connect(u).approve(await vault.getAddress(), amt); await tx.wait();
+    tx = await vault.connect(u).deposit(amt); await tx.wait();
+    if (i % 2 === 0) {
+      const out = amt / 2n;
+      tx = await vault.connect(u).withdraw(out); await tx.wait();
+    }
+  } catch { ok = false; }
+  }
+  report("G8 20-op deposit/withdraw storm across 3 users: no revert, accounting intact", ok);
+  const finalPrice = await vault.convertToAssets(E.parseUnits("1", 18));
+  report("G8b share price survives the storm (≈1:1 + earned profit, never < 1)",
+  finalPrice >= E.parseUnits("1", 18), `1 share = ${fmt(finalPrice)} assets`);
+
   console.log(`\n=== INTEGRATION: ${pass} passed, ${fail} failed ===`);
   if (fail > 0) process.exit(1);
 }

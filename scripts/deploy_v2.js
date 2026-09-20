@@ -102,19 +102,12 @@ async function main() {
   const harvestTx = await vault.harvest();
   await harvestTx.wait();
   console.log("✅ harvest() works");
-  
-  // Emergency withdraw — then restore liquidity via a throwaway wallet so the
-  // vault ends the script fully backed (reserve intact, claims == assets).
-  const emergIdle = await mockUSDC.balanceOf(await vault.getAddress());
-  const emergTx = await vault.emergencyWithdraw();
-  await emergTx.wait();
-  console.log("✅ emergencyWithdraw() works");
-  const restore = new hre.ethers.Wallet(hre.ethers.Wallet.createRandom().privateKey, hre.ethers.provider);
-  await owner.sendTransaction({ to: restore.address, value: hre.ethers.parseEther("1") });
-  await (await mockUSDC.mint(restore.address, emergIdle)).wait();
-  await (await mockUSDC.connect(restore).approve(await vault.getAddress(), emergIdle)).wait();
-  await (await vault.connect(restore).deposit(emergIdle)).wait();
-  console.log("✅ liquidity restored via throwaway deposit:", hre.ethers.formatUnits(emergIdle, 18));
+
+  // NOTE: emergencyWithdraw is deliberately NOT exercised here — it drains
+  // backing and permanently dilutes the share price (correct 4626 crisis
+  // semantics, but this vault is the canonical one the keeper serves).
+  // The emergency path is covered by scripts/integration_tests.js §D on a
+  // throwaway vault, including post-emergency price behavior.
   
   // Name checks
   console.log("name check:", await vault.name(), "== ProYieldVault:", await vault.name() === "ProYieldVault");

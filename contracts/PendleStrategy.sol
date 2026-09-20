@@ -33,8 +33,14 @@ contract PendleStrategy is BaseStrategy {
         }
     }
 
-    function _claimRewards() internal nonReentrant {
-        if (address(this).balance > 0 && msg.sender == owner()) {
+    /// @notice BUGFIX (found by time-warp integration test): this was marked
+    /// nonReentrant while its ONLY caller (harvest) also holds the lock —
+    /// after maturity every harvest reverted with ReentrancyGuardReentrantCall,
+    /// bricking the whole vault harvest for a year. Internal-only helper:
+    /// the entry-point lock is sufficient. Auth extended to the vault so
+    /// ProYieldVault.harvest's sweep loop can claim on behalf of depositors.
+    function _claimRewards() internal {
+        if (address(this).balance > 0 && (msg.sender == owner() || msg.sender == vault)) {
             // slither-disable-next-line low-level-calls
             (bool success, ) = pendleMarket.call{value: address(this).balance}("");
             require(success, "Pendle: transfer failed");
