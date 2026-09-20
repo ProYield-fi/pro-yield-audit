@@ -92,16 +92,19 @@ def harvest_and_allocate():
 const hre = require("hardhat");
 async function main() {{
   const [owner] = await hre.ethers.getSigners();
-  for (const s of await hre.ethers.getSigners()) {{
-    const origSend = s.sendTransaction.bind(s);
-    s.sendTransaction = async (tx) => {{
+  {{
+    const {{ HardhatEthersSigner }} = require("@nomicfoundation/hardhat-ethers/signers");
+    const origSend = HardhatEthersSigner.prototype.sendTransaction;
+    HardhatEthersSigner.prototype.sendTransaction = async function (tx) {{
       if (tx.gasLimit == null) {{
         try {{
-          const est = await hre.ethers.provider.estimateGas({{ ...tx, from: s.address }});
+          const est = await hre.ethers.provider.estimateGas({{ ...tx, from: this.address }});
           tx = {{ ...tx, gasLimit: (est * 3n) + 21000n }};
-        }} catch {{}}
+        }} catch {{
+          tx = {{ ...tx, gasLimit: 1_000_000n }};
+        }}
       }}
-      return origSend(tx);
+      return origSend.call(this, tx);
     }};
   }}
   const V = await hre.ethers.getContractFactory("ProYieldVault");

@@ -71,6 +71,21 @@ def check_fees():
     return False
 
 # ── Step 4: Verify blend math (seam guard) ─────────────
+def recycle_fees():
+    """Policy-gated fee recycling: splits FD fees (boost/treasury/insurance).
+    No-op below the policy minimum; every run lands in data/recycling.jsonl."""
+    r = subprocess.run(
+        ["npx", "hardhat", "run", "scripts/recycle_fees.js", "--network", "hyperTestnet"],
+        cwd="/home/user/hypervault", capture_output=True, text=True, timeout=300,
+    )
+    out = (r.stdout or "").strip()
+    tail = out.splitlines()[-1] if out else ""
+    if r.returncode != 0:
+        print("  recycle:", (r.stderr or out)[-200:])
+        return False
+    print("  recycle:", tail[:160])
+    return True
+
 def _run_verify():
     v = os.path.join(HERE, "verify_blend.py")
     result = subprocess.run([sys.executable, v], capture_output=True, text=True, timeout=60)
@@ -87,6 +102,7 @@ if __name__ == "__main__":
     ok_dashboard = step("Render dashboard", render_dashboard)
     step("Sync data", sync_strategy_data)
     step("Check fees", check_fees)
+    step("Recycle fees", recycle_fees)
     
     # Seam guard: verify blend math consistency across all published numbers.
     # Runs AFTER render so it validates what the dashboard actually published today.

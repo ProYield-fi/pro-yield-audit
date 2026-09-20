@@ -351,7 +351,7 @@ def main():
         verdict = "DECLINED" if acc["apy_base"] <= acc.get("apy_30d", 0) else "watch"
         action_lines.append(f"Review: {acc['symbol']} accountable ({acc['chain']}) — {verdict} ({acc['apy_base']}% vs {acc['apy_30d']}% 30d)")
     pm_daily = pm.get("total_daily_usd") or 0
-    action_lines.append(f"Fee recycling: ${pm_daily:,}/day PM rewards tracked, HL rebates pending — routing + distribution code not yet implemented (fee_distributor.py: 0 distributed)")
+    action_lines.append(f"Fee recycling LIVE: vault fees + arrived rebates -> policy split (60% depositor boost via vault.creditYield / 20% treasury / 20% insurance), policy-gated, ledgered; PM rewards ${pm_daily:,}/day tracked for quoting")
     # Momentum-driven strategy (replaces static timing insight)
     mom_path = os.path.join(DATA, "momentum.json")
     if os.path.exists(mom_path):
@@ -389,6 +389,24 @@ def main():
     action_lines.append(f"Risk tiers: 4 profiles available on ProYield Web — conservative to maximum risk")
     pm_cell = f"${pm.get('total_daily_usd', 0):,}/day across {pm.get('reward_markets', 0)} markets" if pm.get("total_daily_usd") else "UNAVAILABLE"
     hl_str = ", ".join(f"{k} {v:+.1f}% (rejected)" for k,v in funding.items()) if funding else "UNAVAILABLE"
+    # Fee recycling totals from the ledger
+    recycle_cell = "UNAVAILABLE"
+    try:
+        import json as _json
+        led = os.path.join(HERE, "data", "recycling.jsonl")
+        if os.path.exists(led):
+            tot = boost = 0.0
+            last = None
+            for line in open(led):
+                try:
+                    e = _json.loads(line)
+                    tot += float(e.get("total", 0)); boost += float(e.get("boost", 0)); last = e.get("iso")
+                except Exception:
+                    pass
+            if last:
+                recycle_cell = f"${tot:,.2f} recycled ({len(open(led).readlines())} runs) · ${boost:,.2f} to depositors · last {last}"
+    except Exception:
+        pass
     # Delta-neutral alt sleeve (vetted funding-backed stables) from snapshot
     dnsus = None
     if isinstance(standard_data, dict):
@@ -544,6 +562,7 @@ th {{ font-size: 11px; text-transform: uppercase; opacity: .65; }}
 <table>
 <tr><td>Polymarket reward pool (quoting income, not passive)</td><td class="r">{esc(pm_cell)}</td></tr>
 <tr><td>Hyperliquid majors funding APR (HIP-3 carry context, rejected for house money)</td><td class="r">{esc(hl_str)}</td></tr>
+<tr><td>Fee recycling (vault fees + rebates → depositor boost / treasury / insurance)</td><td class="r">{esc(recycle_cell)}</td></tr>
 {dn_alt_row}{carry_rows}
 {cex_monitor}
 </table>

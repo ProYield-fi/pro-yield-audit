@@ -1,0 +1,8 @@
+{
+  "depositor_boost_pct": 60,
+  "treasury_pct": 20,
+  "insurance_pct": 20,
+  "min_amount_usdc": 10,
+  "treasury": null,
+  "insurance": null
+}
