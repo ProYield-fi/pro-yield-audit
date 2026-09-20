@@ -167,7 +167,7 @@ contract ProYieldVault is BaseStrategy {
     /// the current price (4626-style): when the vault has earned profit, a
     /// user's shares redeem for MORE than they deposited.
     /// Pays from idle; recalls from strategies to cover any shortfall.
-    function withdraw(uint256 amount) external override nonReentrant {
+    function withdraw(uint256 amount) external nonReentrant {
         require(amount > 0, "ProYieldVault: zero amount");
         require(amount <= totalAssets(), "ProYieldVault: exceeds assets");
         uint256 sh = _toShares(amount);

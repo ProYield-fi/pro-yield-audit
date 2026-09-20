@@ -2,7 +2,7 @@
 const fs = require("fs");
 const hre = require("hardhat");
 async function main() {
-  const j = JSON.parse(fs.readFileSync("/home/user/hypervault/deployed_addresses.json", "utf8"));
+  const j = JSON.parse(fs.readFileSync(process.env.DEPLOY_MANIFEST || "/home/user/hypervault/deployed_addresses.json", "utf8"));
   const usdc = await hre.ethers.getContractAt("MockUSDC", j.mock_usdc);
   const vault = await hre.ethers.getContractAt("ProYieldVault", j.pro_yield_vault);
   // Simulated second user — fresh wallet like a real on-ramped user

@@ -5,7 +5,7 @@ const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
-const ADDRESSES_PATH = path.join(__dirname, "..", "deployed_addresses.json");
+const ADDRESSES_PATH = process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.json");
 const deployed = JSON.parse(fs.readFileSync(ADDRESSES_PATH, "utf8"));
 
 async function main() {

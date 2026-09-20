@@ -32,12 +32,15 @@ async function main() {
   
   // Persist deployed addresses — single source of truth for keeper/insurance/monitor.
   // Every redeploy on a fresh chain mints new addresses; hardcoded ones go stale.
-  const ADDRESSES_PATH = path.join(__dirname, "..", "deployed_addresses.json");
+  const ADDRESSES_PATH = process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.json");
   const deployed = { deployed_utc: new Date().toISOString(), chain_id: 998, deployer: owner.address };
 
   // PYD token + fee infrastructure (fee loop: vault perf fee -> FD -> staking/insurance)
   const PYDToken = await hre.ethers.getContractFactory("PYDToken");
-  const pyd = await PYDToken.deploy(ethers.parseUnits("100000000", 18)); // 100M
+  // PYDToken's constructor scales x10^18 -- pass the whole-token count so
+  // totalSupply = 100,000,000 tokens exactly (1e26 raw). Passing wei here
+  // double-scales to 1e44 raw (1e18x the intended supply).
+  const pyd = await PYDToken.deploy(100000000n); // 100M tokens
   await pyd.waitForDeployment();
   const FeeDistributor = await hre.ethers.getContractFactory("FeeDistributor");
   const feeDistributor = await FeeDistributor.deploy(await mockUSDC.getAddress());

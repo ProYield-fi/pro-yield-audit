@@ -137,7 +137,14 @@ contract PYDStaking is Ownable, ReentrancyGuard {
 
     function _updatePeriod() internal {
         if (block.timestamp >= periodFinish && periodFinish > 0) {
-            rewardRate = 0; // period over — no accrual past the funded window
+            // Bank the FINAL stretch (lastUpdateTime -> periodFinish) BEFORE
+            // zeroing the rate. Zeroing first erased the unbanked tail for any
+            // claim made after periodFinish (found by the staggered-join test:
+            // a 4-day window — 40k PYD — silently lost). Idempotent: a second
+            // call with lastUpdateTime == periodFinish returns stored.
+            rewardPerTokenStored = _rewardPerToken();
+            lastUpdateTime = periodFinish;
+            rewardRate = 0; // no further accrual past the funded window
         }
     }
 

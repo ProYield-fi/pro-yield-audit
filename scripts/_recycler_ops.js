@@ -21,7 +21,7 @@ async function main() {
     return origSend.call(this, tx);
   };
 
-  const deployed = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployed_addresses.json"), "utf8"));
+  const deployed = JSON.parse(fs.readFileSync(process.env.DEPLOY_MANIFEST || process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.json"), "utf8"));
   const [owner] = await hre.ethers.getSigners();
   const usdc = await hre.ethers.getContractAt("MockUSDC", deployed.mock_usdc);
   const fd = await hre.ethers.getContractAt("FeeDistributor", deployed.fee_distributor);

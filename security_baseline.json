@@ -1,0 +1,28 @@
+{
+  "generated": "2026-09-20",
+  "note": "Accepted findings \u2014 each justified. The monitor alerts ONLY on findings not listed here. New findings surface as critical/warning; review them, then add here with a reason if accepted.",
+  "accepted": {
+    "assembly:SafeERC20": "OpenZeppelin library inline assembly \u2014 not project code.",
+    "assembly:StorageSlot": "OpenZeppelin library inline assembly \u2014 not project code.",
+    "cache-array-length:ProYieldVault": "Array length read in loops where the array cannot change mid-loop (strategies fixed during iteration).",
+    "calls-loop:ProYieldVault": "_recallShortfall loops over the owner-managed strategy list only; strategies are trusted and bounded. Documented accepted design.",
+    "dead-code:Context": "OpenZeppelin library helper \u2014 used via inheritance, detector can't see the dispatch.",
+    "incorrect-equality:BaseStrategy": "Intentional zero-guard (amount == 0) \u2014 rejects no-op calls.",
+    "incorrect-equality:DeltaNeutralStrategy": "Intentional zero-guards (amount == 0, delta == 0) \u2014 settle/accrue early-return logic.",
+    "incorrect-equality:ProYieldVault": "Intentional zero-guards (_totalShares == 0 in share math, balance == 0 in emergencyWithdraw).",
+    "low-level-calls:DeltaNeutralStrategy": "ETH forwarding to owner/short position with require(success) \u2014 intentional, guarded.",
+    "pragma:BaseStrategy": "Floating pragma ^0.8.28 \u2014 compiled with pinned solc 0.8.28 in hardhat.config.js.",
+    "pragma:FeeDistributor": "Floating pragma ^0.8.28 \u2014 compiled with pinned solc 0.8.28.",
+    "pragma:PYDStaking": "Floating pragma ^0.8.28 \u2014 compiled with pinned solc 0.8.28.",
+    "pragma:PYDToken": "Floating pragma ^0.8.28 \u2014 compiled with pinned solc 0.8.28.",
+    "reentrancy-benign:DeltaNeutralStrategy": "All mutating entry points are nonReentrant-guarded (openPosition/closePosition/harvest/setters); the external call targets the owner-set funding source. Slither cannot model the guard.",
+    "reentrancy-benign:ProYieldVault": "All mutating entry points are nonReentrant-guarded; flagged path is guarded at the entry point. Slither cannot model the guard.",
+    "reentrancy-no-eth:DeltaNeutralStrategy": "All entry points (openPosition/closePosition/harvest) are nonReentrant-guarded; external call is to the owner-set funding source (prod: HL adapter). Slither cannot model the guard. Re-verified 2026-09-20: guards present at DeltaNeutralStrategy.sol L50/56/61/67/76/93 + BaseStrategy.harvest.",
+    "solc-version:IERC1363": "OpenZeppelin interface pragma \u2014 library code, not project code.",
+    "solc-version:IERC165": "OpenZeppelin interface pragma \u2014 library code.",
+    "solc-version:Ownable": "OpenZeppelin library pragma \u2014 library code.",
+    "timestamp:DeltaNeutralStrategy": "block.timestamp used for funding accrual (time-based yield) \u2014 intentional DeFi pattern.",
+    "timestamp:PYDStaking": "block.timestamp used for reward streaming \u2014 intentional DeFi pattern.",
+    "timestamp:PendleStrategy": "block.timestamp used for maturity checks \u2014 intentional DeFi pattern."
+  }
+}

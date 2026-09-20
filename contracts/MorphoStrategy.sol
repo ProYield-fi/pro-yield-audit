@@ -43,7 +43,7 @@ contract MorphoStrategy is BaseStrategy {
 
     /// Vault-only: pull parked principal back (withdrawal liquidity path).
     /// Was PUBLIC — any caller could drain up to totalSupply (audit finding).
-    function withdraw(uint256 amount) external override nonReentrant {
+    function withdraw(uint256 amount) external nonReentrant {
         require(msg.sender == vault || msg.sender == owner(), "Morpho: not authorized");
         require(amount > 0, "Morpho: zero amount");
         require(totalSupply >= amount, "Morpho: insufficient supply");
