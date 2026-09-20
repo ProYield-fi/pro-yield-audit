@@ -511,7 +511,121 @@ async function main() {
   report("G8 20-op deposit/withdraw storm across 3 users: no revert, accounting intact", ok);
   const finalPrice = await vault.convertToAssets(E.parseUnits("1", 18));
   report("G8b share price survives the storm (≈1:1 + earned profit, never < 1)",
-  finalPrice >= E.parseUnits("1", 18), `1 share = ${fmt(finalPrice)} assets`);
+    finalPrice >= E.parseUnits("1", 18), `1 share = ${fmt(finalPrice)} assets`);
+
+  // ── H. FULL FEE LOOP — profit -> FeeDistributor -> routing -> staking ──
+  console.log("\n── H. Fee recycling loop ──");
+  const PYD = await E.getContractFactory("PYDToken");
+  const pydT = await PYD.deploy(E.parseUnits("100000000", 18)); await pydT.waitForDeployment();
+  const FD = await E.getContractFactory("FeeDistributor");
+  const fd = await FD.deploy(await usdc.getAddress()); await fd.waitForDeployment();
+  const Staking = await E.getContractFactory("PYDStaking");
+  const stakeC = await Staking.deploy(await pydT.getAddress()); await stakeC.waitForDeployment();
+  // fresh vault routed to THIS FD so its fees land where we can measure them
+  const FVault = await E.getContractFactory("ProYieldVault");
+  const fvv = await FVault.deploy(await usdc.getAddress(), owner.address, await fd.getAddress()); await fvv.waitForDeployment();
+  const d2 = await DeltaNeutral.deploy(await usdc.getAddress(), owner.address, owner.address, await bootOracle.getAddress()); await d2.waitForDeployment();
+  tx = await fvv.addStrategy(await d2.getAddress()); await tx.wait();
+  tx = await d2.setVault(await fvv.getAddress()); await tx.wait();
+  tx = await d2.setOracle(await oracleC.getAddress()); await tx.wait();
+  tx = await d2.setFundingSource(await source.getAddress()); await tx.wait();
+  tx = await usdc.mint(owner.address, E.parseUnits("100000", 18)); await tx.wait();
+  tx = await usdc.approve(await fvv.getAddress(), E.parseUnits("100000", 18)); await tx.wait();
+  tx = await fvv.deposit(E.parseUnits("100000", 18)); await tx.wait();
+  tx = await d2.openPosition(E.parseUnits("20000", 18)); await tx.wait();
+  tx = await d2.updateFunding(); await tx.wait();
+
+  // H1: 30d accrual -> vault harvest -> USDC fee lands in FD
+  const blockN2 = await E.provider.getBlockNumber();
+  const ts2 = (await E.provider.getBlock(blockN2)).timestamp;
+  await E.provider.send("evm_setNextBlockTimestamp", [ts2 + 30 * 24 * 3600]);
+  const fdUsdcPre = await usdc.balanceOf(await fd.getAddress());
+  tx = await fvv.harvest(); await tx.wait();
+  const fdUsdcPost = await usdc.balanceOf(await fd.getAddress());
+  const feeToFD = fdUsdcPost - fdUsdcPre;
+  report("H1 vault performance fee lands in FeeDistributor (USDC)",
+    feeToFD > 0n, `fee=${fmt(feeToFD)}`);
+  tx = await fd.receiveFees(); await tx.wait();
+  report("H1b FD accounting recognizes received fees",
+    (await fd.totalFeesReceived()) === fdUsdcPost, `received=${fmt(await fd.totalFeesReceived())}`);
+
+  // H2: route fees to the treasury (insurance leg) — owner-only, event-logged
+  const treasury = u4; // reuse an existing signer as the treasury destination
+  const routeAmt = feeToFD / 2n;
+  let nonOwnerRouteReverted = false;
+  try { tx = await fd.connect(user1).route(await treasury.getAddress(), routeAmt); await tx.wait(); } catch { nonOwnerRouteReverted = true; }
+  report("H2 non-owner cannot route fees", nonOwnerRouteReverted);
+  tx = await fd.route(await treasury.getAddress(), routeAmt); await tx.wait();
+  report("H2b owner routes half the fees to treasury (fee recycling)",
+    (await usdc.balanceOf(await treasury.getAddress())) === routeAmt,
+    `routed=${fmt(routeAmt)}`);
+
+  // H3: staking — fund rewards, stake, warp, claim EXACTLY what the math says
+  const STAKE = E.parseUnits("1000", 18);
+  const REWARD_POOL = E.parseUnits("100000", 18);
+  const DURATION = 30 * 24 * 3600;
+  tx = await pydT.transfer(u2.address, E.parseUnits("5000", 18)); await tx.wait();
+  tx = await pydT.approve(await stakeC.getAddress(), REWARD_POOL); await tx.wait();
+  tx = await stakeC.fundRewards(REWARD_POOL, DURATION); await tx.wait();
+  tx = await pydT.transfer(user1.address, STAKE); await tx.wait();
+  tx = await pydT.connect(user1).approve(await stakeC.getAddress(), STAKE); await tx.wait();
+  tx = await stakeC.connect(user1).stake(STAKE); await tx.wait();
+  const bn3 = await E.provider.getBlockNumber();
+  const stakeTs = (await E.provider.getBlock(bn3)).timestamp;
+  await E.provider.send("evm_setNextBlockTimestamp", [stakeTs + 15 * 24 * 3600]); // half the period
+  await E.provider.send("evm_mine", []); // views read the last MINED block — mine the warped one
+  let earnedHalf = await stakeC.earned(user1.address);
+  const expectedHalf = (REWARD_POOL / BigInt(DURATION)) * BigInt(15 * 24 * 3600); // 50k over 15d
+  report("H3 staking earned() matches pro-rata math at half-period",
+    earnedHalf >= (expectedHalf * 95n) / 100n && earnedHalf <= (expectedHalf * 105n) / 100n,
+    `earned=${fmt(earnedHalf)} expected≈${fmt(expectedHalf)}`);
+  tx = await stakeC.connect(user1).getReward(); await tx.wait();
+  const claimed = (await pydT.balanceOf(user1.address)) - STAKE;
+  report("H3b claimed rewards land as REAL PYD (old bug paid 100x stake and reverted)",
+    claimed >= (expectedHalf * 95n) / 100n && claimed <= (expectedHalf * 105n) / 100n,
+    `claimed=${fmt(claimed)}`);
+  // H3c: claim again with zero elapsed — nothing (no double-pay)
+  let claim2Amount = 0n;
+  tx = await stakeC.connect(user1).getReward(); await tx.wait();
+  claim2Amount = (await pydT.balanceOf(user1.address)) - STAKE - claimed;
+  report("H3c immediate re-claim pays zero (no double-pay)", claim2Amount === 0n,
+    `second claim=${fmt(claim2Amount)}`);
+  // H3d: withdraw returns principal
+  tx = await stakeC.connect(user1).withdraw(STAKE); await tx.wait();
+  report("H3d withdraw returns staked principal", (await pydT.balanceOf(user1.address)) >= STAKE + claimed);
+
+  // ── I. MORPHO DRAIN-VECTOR (regression) ─────────────────────────
+  console.log("\n── I. Morpho strategy hardening ──");
+  const Morpho = await E.getContractFactory("MorphoStrategy");
+  const morphoS = await Morpho.deploy(await usdc.getAddress(), owner.address, u4.address); // u4 = "morpho market"
+  await morphoS.waitForDeployment();
+  tx = await usdc.mint(await morphoS.getAddress(), E.parseUnits("50000", 18)); await tx.wait(); // parked principal
+  // OLD CODE: any caller could drain up to totalSupply; NEW CODE: vault/owner only
+  let morphoDrainReverted = false;
+  try { tx = await morphoS.connect(user1).withdraw(E.parseUnits("40000", 18)); await tx.wait(); } catch { morphoDrainReverted = true; }
+  report("I1 public drain of Morpho strategy reverts (vault/owner-only now)", morphoDrainReverted);
+  tx = await morphoS.harvest(); await tx.wait();
+  report("I2 morpho harvest no longer books principal as profit",
+    (await morphoS.totalDebt()) === 0n && (await usdc.balanceOf(await morphoS.getAddress())) === E.parseUnits("50000", 18),
+    `balance intact=${fmt(await usdc.balanceOf(await morphoS.getAddress()))}`);
+
+  // ── J. KEEPER ROLE ──────────────────────────────────────────────
+  console.log("\n── J. Keeper authorization ──");
+  const keeper = u4;
+  tx = await vault.setKeeper(await keeper.getAddress()); await tx.wait();
+  // keeper (non-owner) CAN harvest the vault
+  const idleJ = await usdc.balanceOf(await vault.getAddress());
+  let keeperHarvestOk = false;
+  try { tx = await vault.connect(keeper).harvest(); await tx.wait(); keeperHarvestOk = true; } catch {}
+  report("J1 keeper can call vault.harvest()", keeperHarvestOk);
+  // random user CANNOT
+  let randomBlocked = false;
+  try { tx = await vault.connect(u3).harvestStrategy(await delta.getAddress()); await tx.wait(); } catch { randomBlocked = true; }
+  report("J2 random user cannot harvestStrategy", randomBlocked);
+  // keeper cannot drain emergency
+  let keeperEmergencyBlocked = false;
+  try { tx = await vault.connect(keeper).emergencyWithdraw(); await tx.wait(); } catch { keeperEmergencyBlocked = true; }
+  report("J3 keeper cannot emergencyWithdraw (owner-only)", keeperEmergencyBlocked);
 
   console.log(`\n=== INTEGRATION: ${pass} passed, ${fail} failed ===`);
   if (fail > 0) process.exit(1);

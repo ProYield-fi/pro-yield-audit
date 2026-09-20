@@ -1,10 +1,13 @@
 {
-  "deployed_utc": "2026-09-20T00:54:47.125Z",
+  "deployed_utc": "2026-09-20T01:10:44.919Z",
   "chain_id": 998,
   "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
-  "mock_usdc": "0xfe4DEa47b8d385b7F4406b479d32113abeE8bcE0",
-  "pro_yield_vault": "0xbd617BAe275Cc166241b08C8A8fbb18797Add0e0",
-  "delta_neutral": "0x0C8141761e00Aea0bdF2E105f6D2dAb635Cea893",
-  "funding_oracle": "0x7c4A593d8f52fEBDaC6e0952906a1F9e538c5901",
-  "funding_source": "0x4fd94bBE6011b06f2D382F1980Cd9AB0e42A6198"
+  "pyd_token": "0xb111b515B7b9abD2D109f2341aBA9693272F8906",
+  "fee_distributor": "0xbB7bF671d4E6B066c346Ddb10880bcF3f94E8991",
+  "pyd_staking": "0x6a6C9F6400Be3D9E110D2dd665dF2Ce831219f90",
+  "mock_usdc": "0xa74D6DA957DC2b881897bf54eE2aa40080B722c4",
+  "pro_yield_vault": "0x616D54A921665BfB742f32f39FD8bb2158a3173D",
+  "delta_neutral": "0xc5888aA0f7320867BA41CB38b6F34d1F9344D5b5",
+  "funding_oracle": "0xb202C43704082B1985C0a1646ad90A129e864413",
+  "funding_source": "0x2269E56EFB5DBd9bb5e9611e6aAA7369939e7A5d"
 }

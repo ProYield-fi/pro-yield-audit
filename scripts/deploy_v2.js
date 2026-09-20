@@ -16,13 +16,28 @@ async function main() {
   // Every redeploy on a fresh chain mints new addresses; hardcoded ones go stale.
   const ADDRESSES_PATH = path.join(__dirname, "..", "deployed_addresses.json");
   const deployed = { deployed_utc: new Date().toISOString(), chain_id: 998, deployer: owner.address };
+
+  // PYD token + fee infrastructure (fee loop: vault perf fee -> FD -> staking/insurance)
+  const PYDToken = await hre.ethers.getContractFactory("PYDToken");
+  const pyd = await PYDToken.deploy(ethers.parseUnits("100000000", 18)); // 100M
+  await pyd.waitForDeployment();
+  const FeeDistributor = await hre.ethers.getContractFactory("FeeDistributor");
+  const feeDistributor = await FeeDistributor.deploy(await mockUSDC.getAddress());
+  await feeDistributor.waitForDeployment();
+  const PYDStaking = await hre.ethers.getContractFactory("PYDStaking");
+  const staking = await PYDStaking.deploy(await pyd.getAddress());
+  await staking.waitForDeployment();
+  deployed.pyd_token = await pyd.getAddress();
+  deployed.fee_distributor = await feeDistributor.getAddress();
+  deployed.pyd_staking = await staking.getAddress();
+  console.log("PYD:", deployed.pyd_token, "| FeeDistributor:", deployed.fee_distributor, "| Staking:", deployed.pyd_staking);
   
-  // Deploy ProYieldVault
+  // Deploy ProYieldVault — performance fees route to FeeDistributor
   const ProYieldVault = await hre.ethers.getContractFactory("ProYieldVault");
   const vault = await ProYieldVault.deploy(
     await mockUSDC.getAddress(),
     owner.address,
-    owner.address
+    await feeDistributor.getAddress()
   );
   await vault.waitForDeployment();
   console.log("ProYieldVault:", await vault.getAddress());
@@ -57,6 +72,9 @@ async function main() {
   // open a position so accrual has a notional
   await (await delta.openPosition(ethers.parseUnits("30000", 18))).wait();
   await (await delta.updateFunding()).wait();
+  // fund PYD staking rewards (1M PYD over 30 days) — fee-recycling leg
+  await (await pyd.approve(await staking.getAddress(), ethers.parseUnits("1000000", 18))).wait();
+  await (await staking.fundRewards(ethers.parseUnits("1000000", 18), 30 * 24 * 3600)).wait();
   console.log("FundingOracle:", await fundingOracle.getAddress());
   console.log("FundingSource:", await fundingSource.getAddress());
   deployed.funding_oracle = await fundingOracle.getAddress();
