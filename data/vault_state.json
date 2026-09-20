@@ -1,11 +1,11 @@
 {
  "idle": "0.000002 USDC",
- "totalAssets": "100000.0 USDC",
+ "totalAssets": "100488.220590753424657534 USDC",
  "totalYield": "0.007894 USDC",
  "exchangeRate": "1.000256",
  "deltaApyBps": "1100",
  "strategies": "4",
- "ts": "2026-09-20T00:18:11Z",
- "vault": "0x88c0492efDF5B15B1b7585032D2436F919e280E9",
+ "ts": "2026-09-20T00:55:42Z",
+ "vault": "0xbd617BAe275Cc166241b08C8A8fbb18797Add0e0",
  "source": "HyperEVM testnet RPC (hardhat run)"
 }
