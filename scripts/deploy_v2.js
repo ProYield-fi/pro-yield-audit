@@ -37,7 +37,10 @@ async function main() {
 
   // PYD token + fee infrastructure (fee loop: vault perf fee -> FD -> staking/insurance)
   const PYDToken = await hre.ethers.getContractFactory("PYDToken");
-  const pyd = await PYDToken.deploy(ethers.parseUnits("100000000", 18)); // 100M
+  // PYDToken's constructor scales x10^18 -- pass the whole-token count so
+  // totalSupply = 100,000,000 tokens exactly (1e26 raw). Passing wei here
+  // double-scales to 1e44 raw (1e18x the intended supply).
+  const pyd = await PYDToken.deploy(100000000n); // 100M tokens
   await pyd.waitForDeployment();
   const FeeDistributor = await hre.ethers.getContractFactory("FeeDistributor");
   const feeDistributor = await FeeDistributor.deploy(await mockUSDC.getAddress());

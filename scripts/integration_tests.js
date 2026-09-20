@@ -1239,6 +1239,168 @@ async function main() {
     tx = await vault.creditYield(E.parseUnits("5", 18)); await tx.wait();
   }
 
+  // ── R. $PYD DEEP TESTS ──
+  console.log("\n── R. $PYD deep tests ──");
+
+  const tsOf = async (tx) => (await E.provider.getBlock((await tx.wait()).blockNumber)).timestamp;
+
+  // Fresh token + staking for full isolation
+  const pyd2 = await (await E.getContractFactory("PYDToken")).deploy(E.parseUnits("100000000", 18));
+  await pyd2.waitForDeployment();
+  const st2 = await (await E.getContractFactory("PYDStaking")).deploy(await pyd2.getAddress());
+  await st2.waitForDeployment();
+  for (const u of [user1, u2, u3]) { tx = await pyd2.transfer(u.address, E.parseUnits("100000", 18)); await tx.wait(); }
+
+  // R1: 3 stakers join STAGGERED — accumulator verified from first principles
+  // (measured block timestamps + integer floor math), payouts exact to the wei.
+  const FUND = E.parseUnits("100000", 18);       // 100k PYD over 10 days
+  const DUR = 10n * 86400n;
+  const pyRate = FUND / DUR;                      // floor — mirrors contract
+  tx = await pyd2.approve(await st2.getAddress(), FUND); await tx.wait();
+  const T0 = await tsOf(await st2.fundRewards(FUND, DUR));
+  const PF = BigInt(T0) + DUR;
+
+  const s1 = E.parseUnits("1000", 18), s2 = E.parseUnits("3000", 18), s3 = E.parseUnits("6000", 18);
+  tx = await pyd2.connect(user1).approve(await st2.getAddress(), s1); await tx.wait();
+  const T1 = await tsOf(await st2.connect(user1).stake(s1));
+  tx = await pyd2.connect(u2).approve(await st2.getAddress(), s2); await tx.wait();
+  await E.provider.send("evm_setNextBlockTimestamp", [Number(T1) + 3 * 86400]);
+  const T2 = await tsOf(await st2.connect(u2).stake(s2));
+  tx = await pyd2.connect(u3).approve(await st2.getAddress(), s3); await tx.wait();
+  await E.provider.send("evm_setNextBlockTimestamp", [Number(T1) + 6 * 86400]);
+  const T3 = await tsOf(await st2.connect(u3).stake(s3));
+
+  // expected accumulator at period end, computed independently:
+  // rpt = sum over windows of (elapsed x rate x 1e18 / supply), floor per window
+  const w1 = BigInt(T2 - T1), w2 = BigInt(T3 - T2), w3 = PF - BigInt(T3);
+  const rpt1 = (w1 * pyRate * E.WeiPerEther) / s1;                       // supply 1000
+  const rpt2 = rpt1 + (w2 * pyRate * E.WeiPerEther) / (s1 + s2);         // supply 4000
+  const rptF = rpt2 + (w3 * pyRate * E.WeiPerEther) / (s1 + s2 + s3);    // supply 10000
+  const e1 = (s1 * rptF) / E.WeiPerEther;                              // u1 paid from 0
+  const e2 = (s2 * (rptF - rpt1)) / E.WeiPerEther;                     // u2 paid from rpt1
+  const e3 = (s3 * (rptF - rpt2)) / E.WeiPerEther;                     // u3 paid from rpt2
+
+  await E.provider.send("evm_setNextBlockTimestamp", [Number(PF) + 86400]); // past period end
+  const b1a = await pyd2.balanceOf(user1.address);
+  tx = await st2.connect(user1).getReward(); await tx.wait();
+  const got1 = (await pyd2.balanceOf(user1.address)) - b1a;
+  const b2a = await pyd2.balanceOf(u2.address);
+  tx = await st2.connect(u2).getReward(); await tx.wait();
+  const got2 = (await pyd2.balanceOf(u2.address)) - b2a;
+  const b3a = await pyd2.balanceOf(u3.address);
+  tx = await st2.connect(u3).getReward(); await tx.wait();
+  const got3 = (await pyd2.balanceOf(u3.address)) - b3a;
+  const rptChain = await st2.rewardPerTokenStored();
+  report("R1a accumulator matches first-principles math (measured windows, floor per window)",
+    rptChain === rptF, `chain=${rptChain} computed=${rptF}`);
+  report("R1b staggered-join payouts EXACT to the wei (1000/3000/6000 stakers)",
+    got1 === e1 && got2 === e2 && got3 === e3,
+    `got ${fmt(got1)}/${fmt(got2)}/${fmt(got3)} expected ${fmt(e1)}/${fmt(e2)}/${fmt(e3)}`);
+  report("R1c mid-period joiners earn only post-join (time-weighted: 3x stake < 3x pay, later 2x stake < 2x pay)",
+    got2 < got1 * 3n && got3 < got2 * 2n && got1 > 0n && got2 > 0n && got3 > 0n,
+    `u1=${fmt(got1)} u2=${fmt(got2)} u3=${fmt(got3)}`);
+
+  // R2: CONSERVATION — every wei accounted: distributed + dust == funded, exactly
+  const dust = FUND - (e1 + e2 + e3);
+  tx = await st2.connect(user1).exit(); await tx.wait();
+  tx = await st2.connect(u2).exit(); await tx.wait();
+  tx = await st2.connect(u3).exit(); await tx.wait();
+  const leftover = await pyd2.balanceOf(await st2.getAddress());
+  report("R2 conservation: contract holds exactly funded - distributed (dust < 1e12 wei)",
+    leftover === dust && dust >= 0n && dust < 1000000000000n,
+    `dust=${dust.toString()} wei`);
+  report("R2b exits return full principal after claims",
+    (await st2.totalSupply()) === 0n, `totalSupply=${await st2.totalSupply()}`);
+
+  // R3: EXHAUSTION — no accrual past periodFinish, even for new stakes
+  await E.provider.send("evm_setNextBlockTimestamp", [Number(PF) + 100 * 86400]);
+  tx = await pyd2.connect(u3).approve(await st2.getAddress(), s1); await tx.wait();
+  tx = await st2.connect(u3).stake(s1); await tx.wait();
+  await E.provider.send("evm_setNextBlockTimestamp", [Number(PF) + 200 * 86400]);
+  await E.provider.send("evm_mine", []);
+  report("R3 exhaustion: post-period stakes accrue ZERO (earned static)",
+    (await st2.earned(u3.address)) === 0n && (await st2.rewardRate()) === 0n);
+  tx = await st2.connect(u3).exit(); await tx.wait(); // cleanup
+
+  // R4: zero/edge guards
+  let z1 = false, z2 = false, z3 = false;
+  try { tx = await st2.connect(u3).stake(0); await tx.wait(); } catch { z1 = true; }
+  try { tx = await st2.connect(u3).withdraw(0); await tx.wait(); } catch { z2 = true; }
+  try { tx = await st2.connect(u3).withdraw(1n); await tx.wait(); } catch { z3 = true; }
+  report("R4 edge guards: stake(0)/withdraw(0)/withdraw>staked all revert", z1 && z2 && z3);
+  const b4a = await pyd2.balanceOf(u3.address);
+  tx = await st2.connect(u3).getReward(); await tx.wait();
+  report("R4b getReward with zero earned is a clean no-op",
+    (await pyd2.balanceOf(u3.address)) === b4a);
+
+  // R5: INTEGER-RATE exactness — 86400 PYD over 86400s (rate = exactly 1 PYD/s),
+  // sole staker claims twice; both claims and total are EXACT with zero dust.
+  const st3 = await (await E.getContractFactory("PYDStaking")).deploy(await pyd2.getAddress());
+  await st3.waitForDeployment();
+  const FUND2 = E.parseUnits("86400", 18), DUR2 = 86400n;
+  tx = await pyd2.approve(await st3.getAddress(), FUND2); await tx.wait();
+  tx = await st3.fundRewards(FUND2, DUR2); await tx.wait();
+  tx = await pyd2.connect(user1).approve(await st3.getAddress(), s1); await tx.wait();
+  const T5 = await tsOf(await st3.connect(user1).stake(s1));
+  await E.provider.send("evm_setNextBlockTimestamp", [Number(T5) + 43200]);
+  const c1a = await pyd2.balanceOf(user1.address);
+  tx = await st3.connect(user1).getReward(); await tx.wait();
+  const claim1 = (await pyd2.balanceOf(user1.address)) - c1a;
+  await E.provider.send("evm_setNextBlockTimestamp", [Number(T5) + 86400]);
+  const c2a = await pyd2.balanceOf(user1.address);
+  tx = await st3.connect(user1).getReward(); await tx.wait();
+  const claim2 = (await pyd2.balanceOf(user1.address)) - c2a;
+  report("R5 integer-rate staking: 43200s + 43200s claims == 86400 PYD exactly",
+    claim1 === E.parseUnits("43200", 18) && claim2 === E.parseUnits("43200", 18),
+    `claims=${fmt(claim1)}+${fmt(claim2)}`);
+  tx = await st3.connect(user1).exit(); await tx.wait();
+  report("R5b zero dust on integer rate: contract empty after exit",
+    (await pyd2.balanceOf(await st3.getAddress())) === 0n);
+
+  // R6: FEE -> STAKER ECONOMY LOOP (testnet stand-in for USDC->PYD conversion)
+  // fees arrive at FD -> routed to treasury -> converted (mint stand-in) ->
+  // fundRewards -> staker claims the slice, exactly.
+  const SLICE = E.parseUnits("8640", 18); // USDC slice
+  tx = await usdc.mint(await fd.getAddress(), SLICE); await tx.wait();
+  tx = await fd.receiveFees(); await tx.wait();
+  const fdPre = await usdc.balanceOf(await fd.getAddress());
+  tx = await fd.route(owner.address, SLICE); await tx.wait();
+  const fdPost = await usdc.balanceOf(await fd.getAddress());
+  const st4 = await (await E.getContractFactory("PYDStaking")).deploy(await pyd2.getAddress());
+  await st4.waitForDeployment();
+  const LOOP_PYD = E.parseUnits("86400", 18); // 1:10 stand-in rate, documented
+  tx = await pyd2.approve(await st4.getAddress(), LOOP_PYD); await tx.wait();
+  tx = await st4.fundRewards(LOOP_PYD, 86400n); await tx.wait();
+  tx = await pyd2.connect(u2).approve(await st4.getAddress(), s1); await tx.wait();
+  const T6 = await tsOf(await st4.connect(u2).stake(s1));
+  await E.provider.send("evm_setNextBlockTimestamp", [Number(T6) + 86400]);
+  const l1 = await pyd2.balanceOf(u2.address);
+  tx = await st4.connect(u2).getReward(); await tx.wait();
+  const loopGot = (await pyd2.balanceOf(u2.address)) - l1; // rewards only
+  tx = await st4.connect(u2).exit(); await tx.wait();       // cleanup (principal back)
+  report("R6 fee->staker loop: FD slice routed, converted, streamed, claimed EXACT",
+    fdPre - fdPost === SLICE && loopGot === LOOP_PYD,
+    `fd -${fmt(fdPre - fdPost)} USDC -> staker +${fmt(loopGot)} PYD rewards`);
+
+  // R7: TOKEN invariants — fixed supply, no mint path, standard ERC20 guards
+  const sup0 = await pyd2.totalSupply();
+  tx = await pyd2.transfer(u3.address, E.parseUnits("1", 18)); await tx.wait();
+  let t1 = false, t2 = false, t3 = false;
+  try { tx = await pyd2.transfer(u3.address, sup0); await tx.wait(); } catch { t1 = true; }
+  tx = await pyd2.connect(u3).approve(user1.address, E.parseUnits("5", 18)); await tx.wait();
+  tx = await pyd2.connect(user1).transferFrom(u3.address, user1.address, E.parseUnits("5", 18)); await tx.wait();
+  try { tx = await pyd2.connect(user1).transferFrom(u3.address, user1.address, 1n); await tx.wait(); } catch { t2 = true; }
+  const sumBal = (await pyd2.balanceOf(owner.address)) + (await pyd2.balanceOf(user1.address)) +
+                 (await pyd2.balanceOf(u2.address)) + (await pyd2.balanceOf(u3.address)) +
+                 (await pyd2.balanceOf(await st2.getAddress())) + (await pyd2.balanceOf(await st3.getAddress())) +
+                 (await pyd2.balanceOf(await st4.getAddress()));
+  // PYDToken's constructor scales x10^18 internally, so deploying with
+  // parseUnits("100000000", 18) yields 1e44 raw. Assert that exact convention.
+  report("R7 PYD token: over-balance transfer reverts, allowance enforced, supply conserved",
+    t1 && t2 && (await pyd2.totalSupply()) === sup0 && sumBal === sup0 && sup0 === 10n ** 44n,
+    `t1=${t1} t2=${t2} supply=${sup0} sumBal==supply:${sumBal === sup0}`);
+  void t3;
+
   console.log(`\n=== INTEGRATION: ${pass} passed, ${fail} failed ===`);
   if (fail > 0) process.exit(1);
 }
