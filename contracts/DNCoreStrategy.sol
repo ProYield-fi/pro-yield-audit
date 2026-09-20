@@ -147,8 +147,8 @@ contract DNCoreStrategy is BaseStrategy {
         corePrincipal6 += core6;
         address wallet = HLConstants.coreDepositWallet();
         underlying.forceApprove(wallet, evmAmount);
-        ICoreDepositWallet(wallet).deposit(evmAmount, HLConstants.SPOT_DEX);
         emit BridgeToCore(evmAmount, core6);
+        ICoreDepositWallet(wallet).deposit(evmAmount, HLConstants.SPOT_DEX);
     }
 
     /// @notice Return USDC Core->EVM (sendAsset to the USDC system address).
@@ -166,6 +166,7 @@ contract DNCoreStrategy is BaseStrategy {
         if (profitRed > 0) {
             profitRealized += uint256(profitRed) * coreScale;
         }
+        emit BridgeToEvm(amount6, principalRed, profitRed);
         _send(
             HLConstants.SEND_ASSET_ACTION,
             abi.encode(
@@ -177,35 +178,34 @@ contract DNCoreStrategy is BaseStrategy {
                 amount6
             )
         );
-        emit BridgeToEvm(amount6, principalRed, profitRed);
     }
 
     /*//////////////////////// Trading ////////////////////////*/
-    function moveUsdcToPerp(uint64 ntl) external onlyKeeper notPaused coreAccountRequired {
+    function moveUsdcToPerp(uint64 ntl) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         require(ntl > 0 && uint256(ntl) <= maxActionUsd6, "DNCore: cap");
         _send(HLConstants.USD_CLASS_TRANSFER_ACTION, abi.encode(ntl, true));
     }
 
-    function moveUsdcToSpot(uint64 ntl) external onlyKeeper notPaused coreAccountRequired {
+    function moveUsdcToSpot(uint64 ntl) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         require(ntl > 0 && uint256(ntl) <= maxActionUsd6, "DNCore: cap");
         _send(HLConstants.USD_CLASS_TRANSFER_ACTION, abi.encode(ntl, false));
     }
 
     /// @notice Open the short hedge (sell perp). limitPx/sz are 10^8 x human
     /// value; sz must respect szDecimals (read 0x80a before sizing).
-    function openShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired {
+    function openShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         _order(asset, false, false, limitPx, sz, tif);
     }
 
     /// @notice Unwind — buy back the short (reduceOnly).
-    function closeShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired {
+    function closeShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         _order(asset, true, true, limitPx, sz, tif);
     }
 
-    function cancelOrderByCloid(uint32 asset, uint128 cloid) external onlyKeeper notPaused coreAccountRequired {
+    function cancelOrderByCloid(uint32 asset, uint128 cloid) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         require(asset == perpAsset, "DNCore: wrong asset");
-        _send(HLConstants.CANCEL_ORDER_BY_CLOID_ACTION, abi.encode(asset, cloid));
         emit OrderCancelled(asset, cloid);
+        _send(HLConstants.CANCEL_ORDER_BY_CLOID_ACTION, abi.encode(asset, cloid));
     }
 
     /// @dev notional(USDC 6dp) = limitPx * sz / 1e8 / 1e8 * 1e6 = limitPx * sz / 1e10.
@@ -217,27 +217,27 @@ contract DNCoreStrategy is BaseStrategy {
         require(notional6 >= MIN_ORDER_USD6, "DNCore: below $10 min notional");
         require(notional6 <= maxActionUsd6, "DNCore: cap");
         uint128 cloid = 0;
-        _send(HLConstants.LIMIT_ORDER_ACTION, abi.encode(asset, isBuy, limitPx, sz, reduceOnly, tif, cloid));
         emit OrderSent(asset, isBuy, reduceOnly, limitPx, sz, tif, cloid);
+        _send(HLConstants.LIMIT_ORDER_ACTION, abi.encode(asset, isBuy, limitPx, sz, reduceOnly, tif, cloid));
     }
 
     /*//////////////////////// Staking (fee-discount path) ////////////////////////*/
-    function stakeHype(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired {
+    function stakeHype(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
         require(weiAmount > 0, "DNCore: zero amount");
-        _send(HLConstants.STAKING_DEPOSIT_ACTION, abi.encode(weiAmount));
         emit StakeDeposited(weiAmount);
+        _send(HLConstants.STAKING_DEPOSIT_ACTION, abi.encode(weiAmount));
     }
 
-    function delegateHype(address validator, uint64 weiAmount, bool undelegate) external onlyOwner notPaused coreAccountRequired {
+    function delegateHype(address validator, uint64 weiAmount, bool undelegate) external onlyOwner notPaused coreAccountRequired nonReentrant {
         require(validator != address(0), "DNCore: zero validator");
-        _send(HLConstants.TOKEN_DELEGATE_ACTION, abi.encode(validator, weiAmount, undelegate));
         emit Delegated(validator, weiAmount, undelegate);
+        _send(HLConstants.TOKEN_DELEGATE_ACTION, abi.encode(validator, weiAmount, undelegate));
     }
 
-    function withdrawStake(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired {
+    function withdrawStake(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
         require(weiAmount > 0, "DNCore: zero amount");
-        _send(HLConstants.STAKING_WITHDRAW_ACTION, abi.encode(weiAmount));
         emit StakeWithdrawn(weiAmount);
+        _send(HLConstants.STAKING_WITHDRAW_ACTION, abi.encode(weiAmount));
     }
 
     /*//////////////////////// Core sync (read precompiles) ////////////////////////*/
@@ -328,7 +328,7 @@ contract DNCoreStrategy is BaseStrategy {
 
     function _send(uint24 actionId, bytes memory payload) internal {
         bytes memory data = abi.encodePacked(uint8(1), actionId, payload);
-        CORE_WRITER.sendRawAction(data);
         emit ActionSent(actionId, data);
+        CORE_WRITER.sendRawAction(data);
     }
 }

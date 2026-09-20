@@ -135,15 +135,16 @@ contract DNCoreAdapter is Ownable, ReentrancyGuard {
         require(evmAmount > 0, "adapter: zero amount");
         address wallet = HLConstants.coreDepositWallet();
         usdc.forceApprove(wallet, evmAmount);
-        ICoreDepositWallet(wallet).deposit(evmAmount, HLConstants.SPOT_DEX);
         emit BridgeToCore(evmAmount);
+        ICoreDepositWallet(wallet).deposit(evmAmount, HLConstants.SPOT_DEX);
     }
 
     /// @notice Step 4 (unwind) — return USDC Core→EVM via sendAsset to the system
     /// address. NOTE: the contract must hold some HYPE on Core to pay transfer gas,
     /// otherwise the action is dropped (silently).
-    function bridgeBackToEvm(uint64 weiAmount) external onlyKeeper notPaused coreAccountRequired {
+    function bridgeBackToEvm(uint64 weiAmount) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         require(weiAmount > 0, "adapter: zero amount");
+        emit BridgeToEvm(weiAmount);
         _send(
             HLConstants.SEND_ASSET_ACTION,
             abi.encode(
@@ -155,37 +156,36 @@ contract DNCoreAdapter is Ownable, ReentrancyGuard {
                 weiAmount
             )
         );
-        emit BridgeToEvm(weiAmount);
     }
 
     /*//////////////////////// Trading ////////////////////////*/
     /// @notice Step 2 — move USDC spot→perp (or back) on Core. `ntl` is in USDC
     /// perp units (6 decimals; 1 USDC = 1e6).
-    function moveUsdcToPerp(uint64 ntl) external onlyKeeper notPaused coreAccountRequired {
+    function moveUsdcToPerp(uint64 ntl) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         require(ntl > 0 && uint256(ntl) <= maxActionUsd6, "adapter: cap");
         _send(HLConstants.USD_CLASS_TRANSFER_ACTION, abi.encode(ntl, true));
     }
 
-    function moveUsdcToSpot(uint64 ntl) external onlyKeeper notPaused coreAccountRequired {
+    function moveUsdcToSpot(uint64 ntl) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         require(ntl > 0 && uint256(ntl) <= maxActionUsd6, "adapter: cap");
         _send(HLConstants.USD_CLASS_TRANSFER_ACTION, abi.encode(ntl, false));
     }
 
     /// @notice Step 3 — open the short hedge (sell perp). limitPx/sz are 10^8 ×
     /// human value; sz must respect the asset's szDecimals (keeper reads 0x80a).
-    function openShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired {
+    function openShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         _order(asset, false, false, limitPx, sz, tif);
     }
 
     /// @notice Unwind — buy back the short (reduceOnly).
-    function closeShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired {
+    function closeShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         _order(asset, true, true, limitPx, sz, tif);
     }
 
-    function cancelOrderByCloid(uint32 asset, uint128 cloid) external onlyKeeper notPaused coreAccountRequired {
+    function cancelOrderByCloid(uint32 asset, uint128 cloid) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         require(asset == perpAsset, "adapter: wrong asset");
-        _send(HLConstants.CANCEL_ORDER_BY_CLOID_ACTION, abi.encode(asset, cloid));
         emit OrderCancelled(asset, cloid);
+        _send(HLConstants.CANCEL_ORDER_BY_CLOID_ACTION, abi.encode(asset, cloid));
     }
 
     /// @dev notional(USDC 6dp) = limitPx * sz / 1e8 / 1e8 * 1e6 = limitPx * sz / 1e10.
@@ -197,31 +197,31 @@ contract DNCoreAdapter is Ownable, ReentrancyGuard {
         require(notional6 >= MIN_ORDER_USD6, "adapter: below $10 min notional");
         require(notional6 <= maxActionUsd6, "adapter: cap");
         uint128 cloid = 0;
-        _send(HLConstants.LIMIT_ORDER_ACTION, abi.encode(asset, isBuy, limitPx, sz, reduceOnly, tif, cloid));
         emit OrderSent(asset, isBuy, reduceOnly, limitPx, sz, tif, cloid);
+        _send(HLConstants.LIMIT_ORDER_ACTION, abi.encode(asset, isBuy, limitPx, sz, reduceOnly, tif, cloid));
     }
 
     /*//////////////////////// Staking (fee-discount path) ////////////////////////*/
     /// @notice Stake HYPE held on the contract's Core spot balance (action 4).
     /// Owner-gated: policy op, not routine keeper work.
-    function stakeHype(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired {
+    function stakeHype(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
         require(weiAmount > 0, "adapter: zero amount");
-        _send(HLConstants.STAKING_DEPOSIT_ACTION, abi.encode(weiAmount));
         emit StakeDeposited(weiAmount);
+        _send(HLConstants.STAKING_DEPOSIT_ACTION, abi.encode(weiAmount));
     }
 
     /// @notice Delegate / undelegate staked HYPE to a validator (action 3).
-    function delegateHype(address validator, uint64 weiAmount, bool undelegate) external onlyOwner notPaused coreAccountRequired {
+    function delegateHype(address validator, uint64 weiAmount, bool undelegate) external onlyOwner notPaused coreAccountRequired nonReentrant {
         require(validator != address(0), "adapter: zero validator");
-        _send(HLConstants.TOKEN_DELEGATE_ACTION, abi.encode(validator, weiAmount, undelegate));
         emit Delegated(validator, weiAmount, undelegate);
+        _send(HLConstants.TOKEN_DELEGATE_ACTION, abi.encode(validator, weiAmount, undelegate));
     }
 
     /// @notice Withdraw HYPE from staking back to Core spot (action 5).
-    function withdrawStake(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired {
+    function withdrawStake(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
         require(weiAmount > 0, "adapter: zero amount");
-        _send(HLConstants.STAKING_WITHDRAW_ACTION, abi.encode(weiAmount));
         emit StakeWithdrawn(weiAmount);
+        _send(HLConstants.STAKING_WITHDRAW_ACTION, abi.encode(weiAmount));
     }
 
     /*//////////////////////// Reads (precompiles) ////////////////////////*/
@@ -270,7 +270,7 @@ contract DNCoreAdapter is Ownable, ReentrancyGuard {
 
     function _send(uint24 actionId, bytes memory payload) internal {
         bytes memory data = abi.encodePacked(uint8(1), actionId, payload);
-        CORE_WRITER.sendRawAction(data);
         emit ActionSent(actionId, data);
+        CORE_WRITER.sendRawAction(data);
     }
 }
