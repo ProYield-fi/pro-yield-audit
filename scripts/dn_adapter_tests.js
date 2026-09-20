@@ -73,6 +73,9 @@ async function main() {
   const perpInfoAt = await mockAt("MockPerpInfo", P_80A);
   const oracleAt = await mockAt("MockOraclePx", P_807);
   const walletAt = await mockAt("MockCoreDepositWallet", TESTNET_DEPOSIT_WALLET);
+  // Shared anvil: storage survives runs — reset token so deposit() does not
+  // attempt a pull the adapter cannot back (set by dn_strategy_tests).
+  await (await walletAt.setToken("0x0000000000000000000000000000000000000000")).wait();
 
   await (await existsAt.setExists(true)).wait();
   await (await perpInfoAt.set("BTC", 1, 5, 40, false)).wait();
