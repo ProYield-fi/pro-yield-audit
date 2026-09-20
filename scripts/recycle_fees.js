@@ -41,6 +41,13 @@ async function main() {
   if (!dryRun) {
     await (await fd.receiveFees()).wait();
   }
+  // 1) validate policy FIRST — a bad policy must fail before anything moves
+  const boostPct = BigInt(policy.depositor_boost_pct ?? 60);
+  const treasuryPct = BigInt(policy.treasury_pct ?? 20);
+  const insurancePct = BigInt(policy.insurance_pct ?? 20);
+  const total = boostPct + treasuryPct + insurancePct;
+  if (total !== 100n) throw new Error(`policy pcts sum to ${total}, must be 100`);
+
   const bal = await usdc.balanceOf(await fd.getAddress());
   const minAmt = hre.ethers.parseUnits(String(policy.min_amount_usdc ?? 10), 18);
   console.log("FD balance:", hre.ethers.formatUnits(bal, 18), "USDC | min:", hre.ethers.formatUnits(minAmt, 18));
@@ -50,11 +57,6 @@ async function main() {
   }
 
   // 2) split per policy
-  const boostPct = BigInt(policy.depositor_boost_pct ?? 60);
-  const treasuryPct = BigInt(policy.treasury_pct ?? 20);
-  const insurancePct = BigInt(policy.insurance_pct ?? 20);
-  const total = boostPct + treasuryPct + insurancePct;
-  if (total !== 100n) throw new Error(`policy pcts sum to ${total}, must be 100`);
 
   const boost = (bal * boostPct) / 100n;
   const treasury = (bal * treasuryPct) / 100n;
@@ -74,7 +76,20 @@ async function main() {
   if (boost > 0n) {
     await (await fd.route(await vault.getAddress(), boost)).wait();
     const taPre = await vault.totalAssets();
-    const rc = await (await vault.creditYield(boost)).wait();
+    // retry-once: if the credit tx fails after routing, the boost sits in the
+    // vault as uncredited balance (recoverable — creditYield is balance-guarded
+    // and can be re-called by owner). Retry before surfacing the error.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await (await vault.creditYield(boost)).wait();
+        break;
+      } catch (e) {
+        if (attempt >= 1) {
+          console.error("CREDIT FAILED — boost is routed and recoverable via vault.creditYield(" + hre.ethers.formatUnits(boost, 18) + "); aborting ledger write");
+          throw e;
+        }
+      }
+    }
     const taPost = await vault.totalAssets();
     if (taPost - taPre !== boost) throw new Error("credit did not raise totalAssets exactly");
     console.log("credited boost to depositors:", hre.ethers.formatUnits(boost, 18), "USDC");

@@ -1116,9 +1116,11 @@ async function main() {
     const taPost = await vault.totalAssets();
     const pricePost = (taPost * E.WeiPerEther) / ts;
     const credited = rc.logs.map(l => { try { return vault.interface.parseLog(l); } catch { return null; } }).find(e => e && e.name === "YieldCredited");
-    report("P3 creditYield raises share price EXACTLY by amount/shares",
+    const priceExpP3 = (ROUTED * E.WeiPerEther) / ts;
+    const priceDeltaP3 = pricePost - pricePre;
+    report("P3 creditYield raises share price by amount/shares (±1 wei floor)",
       (taPost - taPre) === ROUTED && credited && credited.args[0] === ROUTED &&
-      pricePost - pricePre === (ROUTED * E.WeiPerEther) / ts,
+      priceDeltaP3 >= priceExpP3 && priceDeltaP3 <= priceExpP3 + 1n,
       `price ${fmt(pricePre)} -> ${fmt(pricePost)}`);
     // conservation: vault + strategies >= totalAssets (real backing)
     let held = await usdc.balanceOf(await vault.getAddress());
@@ -1127,6 +1129,101 @@ async function main() {
     held += await usdc.balanceOf(await sky.getAddress());
     held += await usdc.balanceOf(await morphoS.getAddress());
     report("P3b conservation holds after credit (backing >= totalAssets)", held >= taPost);
+  }
+
+  // ── Q. RECYCLING ADVERSARIAL + EDGE CASES ──
+  console.log("\n── Q. Recycling edges ──");
+
+  // Q1: a recycled boost is NEVER fee'd — harvest fees apply only to harvest profit
+  {
+    const CREDIT = E.parseUnits("100", 18);
+    tx = await usdc.mint(await vault.getAddress(), CREDIT); await tx.wait();
+    const taAfterCredit = await vault.totalAssets();
+    tx = await vault.creditYield(CREDIT); await tx.wait();
+    // pinned accrual cycle for a known profit
+    if ((await delta.delta()) === 0n) { tx = await delta.openPosition(E.parseUnits("30000", 18)); await tx.wait(); }
+    tx = await vault.connect(u4).harvest({ gasLimit: 2_500_000 }); await tx.wait(); // clear + pin
+    const size = await delta.delta();
+    const t0 = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    const la0 = await delta.lastAccrual();
+    const W = BigInt(t0 + 86400);
+    await E.provider.send("evm_setNextBlockTimestamp", [t0 + 86400]);
+    const ownerPre = await usdc.balanceOf(owner.address);
+    const taPreH = await vault.totalAssets();
+    tx = await vault.connect(u4).harvest({ gasLimit: 2_500_000 }); await tx.wait();
+    const feeGot = (await usdc.balanceOf(owner.address)) - ownerPre;
+    const taPostH = await vault.totalAssets();
+    const expected = (size * 1100n * (W - BigInt(la0))) / (10000n * 31536000n);
+    const feeExp = expected / 10n;
+    report("Q1 recycled boost is NOT fee'd — harvest fee = 10% of harvest profit only",
+      feeGot === feeExp && (taPostH - taPreH) === (expected - feeExp) && taPostH > taAfterCredit + (expected - feeExp),
+      `fee=${fmt(feeGot)} (exp ${fmt(feeExp)}) net=${fmt(taPostH - taPreH)}`);
+  }
+
+  // Q2: multiple credits accumulate; price rises exactly by the sum
+  {
+    const ts = await vault.totalShares();
+    const taPre = await vault.totalAssets();
+    let credited = 0n;
+    for (let i = 0; i < 3; i++) {
+      const amt = E.parseUnits("10", 18);
+      tx = await usdc.mint(await vault.getAddress(), amt); await tx.wait();
+      tx = await vault.creditYield(amt); await tx.wait();
+      credited += amt;
+    }
+    const taPost = await vault.totalAssets();
+    const pricePre = (taPre * E.WeiPerEther) / ts;
+    const pricePost = (taPost * E.WeiPerEther) / ts;
+    const priceExpQ2 = (credited * E.WeiPerEther) / ts;
+    const priceDeltaQ2 = pricePost - pricePre;
+    report("Q2 three credits accumulate — price rises by sum/shares (±1 wei floor)",
+      (taPost - taPre) === credited && priceDeltaQ2 >= priceExpQ2 && priceDeltaQ2 <= priceExpQ2 + 1n,
+      `+${fmt(priceDeltaQ2)} per share`);
+  }
+
+  // Q3: depositor EXITS after boosts — payout == quoted price exactly (no slippage)
+  {
+    const sh = await vault.shares(user1.address);
+    if (sh > 0n) {
+      const quoted = await vault.convertToAssets(sh);
+      const balPre = await usdc.balanceOf(user1.address);
+      tx = await vault.connect(user1).withdraw(quoted); await tx.wait();
+      const got = (await usdc.balanceOf(user1.address)) - balPre;
+      report("Q3 exit after boosts: payout == convertToAssets quote (no slippage)",
+        got === quoted, `quoted=${fmt(quoted)} got=${fmt(got)}`);
+    } else {
+      report("Q3 exit after boosts", true, "user1 has no shares — skipped");
+    }
+  }
+
+  // Q4: credit into an EMPTY vault is safe (no div-by-zero), first depositor benefits
+  {
+    const V2 = await E.getContractFactory("ProYieldVault");
+    const v2 = await V2.deploy(await usdc.getAddress(), owner.address, owner.address);
+    await v2.waitForDeployment();
+    tx = await usdc.mint(await v2.getAddress(), E.parseUnits("100", 18)); await tx.wait();
+    let ok = true;
+    try { tx = await v2.creditYield(E.parseUnits("100", 18)); await tx.wait(); } catch { ok = false; }
+    report("Q4 credit into empty vault: no revert (no div-by-zero)", ok);
+    if (ok) {
+      tx = await usdc.mint(user1.address, E.parseUnits("1000", 18)); await tx.wait();
+      tx = await usdc.connect(user1).approve(await v2.getAddress(), E.parseUnits("1000", 18)); await tx.wait();
+      tx = await v2.connect(user1).deposit(E.parseUnits("1000", 18)); await tx.wait();
+      const maxW = await v2.maxWithdraw(user1.address);
+      // first depositor gets deposit + most of the gift (offset dust aside)
+      report("Q4b first depositor after empty-vault credit redeems ~deposit + gift",
+        maxW >= E.parseUnits("1095", 18), `maxWithdraw=${fmt(maxW)}`);
+    }
+  }
+
+  // Q5: non-owner cannot re-run the recycler's credit path after funds arrive
+  {
+    tx = await usdc.mint(await vault.getAddress(), E.parseUnits("5", 18)); await tx.wait();
+    let blocked = false;
+    try { tx = await vault.connect(u2).creditYield(E.parseUnits("5", 18)); await tx.wait(); } catch { blocked = true; }
+    report("Q5 anyone else cannot credit incoming funds (owner-gated)", blocked);
+    // cleanup: credit it as owner so it isn't stranded
+    tx = await vault.creditYield(E.parseUnits("5", 18)); await tx.wait();
   }
 
   console.log(`\n=== INTEGRATION: ${pass} passed, ${fail} failed ===`);
