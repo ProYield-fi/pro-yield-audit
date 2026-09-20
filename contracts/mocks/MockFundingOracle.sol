@@ -12,7 +12,7 @@ interface IFundingOracle {
 /// (keeper-signed or via the HL EVM precompiles when available).
 contract MockFundingOracle is IFundingOracle {
     uint256 public rate; // annualized bps
-    address public owner;
+    address public immutable owner;
 
     event RateSet(uint256 rate);
 

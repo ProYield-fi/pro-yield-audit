@@ -23,17 +23,13 @@ contract SkyStrategy is BaseStrategy {
         return "Sky";
     }
 
+    /// @notice Honest harvest: this strategy holds its allocation as USDC and
+    /// earns via the (to-be-integrated) Sky adapter. The previous version
+    /// moved the strategy's ENTIRE ETH balance to msg.sender and booked it
+    /// as `totalDebt` profit — fake accounting + a drain pattern (same class
+    /// as the Morpho fake-profit bug). Until the real adapter lands, harvest
+    /// returns 0: no principal moves, no debt is fabricated.
     function _doHarvest() internal override returns (uint256) {
-        uint256 profit = 0;
-        if (address(this).balance > 0 && isActive && msg.sender == owner()) {
-            uint256 balance = address(this).balance;
-            totalDebt += balance;
-            uint256 _bal = balance;
-            // slither-disable-next-line low-level-calls
-            (bool success, ) = msg.sender.call{value: balance}("");
-            require(success, "Sky: transfer failed");
-            profit = balance;
-        }
-        return profit;
+        return 0;
     }
 }

@@ -4,6 +4,24 @@ const path = require("path");
 
 async function main() {
   const [owner] = await hre.ethers.getSigners();
+  // OOG-flake killer (prototype-level): pad every signer's gas 3x — getSigners()
+  // returns fresh instances per call, so per-instance patches miss factory calls.
+  {
+    const { HardhatEthersSigner } = require("@nomicfoundation/hardhat-ethers/signers");
+    const origSend = HardhatEthersSigner.prototype.sendTransaction;
+    HardhatEthersSigner.prototype.sendTransaction = async function (tx) {
+      if (tx.gasLimit == null) {
+        try {
+          const est = await hre.ethers.provider.estimateGas({ ...tx, from: this.address });
+          tx = { ...tx, gasLimit: (est * 3n) + 21000n };
+        } catch {
+          tx = { ...tx, gasLimit: 1_000_000n };
+        }
+      }
+      return origSend.call(this, tx);
+    };
+  }
+
   console.log("Deploying with:", owner.address);
   
   // Deploy MockUSDC
@@ -16,13 +34,28 @@ async function main() {
   // Every redeploy on a fresh chain mints new addresses; hardcoded ones go stale.
   const ADDRESSES_PATH = path.join(__dirname, "..", "deployed_addresses.json");
   const deployed = { deployed_utc: new Date().toISOString(), chain_id: 998, deployer: owner.address };
+
+  // PYD token + fee infrastructure (fee loop: vault perf fee -> FD -> staking/insurance)
+  const PYDToken = await hre.ethers.getContractFactory("PYDToken");
+  const pyd = await PYDToken.deploy(ethers.parseUnits("100000000", 18)); // 100M
+  await pyd.waitForDeployment();
+  const FeeDistributor = await hre.ethers.getContractFactory("FeeDistributor");
+  const feeDistributor = await FeeDistributor.deploy(await mockUSDC.getAddress());
+  await feeDistributor.waitForDeployment();
+  const PYDStaking = await hre.ethers.getContractFactory("PYDStaking");
+  const staking = await PYDStaking.deploy(await pyd.getAddress());
+  await staking.waitForDeployment();
+  deployed.pyd_token = await pyd.getAddress();
+  deployed.fee_distributor = await feeDistributor.getAddress();
+  deployed.pyd_staking = await staking.getAddress();
+  console.log("PYD:", deployed.pyd_token, "| FeeDistributor:", deployed.fee_distributor, "| Staking:", deployed.pyd_staking);
   
-  // Deploy ProYieldVault
+  // Deploy ProYieldVault — performance fees route to FeeDistributor
   const ProYieldVault = await hre.ethers.getContractFactory("ProYieldVault");
   const vault = await ProYieldVault.deploy(
     await mockUSDC.getAddress(),
     owner.address,
-    owner.address
+    await feeDistributor.getAddress()
   );
   await vault.waitForDeployment();
   console.log("ProYieldVault:", await vault.getAddress());
@@ -54,9 +87,9 @@ async function main() {
   await (await mockUSDC.mint(owner.address, ethers.parseUnits("1000000", 18))).wait();
   await (await mockUSDC.approve(await fundingSource.getAddress(), ethers.parseUnits("1000000", 18))).wait();
   await (await fundingSource.fund(ethers.parseUnits("1000000", 18))).wait();
-  // open a position so accrual has a notional
-  await (await delta.openPosition(ethers.parseUnits("30000", 18))).wait();
-  await (await delta.updateFunding()).wait();
+  // fund PYD staking rewards (1M PYD over 30 days) — fee-recycling leg
+  await (await pyd.approve(await staking.getAddress(), ethers.parseUnits("1000000", 18))).wait();
+  await (await staking.fundRewards(ethers.parseUnits("1000000", 18), 30 * 24 * 3600)).wait();
   console.log("FundingOracle:", await fundingOracle.getAddress());
   console.log("FundingSource:", await fundingSource.getAddress());
   deployed.funding_oracle = await fundingOracle.getAddress();
@@ -97,24 +130,31 @@ async function main() {
   const allocTx = await vault.allocate();
   await allocTx.wait();
   console.log("✅ allocate() works");
+
+  // Open the funding position at (almost) the full allocated capital so the
+  // demo vault's book yield ≈ the funding rate. Only ~90% is deployed by
+  // allocate() (10% reserve), so size the position to match — an undersized
+  // position (old 30k) makes the demo look like 1/3 of the real engine.
+  const allocated = await mockUSDC.balanceOf(await delta.getAddress());
+  if (allocated > 0n) {
+    const positionSize = (allocated * 9n) / 10n; // small buffer stays in the strategy
+    await (await delta.openPosition(positionSize)).wait();
+    console.log("✅ delta position opened at", ethers.formatUnits(positionSize, 18), "USDC");
+  } else {
+    console.log("⚠ allocate deployed 0 to delta — position NOT opened");
+  }
+  await (await delta.updateFunding()).wait();
   
   // Harvest
   const harvestTx = await vault.harvest();
   await harvestTx.wait();
   console.log("✅ harvest() works");
-  
-  // Emergency withdraw — then restore liquidity via a throwaway wallet so the
-  // vault ends the script fully backed (reserve intact, claims == assets).
-  const emergIdle = await mockUSDC.balanceOf(await vault.getAddress());
-  const emergTx = await vault.emergencyWithdraw();
-  await emergTx.wait();
-  console.log("✅ emergencyWithdraw() works");
-  const restore = new hre.ethers.Wallet(hre.ethers.Wallet.createRandom().privateKey, hre.ethers.provider);
-  await owner.sendTransaction({ to: restore.address, value: hre.ethers.parseEther("1") });
-  await (await mockUSDC.mint(restore.address, emergIdle)).wait();
-  await (await mockUSDC.connect(restore).approve(await vault.getAddress(), emergIdle)).wait();
-  await (await vault.connect(restore).deposit(emergIdle)).wait();
-  console.log("✅ liquidity restored via throwaway deposit:", hre.ethers.formatUnits(emergIdle, 18));
+
+  // NOTE: emergencyWithdraw is deliberately NOT exercised here — it drains
+  // backing and permanently dilutes the share price (correct 4626 crisis
+  // semantics, but this vault is the canonical one the keeper serves).
+  // The emergency path is covered by scripts/integration_tests.js §D on a
+  // throwaway vault, including post-emergency price behavior.
   
   // Name checks
   console.log("name check:", await vault.name(), "== ProYieldVault:", await vault.name() === "ProYieldVault");

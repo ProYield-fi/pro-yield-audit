@@ -6,6 +6,14 @@ using SafeERC20 for IERC20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+/// @notice Morpho Blue supply strategy (principal parking — yield accrual
+/// arrives with the real Morpho Blue adapter in the production pass).
+/// FIX (audit 09-20): _doHarvest used to transfer the strategy's ENTIRE USDC
+/// balance to `morpho` and book it as "profit" (principal drain booked as
+/// yield), and withdraw() let ANY caller pull up to totalSupply of the
+/// strategy's balance — bypassing vault auth. Both removed: harvest is an
+/// explicit no-op until the real adapter exists, and withdrawal is
+/// vault-only (mirrors BaseStrategy.recall authorization).
 contract MorphoStrategy is BaseStrategy {
     address public morpho;
     uint256 public totalSupply;
@@ -26,30 +34,27 @@ contract MorphoStrategy is BaseStrategy {
         morpho = morpho_;
     }
 
-    function supply(uint256 amount) external nonReentrant {
+    /// Operator-only: park principal in the Morpho market.
+    function supply(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "Morpho: zero amount");
-        require(morpho != address(0), "Morpho: not set");
-        underlying.safeTransferFrom(msg.sender, morpho, amount);
+        underlying.safeTransfer(morpho, amount);
         totalSupply += amount;
     }
 
+    /// Vault-only: pull parked principal back (withdrawal liquidity path).
+    /// Was PUBLIC — any caller could drain up to totalSupply (audit finding).
     function withdraw(uint256 amount) external override nonReentrant {
+        require(msg.sender == vault || msg.sender == owner(), "Morpho: not authorized");
         require(amount > 0, "Morpho: zero amount");
         require(totalSupply >= amount, "Morpho: insufficient supply");
         totalSupply -= amount;
         underlying.safeTransfer(msg.sender, amount);
     }
 
-    function _doHarvest() internal override returns (uint256) {
-        uint256 profit = 0;
-        if (morpho != address(0)) {
-            // Harvest from Morpho by calling withdraw/supply cycle
-            uint256 balance = underlying.balanceOf(address(this));
-            if (balance > 0) {
-                underlying.safeTransfer(morpho, balance);
-                profit = balance;
-            }
-        }
-        return profit;
+    /// No yield accrual until the production Morpho Blue adapter lands.
+    /// The previous version moved PRINCIPAL to `morpho` and booked it as
+    /// profit — a drain vector with fake accounting. Honest zero until real.
+    function _doHarvest() internal pure override returns (uint256) {
+        return 0;
     }
 }

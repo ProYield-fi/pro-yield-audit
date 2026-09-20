@@ -84,7 +84,12 @@ contract DeltaNeutralStrategy is BaseStrategy {
         emit PositionClosed(msg.sender, size);
     }
 
-    /// @notice Fetch the live annualized funding rate from the oracle.
+    /// @notice Max annualized funding rate the strategy will ever accrue from.
+    /// A broken/hostile oracle returning garbage cannot fabricate runaway
+    /// yield or overflow `delta * rate * elapsed`.
+    uint256 public constant MAX_RATE_BPS = 10_000; // 100% annualized
+
+    /// @notice Fetch the live annualized funding rate from the oracle (clamped).
     function updateFunding() external onlyOwner nonReentrant {
         fundingRate = _fetchFundingRate();
         lastUpdate = block.timestamp;
@@ -93,7 +98,8 @@ contract DeltaNeutralStrategy is BaseStrategy {
 
     function _fetchFundingRate() internal view returns (uint256) {
         if (oracle == address(0)) return 0;
-        return IFundingOracle(oracle).getFundingRate();
+        uint256 raw = IFundingOracle(oracle).getFundingRate();
+        return raw > MAX_RATE_BPS ? MAX_RATE_BPS : raw; // clamp, don't revert — keeper liveness
     }
 
     /// @notice Accrue funding on `delta` since lastAccrual. Pays REAL USDC

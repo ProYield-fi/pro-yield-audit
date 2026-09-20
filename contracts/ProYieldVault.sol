@@ -14,8 +14,13 @@ contract ProYieldVault is BaseStrategy {
     mapping(address => bool) public strategies;
     event PerformanceFeeSet(uint256 fee);
     mapping(address => bool) public strategyActive;   // per-strategy circuit breaker
+    event StrategyHarvestFailed(address indexed strategy);
     uint256 private _totalAssets;
+    uint256 private _totalShares;                     // sum of all user shares (ERC-4626 style)
     address[] public strategyList;
+    // Virtual share offset (OpenZeppelin ERC4626 pattern): blunts first-depositor
+    // inflation attacks by requiring huge donations to move the share price.
+    uint256 private constant SHARE_OFFSET = 1e3;
 
     constructor(
         address _underlying,
@@ -27,7 +32,7 @@ contract ProYieldVault is BaseStrategy {
         require(initialOwner != address(0), "ProYieldVault: zero owner");
         feeDistributor = _feeDistributor;
         performanceFee = 1000;
-        withdrawalFee = 50;
+        withdrawalFee = 0; // product promise: NO withdrawal fees (kept for future gating)
     }
 
     function name() external view override returns (string memory) {
@@ -36,6 +41,35 @@ contract ProYieldVault is BaseStrategy {
 
     function totalAssets() public override view returns (uint256) {
         return _totalAssets;
+    }
+
+    function totalShares() external view returns (uint256) {
+        return _totalShares;
+    }
+
+    /// Shares for a given asset amount at the current price (floor).
+    function convertToShares(uint256 assets) external view returns (uint256) {
+        return _toShares(assets);
+    }
+
+    /// Asset value of a share amount at the current price (floor).
+    function convertToAssets(uint256 sharesAmt) external view returns (uint256) {
+        return _toAssets(sharesAmt); // named sharesAmt — does not shadow BaseStrategy.shares
+    }
+
+    /// Max assets `account` can withdraw right now (frontend helper).
+    function maxWithdraw(address account) external view returns (uint256) {
+        return _toAssets(shares[account]);
+    }
+
+    function _toShares(uint256 assets) internal view returns (uint256) {
+        if (_totalShares == 0) return assets; // first depositor: 1:1
+        return (assets * (_totalShares + SHARE_OFFSET)) / (_totalAssets + SHARE_OFFSET);
+    }
+
+    function _toAssets(uint256 sharesAmt) internal view returns (uint256) {
+        if (_totalShares == 0) return sharesAmt;
+        return (sharesAmt * (_totalAssets + SHARE_OFFSET)) / (_totalShares + SHARE_OFFSET);
     }
 
     function addStrategy(address strategy) external onlyOwner {
@@ -54,7 +88,10 @@ contract ProYieldVault is BaseStrategy {
 
     function deposit(uint256 amount) external override nonReentrant {
         require(amount > 0, "ProYieldVault: zero amount");
-        shares[msg.sender] += amount;
+        uint256 sh = _toShares(amount); // price-aware mint (4626-style)
+        require(sh > 0, "ProYieldVault: zero shares"); // dust guard — no free deposits
+        shares[msg.sender] += sh;
+        _totalShares += sh;
         _totalAssets += amount;
         underlying.safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, amount);
@@ -126,18 +163,20 @@ contract ProYieldVault is BaseStrategy {
         }
     }
 
-    /// @notice User withdrawal. Shares are 1:1 with deposited USDC.
+    /// @notice User withdrawal by ASSET amount. Shares burned are computed at
+    /// the current price (4626-style): when the vault has earned profit, a
+    /// user's shares redeem for MORE than they deposited.
     /// Pays from idle; recalls from strategies to cover any shortfall.
-    /// Overrides BaseStrategy.withdraw, whose proportional share math
-    /// under-burned shares on partial withdrawals (drain vector) and which
-    /// could not honor withdrawals once allocate() had swept idle funds (T-012).
     function withdraw(uint256 amount) external override nonReentrant {
         require(amount > 0, "ProYieldVault: zero amount");
-        require(amount <= shares[msg.sender], "ProYieldVault: exceeds shares");
         require(amount <= totalAssets(), "ProYieldVault: exceeds assets");
+        uint256 sh = _toShares(amount);
+        require(sh > 0, "ProYieldVault: zero shares");
+        require(sh <= shares[msg.sender], "ProYieldVault: exceeds shares");
         // Effects BEFORE interactions (slither reentrancy-no-eth): burn shares
         // and shrink liabilities before any external recall call.
-        shares[msg.sender] -= amount;
+        shares[msg.sender] -= sh;
+        _totalShares -= sh;
         _totalAssets -= amount;
         _recallShortfall(amount);
         underlying.safeTransfer(msg.sender, amount);
@@ -152,7 +191,14 @@ contract ProYieldVault is BaseStrategy {
         for (uint256 i = 0; i < len; i++) {  // calls-loop: vault-authorized strategies only
             address s = strategyList[i];
             if (strategies[s] && strategyActive[s]) {
-                BaseStrategy(s).harvest(); // strategies authorized to sweep to vault
+                // Resilient sweep: ONE broken strategy must never brick the
+                // whole vault's harvest (profits of healthy strategies would
+                // strand, keeper loops, fee loop stalls). Skip + emit; the
+                // strategy stays visible for ops/owner intervention.
+                try BaseStrategy(s).harvest() {
+                } catch {
+                    emit StrategyHarvestFailed(s);
+                }
             }
         }
         uint256 totalProfit = underlying.balanceOf(address(this)) - idleBefore;
@@ -160,8 +206,34 @@ contract ProYieldVault is BaseStrategy {
             uint256 fee = (totalProfit * performanceFee) / 10000;
             if (fee > 0) underlying.safeTransfer(feeDistributor, fee);
         }
+        // Profit attribution (4626-style): NET profit (after fee) raises the
+        // share price — every depositor earns pro-rata. Fees leave accounting.
+        if (totalProfit > _feeOn(totalProfit)) {
+            _totalAssets += totalProfit - _feeOn(totalProfit);
+        }
         lastHarvest = block.timestamp;
         emit Harvest(totalProfit);
+    }
+
+    /// Fee mirror of harvest's calculation (internal, avoids duplication).
+    function _feeOn(uint256 profit) internal view returns (uint256) {
+        if (performanceFee == 0) return 0;
+        return (profit * performanceFee) / 10000;
+    }
+
+    /// @notice Credit EXTERNAL yield (fee recycling, rebates, grants) to
+    /// depositors by raising the share price. Flow: the recycler routes X
+    /// USDC into this vault (FeeDistributor.route), then calls creditYield(X).
+    /// The balance check makes crediting more than actually sits in the vault
+    /// impossible; the recycler's route+credit pairing keeps accounting ==
+    /// real assets (credit only NEW arrivals, never re-count idle).
+    event YieldCredited(uint256 amount);
+
+    function creditYield(uint256 amount) external onlyOwner nonReentrant {
+        require(amount > 0, "ProYieldVault: zero amount");
+        require(underlying.balanceOf(address(this)) >= amount, "ProYieldVault: exceeds balance");
+        _totalAssets += amount;
+        emit YieldCredited(amount);
     }
 
     function harvestStrategy(address strategy) external onlyOwner nonReentrant {
