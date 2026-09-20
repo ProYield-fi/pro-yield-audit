@@ -1370,7 +1370,8 @@ async function main() {
   await st4.waitForDeployment();
   const LOOP_PYD = E.parseUnits("86400", 18); // 1:10 stand-in rate, documented
   tx = await pyd2.approve(await st4.getAddress(), LOOP_PYD); await tx.wait();
-  tx = await st4.fundRewards(LOOP_PYD, 86400n); await tx.wait();
+  tx = await st4.fundRewards(LOOP_PYD, 86400n);
+  const Tf = await tsOf(tx); // stream start (periodFinish = Tf + 86400)
   tx = await pyd2.connect(u2).approve(await st4.getAddress(), s1); await tx.wait();
   const T6 = await tsOf(await st4.connect(u2).stake(s1));
   await E.provider.send("evm_setNextBlockTimestamp", [Number(T6) + 86400]);
@@ -1378,9 +1379,15 @@ async function main() {
   tx = await st4.connect(u2).getReward(); await tx.wait();
   const loopGot = (await pyd2.balanceOf(u2.address)) - l1; // rewards only
   tx = await st4.connect(u2).exit(); await tx.wait();       // cleanup (principal back)
+  // Deterministic expectation: pro-rata stream (rate = 1 PYD/s). The staker
+  // joins (T6 - Tf) seconds after the stream starts, so misses exactly that
+  // many seconds — a same-second join yields the full LOOP_PYD. (Was timing-
+  // flaky: expected the full amount regardless of which second the stake
+  // block landed in relative to the fund block.)
+  const expected6 = BigInt(86400 - (T6 - Tf)) * (LOOP_PYD / 86400n);
   report("R6 fee->staker loop: FD slice routed, converted, streamed, claimed EXACT",
-    fdPre - fdPost === SLICE && loopGot === LOOP_PYD,
-    `fd -${fmt(fdPre - fdPost)} USDC -> staker +${fmt(loopGot)} PYD rewards`);
+    fdPre - fdPost === SLICE && loopGot === expected6,
+    `fd -${fmt(fdPre - fdPost)} USDC -> staker +${fmt(loopGot)} PYD (expected ${fmt(expected6)}, joined ${T6 - Tf}s after start)`);
 
   // R7: TOKEN invariants — fixed supply, no mint path, standard ERC20 guards
   const sup0 = await pyd2.totalSupply();
