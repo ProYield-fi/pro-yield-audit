@@ -105,3 +105,6 @@ dashboard.html → 2026-09-19T20:30:01Z  blend=9.06%  safe=18  strategy=8
 [2026-09-19T22:30:03-04:00] Rates unchanged (blend=9.06%). Skipped regeneration.
 [2026-09-19T22:45:03-04:00] Rates unchanged (blend=9.06%). Skipped regeneration.
 [2026-09-19T23:00:06-04:00] Rates unchanged (blend=9.06%). Skipped regeneration.
+dashboard.html → 2026-09-20T03:15:01Z  blend=8.94%  safe=17  strategy=8
+[2026-09-19T23:15:05-04:00] Regenerated: blend=8.94% (was 9.06)
+[2026-09-19T23:30:07-04:00] Rates unchanged (blend=8.94%). Skipped regeneration.

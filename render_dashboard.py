@@ -168,7 +168,12 @@ def main():
     pm = pm_rewards()
     funding_full = hl_funding() or {}
     funding = funding_full.get("majors_funding_apr") or {}
-    carry_opps = funding_full.get("opportunities") or []
+    # Prefer snapshot opportunities — they carry 30d empirical verification
+    carry_opps = []
+    if isinstance(standard_data, dict):
+        carry_opps = (standard_data.get("hyperliquid_funding") or {}).get("opportunities") or []
+    if not carry_opps:
+        carry_opps = funding_full.get("opportunities") or []
     
     # Load history
     hist_path = os.path.join(DATA, "history.jsonl")
@@ -402,8 +407,12 @@ def main():
     carry_sorted = sorted(carry_opps, key=lambda o: -(o.get("cap_usd") or 0))
     for o in carry_sorted[:3]:
         lim = " · capacity-limited" if o.get("capacity_limited") else ""
-        carry_rows += (f'<tr><td>Carry scan: {esc(o["name"])} (short-earns funding)</td>'
-                       f'<td class="r">{o["funding_apr"]:+.1f}% APR · OI ${o["oi_usd"]/1e6:,.1f}M · size cap ${o["cap_usd"]/1e3:,.0f}K{lim}</td></tr>')
+        v = o.get("verified")
+        vtag = "✅30d" if v is True else ("⛔30d-neg" if v is False else "⚠spot-only")
+        m30 = o.get("mean_30d_apr")
+        m30s = f" · 30d {m30:+.1f}%" if isinstance(m30, (int, float)) else ""
+        carry_rows += (f'<tr><td>Carry scan: {esc(o["name"])} (short-earns funding) {vtag}</td>'
+                       f'<td class="r">{o["funding_apr"]:+.1f}% spot{m30s} · OI ${o["oi_usd"]/1e6:,.1f}M · size cap ${o["cap_usd"]/1e3:,.0f}K{lim}</td></tr>')
 
     # CEX benchmarks
     cex_monitor = '<tr><td>CeFi benchmark: Kraken Earn</td><td class="r">USDC 1.75% (custodial)</td></tr>'

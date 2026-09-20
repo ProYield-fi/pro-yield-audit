@@ -122,8 +122,34 @@ def hl_funding():
             except Exception:
                 continue
         opps.sort(key=lambda o: -o["funding_apr"])
-        return {"majors_funding_apr": majors, "opportunities": opps[:10],
-                "capacity_rule": "deployable per name <= 5% of OI",
+        top = opps[:10]
+        # 30d EMPIRICAL VERIFICATION before anything surfaces as sizeable:
+        # spot funding is noise (xyz:CL showed +167% spot vs -49% 30d mean).
+        # Verify the largest-capacity names (top 6 by cap) against 30d hourly.
+        for o in sorted(top, key=lambda o: -(o["cap_usd"] or 0))[:6]:
+            try:
+                start = int((time.time() - 30 * 86400) * 1000)
+                pts, cursor = [], start
+                for _ in range(3):
+                    page = json.loads(_hl_post({"type": "fundingHistory", "coin": o["name"], "startTime": cursor}))
+                    if not page:
+                        break
+                    pts.extend(page)
+                    cursor = page[-1]["time"] + 1
+                    if len(page) < 500:
+                        break
+                if pts:
+                    aprs = [float(p["fundingRate"]) * 24 * 365 * 100 for p in pts]
+                    mean = sum(aprs) / len(aprs)
+                    o["mean_30d_apr"] = round(mean, 1)
+                    o["pos_30d_pct"] = round(sum(1 for x in aprs if x > 0) / len(aprs) * 100, 1)
+                    o["verified"] = mean > 0
+                else:
+                    o["verified"] = None  # no history — never size on spot alone
+            except Exception:
+                o["verified"] = None
+        return {"majors_funding_apr": majors, "opportunities": top,
+                "capacity_rule": "deployable per name <= 5% of OI; verified = 30d mean funding > 0",
                 "source": "api.hyperliquid.xyz/info",
                 "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     except Exception as e:
