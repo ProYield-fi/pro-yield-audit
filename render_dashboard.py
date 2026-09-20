@@ -507,7 +507,7 @@ Blend model (snapshot {esc(snap_gen or 'UNAVAILABLE')}): {w_core:.0f}% core · {
 <tr><td><b>MoonPay On-Ramp</b></td><td class="good">✅ CONFIGURED</td><td class="r">Testnet</td><td>pk_test_59DnsDRRtJa40GZ2esBNJ4JvYAd3sPL. SECRET+WEBHOOK in CF Pages dashboard (Encrypt ON). Production: get live keys from MoonPay dashboard.</td></tr>
 <tr><td><b>Stripe On-Ramp</b></td><td class="bad">❌ BLOCKED</td><td class="r">2.9% + $0.30</td><td>Not supported in Bahamas. EU/US only. Requires legal entity in supported country</td></tr>
 <tr><td><b>Ramp Network</b></td><td class="bad">❌ BLOCKED</td><td class="r">N/A</td><td>Explicitly blocks Bahamas. Cannot use.</td></tr>
-<tr><td><b>Delta-Neutral Strategy</b></td><td class="ok">✅ LIVE</td><td class="r">{dn_display_apy:.1f}% APR</td><td>Live HL funding: BTC {btc_funding:.1f}%, ETH {eth_funding:.1f}% (re-read hourly by scout; volatile). Non-directional, hedged.</td></tr>
+<tr><td><b>Delta-Neutral Strategy</b></td><td class="ok">✅ LIVE</td><td class="r">{dn_display_apy:.1f}% APR</td><td>Live HL funding: BTC {btc_funding:.1f}%, ETH {eth_funding:.1f}%. On-chain accrual LIVE on testnet (oracle+venue verified; prod swaps HL adapter). Non-directional, hedged.</td></tr>
 <tr><td><b>Vault Performance Fees</b></td><td class="warn">⏳ PENDING</td><td class="r">TBD</td><td>Requires audit + governance. Not started.</td></tr>
 </table>
 
