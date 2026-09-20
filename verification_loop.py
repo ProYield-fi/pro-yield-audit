@@ -230,6 +230,17 @@ def main():
     }
     save_verification(verification)
     print(f"\n✓ Verification saved to verification.json (run #{len(load_verification_history())})")
+
+    # 6b) Cross-source check — protocol-NATIVE APIs as an INDEPENDENT second
+    # source beside DeFiLlama (morpho blue-api, pendle api-v2). Non-fatal.
+    try:
+        import cross_source_check
+        res = cross_source_check.cross_check(quiet=True)
+        s = res["summary"]
+        print(f"  ✓ cross-source: {s['in_sync']} in sync / {s['drifted']} drifted / "
+              f"{s['unmatched']} unmatched of {s['checked']} (native APIs) -> verification_cross.json")
+    except Exception as e:
+        print(f"  cross-source check skipped: {type(e).__name__}: {str(e)[:90]}")
     
     # 7) Recommendation
     print(f"\n{'='*60}")
