@@ -1,5 +1,5 @@
 {
- "generated_utc": "2026-09-20T03:30:45Z",
+ "generated_utc": "2026-09-20T04:15:07Z",
  "standard": "live-data-verification: all figures from named live sources; gaps marked UNAVAILABLE",
  "pools": [
   {
@@ -11,7 +11,7 @@
    "apy_30d": 3.56,
    "tvl_usd": 4382643290,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "DN_STABLE",
@@ -22,7 +22,7 @@
    "apy_30d": 4.67,
    "tvl_usd": 1332578396,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -33,7 +33,7 @@
    "apy_30d": 3.22,
    "tvl_usd": 521023089,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -44,7 +44,7 @@
    "apy_30d": 4.31,
    "tvl_usd": 429609216,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -55,7 +55,7 @@
    "apy_30d": 4.32,
    "tvl_usd": 419734945,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -66,7 +66,7 @@
    "apy_30d": 3.56,
    "tvl_usd": 362877154,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -77,7 +77,7 @@
    "apy_30d": 3.41,
    "tvl_usd": 238375065,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -88,7 +88,7 @@
    "apy_30d": 1.24,
    "tvl_usd": 211558679,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -99,7 +99,7 @@
    "apy_30d": 5.4,
    "tvl_usd": 192452589,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "SATELLITE",
@@ -110,7 +110,7 @@
    "apy_30d": 12.4,
    "tvl_usd": 170566057,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -121,7 +121,7 @@
    "apy_30d": 4.31,
    "tvl_usd": 170095007,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -132,7 +132,7 @@
    "apy_30d": 4.4,
    "tvl_usd": 163588601,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -143,7 +143,7 @@
    "apy_30d": 3.22,
    "tvl_usd": 129797750,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -154,7 +154,7 @@
    "apy_30d": 4.25,
    "tvl_usd": 122880234,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -165,7 +165,7 @@
    "apy_30d": 0,
    "tvl_usd": 113973879,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -176,7 +176,7 @@
    "apy_30d": 4.25,
    "tvl_usd": 99422531,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "SATELLITE",
@@ -187,7 +187,7 @@
    "apy_30d": 11.95,
    "tvl_usd": 74976690,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "SATELLITE",
@@ -198,7 +198,7 @@
    "apy_30d": 15.18,
    "tvl_usd": 69780996,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -209,7 +209,7 @@
    "apy_30d": 4.04,
    "tvl_usd": 66595887,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "SATELLITE",
@@ -220,7 +220,7 @@
    "apy_30d": 10.56,
    "tvl_usd": 51144807,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "FIXED",
@@ -231,7 +231,7 @@
    "apy_30d": 8.28,
    "tvl_usd": 50317342,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "FIXED",
@@ -242,7 +242,7 @@
    "apy_30d": 5.03,
    "tvl_usd": 20779056,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -253,7 +253,7 @@
    "apy_30d": 4.1,
    "tvl_usd": 20364453,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   },
   {
    "tag": "CORE",
@@ -264,14 +264,14 @@
    "apy_30d": 3.56,
    "tvl_usd": 5128925,
    "source": "yields.llama.fi/pools",
-   "ts": "2026-09-20T03:30:46Z"
+   "ts": "2026-09-20T04:15:07Z"
   }
  ],
  "polymarket_rewards": {
-  "total_daily_usd": 20690,
-  "reward_markets": 92,
+  "total_daily_usd": 23346,
+  "reward_markets": 101,
   "source": "gamma-api.polymarket.com",
-  "ts": "2026-09-20T03:30:46Z"
+  "ts": "2026-09-20T04:15:07Z"
  },
  "hyperliquid_funding": {
   "majors_funding_apr": {
@@ -281,96 +281,96 @@
   "opportunities": [
    {
     "name": "para:TREAD",
-    "funding_apr": 1002.2,
-    "oi_usd": 256894,
-    "cap_usd": 12845,
+    "funding_apr": 490.0,
+    "oi_usd": 260018,
+    "cap_usd": 13001,
     "capacity_limited": true
    },
    {
-    "name": "xyz:XLE",
-    "funding_apr": 131.2,
-    "oi_usd": 6514562,
-    "cap_usd": 325728,
+    "name": "xyz:CXMT",
+    "funding_apr": 173.6,
+    "oi_usd": 53033584,
+    "cap_usd": 2651679,
+    "capacity_limited": false,
+    "mean_30d_apr": -48.0,
+    "pos_30d_pct": 50.7,
+    "verified": false
+   },
+   {
+    "name": "GOAT",
+    "funding_apr": 168.5,
+    "oi_usd": 768829,
+    "cap_usd": 38441,
     "capacity_limited": true,
-    "mean_30d_apr": 16.4,
-    "pos_30d_pct": 83.9,
+    "mean_30d_apr": 26.3,
+    "pos_30d_pct": 100.0,
+    "verified": true
+   },
+   {
+    "name": "xyz:WDC",
+    "funding_apr": 140.2,
+    "oi_usd": 2227355,
+    "cap_usd": 111368,
+    "capacity_limited": true,
+    "mean_30d_apr": 6.1,
+    "pos_30d_pct": 82.9,
+    "verified": true
+   },
+   {
+    "name": "MEGA",
+    "funding_apr": 134.5,
+    "oi_usd": 6561226,
+    "cap_usd": 328061,
+    "capacity_limited": true,
+    "mean_30d_apr": 19.2,
+    "pos_30d_pct": 100.0,
     "verified": true
    },
    {
     "name": "io:GPRO",
-    "funding_apr": 118.7,
-    "oi_usd": 442977,
-    "cap_usd": 22149,
+    "funding_apr": 117.3,
+    "oi_usd": 443189,
+    "cap_usd": 22159,
     "capacity_limited": true
    },
    {
-    "name": "xyz:EWZ",
-    "funding_apr": 100.2,
-    "oi_usd": 579147,
-    "cap_usd": 28957,
-    "capacity_limited": true
+    "name": "AZTEC",
+    "funding_apr": 99.4,
+    "oi_usd": 1669166,
+    "cap_usd": 83458,
+    "capacity_limited": true,
+    "mean_30d_apr": 36.5,
+    "pos_30d_pct": 100.0,
+    "verified": true
    },
    {
     "name": "0G",
-    "funding_apr": 77.7,
-    "oi_usd": 1898338,
-    "cap_usd": 94917,
+    "funding_apr": 98.2,
+    "oi_usd": 1917854,
+    "cap_usd": 95893,
     "capacity_limited": true,
-    "mean_30d_apr": -2.6,
+    "mean_30d_apr": -2.5,
     "pos_30d_pct": 89.4,
     "verified": false
    },
    {
-    "name": "xyz:CL",
-    "funding_apr": 65.6,
-    "oi_usd": 183308406,
-    "cap_usd": 9165420,
-    "capacity_limited": false,
-    "mean_30d_apr": -48.7,
-    "pos_30d_pct": 47.8,
-    "verified": false
-   },
-   {
-    "name": "APEX",
-    "funding_apr": 59.7,
-    "oi_usd": 2542697,
-    "cap_usd": 127135,
-    "capacity_limited": true,
-    "mean_30d_apr": 53.4,
-    "pos_30d_pct": 100.0,
-    "verified": true
-   },
-   {
-    "name": "GOAT",
-    "funding_apr": 56.7,
-    "oi_usd": 767488,
-    "cap_usd": 38374,
-    "capacity_limited": true,
-    "mean_30d_apr": 26.2,
-    "pos_30d_pct": 100.0,
-    "verified": true
-   },
-   {
-    "name": "xyz:MAGS",
-    "funding_apr": 52.1,
-    "oi_usd": 716899,
-    "cap_usd": 35845,
+    "name": "xyz:SHEIN",
+    "funding_apr": 83.6,
+    "oi_usd": 710661,
+    "cap_usd": 35533,
     "capacity_limited": true
    },
    {
-    "name": "xyz:BRENTOIL",
-    "funding_apr": 36.3,
-    "oi_usd": 164234107,
-    "cap_usd": 8211705,
-    "capacity_limited": false,
-    "mean_30d_apr": -55.7,
-    "pos_30d_pct": 47.4,
-    "verified": false
+    "name": "xyz:EWZ",
+    "funding_apr": 79.1,
+    "oi_usd": 579092,
+    "cap_usd": 28955,
+    "capacity_limited": true
    }
   ],
   "capacity_rule": "deployable per name <= 5% of OI; verified = 30d mean funding > 0",
   "source": "api.hyperliquid.xyz/info",
-  "ts": "2026-09-20T03:30:53Z"
+  "ts": "2026-09-20T04:15:15Z"
  },
  "blend": {
   "blend_apy": 9.06,
@@ -403,7 +403,7 @@
      "apy_30d": 5.4,
      "tvl_usd": 192452589,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     },
     {
      "tag": "CORE",
@@ -414,7 +414,7 @@
      "apy_30d": 4.4,
      "tvl_usd": 163588601,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     },
     {
      "tag": "CORE",
@@ -425,7 +425,7 @@
      "apy_30d": 4.32,
      "tvl_usd": 419734945,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     },
     {
      "tag": "CORE",
@@ -436,7 +436,7 @@
      "apy_30d": 4.31,
      "tvl_usd": 429609216,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     }
    ],
    "fixed": [
@@ -449,7 +449,7 @@
      "apy_30d": 8.28,
      "tvl_usd": 50317342,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     }
    ],
    "satellite": [
@@ -462,7 +462,7 @@
      "apy_30d": 15.18,
      "tvl_usd": 69780996,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     },
     {
      "tag": "SATELLITE",
@@ -473,7 +473,7 @@
      "apy_30d": 12.4,
      "tvl_usd": 170566057,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     },
     {
      "tag": "SATELLITE",
@@ -484,7 +484,7 @@
      "apy_30d": 11.95,
      "tvl_usd": 74976690,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     },
     {
      "tag": "SATELLITE",
@@ -495,7 +495,7 @@
      "apy_30d": 10.56,
      "tvl_usd": 51144807,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     }
    ],
    "delta_stable": [
@@ -508,7 +508,7 @@
      "apy_30d": 4.67,
      "tvl_usd": 1332578396,
      "source": "yields.llama.fi/pools",
-     "ts": "2026-09-20T03:30:46Z"
+     "ts": "2026-09-20T04:15:07Z"
     }
    ]
   },
