@@ -945,6 +945,134 @@ async function main() {
     report("N7b oracle restored (rate back to 1100)", (await delta.fundingRate()) === 1100n);
   }
 
+  // ── O. ROUND-4: MATURITY CLAIMS, FEE CHANGES, ALLOCATE CONSERVATION ──
+  console.log("\n── O. Round-4 deep edges ──");
+
+  // O1: Pendle post-maturity ETH claim — forwards held ETH to the venue/market
+  {
+    const ethAmt2 = E.parseEther("0.3");
+    tx = await owner.sendTransaction({ to: await pendle.getAddress(), value: ethAmt2 }); await tx.wait();
+    const held = await E.provider.getBalance(await pendle.getAddress());
+    const mat = await pendle.maturity();
+    const nowTs = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    if (nowTs <= mat) {
+      await E.provider.send("evm_setNextBlockTimestamp", [Number(mat) + 86400]);
+      await E.provider.send("evm_mine", []);
+    }
+    tx = await vault.harvest({ gasLimit: 2_500_000 }); await tx.wait();
+    const after = await E.provider.getBalance(await pendle.getAddress());
+    report("O1 Pendle post-maturity claim forwards held ETH (strategy drained)",
+      held === ethAmt2 && after === 0n, `held=${fmt(held)} after=${fmt(after)}`);
+  }
+
+  // O2: FeeDistributor route guards — clamps to balance, route(0) reverts
+  {
+    const fdBal = await usdc.balanceOf(await fd.getAddress());
+    const preT = await usdc.balanceOf(u4.address);
+    tx = await fd.route(u4.address, fdBal + E.parseUnits("1000000", 18)); await tx.wait();
+    const gotAll = (await usdc.balanceOf(u4.address)) - preT;
+    report("O2 FD route clamps to balance (cannot over-route, no revert-trap)",
+      gotAll === fdBal && (await usdc.balanceOf(await fd.getAddress())) === 0n, `routed=${fmt(gotAll)}`);
+    let zeroReverted = false;
+    try { tx = await fd.route(u4.address, 0n); await tx.wait(); } catch { zeroReverted = true; }
+    report("O2b route(0) on empty FD reverts (nothing to route)", zeroReverted);
+  }
+
+  // O3: staking — stake after expiry accrues nothing; new funding restarts accrual
+  {
+    const st3 = await (await E.getContractFactory("PYDStaking")).deploy(await pydT.getAddress());
+    await st3.waitForDeployment();
+    tx = await pydT.transfer(u3.address, E.parseUnits("500", 18)); await tx.wait();
+    tx = await pydT.connect(u3).approve(await st3.getAddress(), E.parseUnits("500", 18)); await tx.wait();
+    tx = await st3.connect(u3).stake(E.parseUnits("500", 18)); await tx.wait();
+    await E.provider.send("evm_mine", []);
+    const e0 = await st3.earned(u3.address);
+    report("O3 stake with no funded window accrues nothing (honest zero)", e0 === 0n);
+    tx = await pydT.approve(await st3.getAddress(), E.parseUnits("1000", 18)); await tx.wait();
+    tx = await st3.fundRewards(E.parseUnits("1000", 18), 24 * 3600); await tx.wait();
+    const ts8 = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    await E.provider.send("evm_setNextBlockTimestamp", [ts8 + 12 * 3600]);
+    await E.provider.send("evm_mine", []);
+    const eU3 = await st3.earned(u3.address);
+    report("O3b funding after the fact restarts accrual for existing stakers",
+      eU3 > E.parseUnits("490", 18) && eU3 <= E.parseUnits("500", 18), `earned=${fmt(eU3)}`);
+  }
+
+  // O4: performanceFee change applies immediately — EXACT fee math on a pinned cycle
+  {
+    // top up the funding source so settle can always pay
+    tx = await usdc.mint(owner.address, E.parseUnits("50000", 18)); await tx.wait();
+    tx = await usdc.approve(await source.getAddress(), E.parseUnits("50000", 18)); await tx.wait();
+    tx = await source.fund(E.parseUnits("50000", 18)); await tx.wait();
+    // ensure a delta position exists
+    if ((await delta.delta()) === 0n) {
+      tx = await delta.openPosition(E.parseUnits("30000", 18)); await tx.wait();
+    }
+    tx = await vault.setPerformanceFee(2000); await tx.wait(); // 20% temporarily
+    // clear residual accrual + pin lastAccrual with a harvest from u4 (owner untouched)
+    tx = await vault.connect(u4).harvest({ gasLimit: 2_500_000 }); await tx.wait();
+    const size = await delta.delta();
+    const t0 = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    const la0 = await delta.lastAccrual();
+    const W1 = BigInt(t0 + 86400);
+    await E.provider.send("evm_setNextBlockTimestamp", [t0 + 86400]);
+    const ownerPre = await usdc.balanceOf(owner.address);
+    const taPre = await vault.totalAssets();
+    tx = await vault.connect(u4).harvest({ gasLimit: 2_500_000 }); await tx.wait();
+    const feeGot = (await usdc.balanceOf(owner.address)) - ownerPre; // fees route to owner on THIS vault
+    const taPost = await vault.totalAssets();
+    const YEAR = 31536000n, BPS = 10000n;
+    const expected = (size * 1100n * (W1 - BigInt(la0))) / (BPS * YEAR);
+    const feeExp = (expected * 2000n) / BPS;
+    report("O4 fee change to 20% applies immediately — fee EXACT to the wei",
+      feeGot === feeExp && (taPost - taPre) === (expected - feeExp),
+      `expected=${fmt(expected)} fee=${fmt(feeGot)} net=${fmt(taPost - taPre)}`);
+    // restore 10% and verify the 10% path on a second pinned cycle
+    tx = await vault.setPerformanceFee(1000); await tx.wait();
+    const t1 = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    const la1 = await delta.lastAccrual();
+    const W2 = BigInt(t1 + 86400);
+    await E.provider.send("evm_setNextBlockTimestamp", [t1 + 86400]);
+    const ownerPre2 = await usdc.balanceOf(owner.address);
+    const taPre2 = await vault.totalAssets();
+    tx = await vault.connect(u4).harvest({ gasLimit: 2_500_000 }); await tx.wait();
+    const feeGot2 = (await usdc.balanceOf(owner.address)) - ownerPre2;
+    const taPost2 = await vault.totalAssets();
+    const expected2 = (size * 1100n * (W2 - BigInt(la1))) / (BPS * YEAR);
+    const feeExp2 = (expected2 * 1000n) / BPS;
+    report("O4b restored 10% fee — second cycle EXACT to the wei",
+      feeGot2 === feeExp2 && (taPost2 - taPre2) === (expected2 - feeExp2),
+      `expected=${fmt(expected2)} fee=${fmt(feeGot2)}`);
+  }
+
+  // O5: allocate() conservation — moves funds, never loses them; reserve holds
+  {
+    const addrs = [await vault.getAddress(), await delta.getAddress(), await pendle.getAddress(), await sky.getAddress(), await morphoS.getAddress()];
+    let sumPre = 0n;
+    for (const a of addrs) sumPre += await usdc.balanceOf(a);
+    tx = await vault.allocate({ gasLimit: 2_500_000 }); await tx.wait();
+    let sumPost = 0n;
+    for (const a of addrs) sumPost += await usdc.balanceOf(a);
+    const idleAfter = await usdc.balanceOf(await vault.getAddress());
+    const ta = await vault.totalAssets();
+    report("O5 allocate() conserves value (vault+strategies sum unchanged)",
+      sumPre === sumPost, `sum=${fmt(sumPre)}`);
+    report("O5b reserve invariant: idle >= 10% of totalAssets after allocate",
+      idleAfter + 1n >= ta / 10n, `idle=${fmt(idleAfter)} reserve=${fmt(ta / 10n)}`);
+  }
+
+  // O6: rapid-fire triple harvest — no revert, no drift, no double-count
+  {
+    const taPre = await vault.totalAssets();
+    for (let i = 0; i < 3; i++) {
+      tx = await vault.harvest({ gasLimit: 2_500_000 }); await tx.wait();
+    }
+    const taPost = await vault.totalAssets();
+    report("O6 triple back-to-back harvest: no revert, ~zero drift (no double-count)",
+      taPost >= taPre && taPost - taPre < E.parseUnits("1", 18),
+      `drift=${fmt(taPost - taPre)}`);
+  }
+
   console.log(`\n=== INTEGRATION: ${pass} passed, ${fail} failed ===`);
   if (fail > 0) process.exit(1);
 }

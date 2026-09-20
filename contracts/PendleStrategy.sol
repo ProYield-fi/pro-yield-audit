@@ -22,6 +22,11 @@ contract PendleStrategy is BaseStrategy {
         return "Pendle";
     }
 
+    /// @notice Accept native venue settlements (mirrors DeltaNeutral). Without
+    /// this, _claimRewards's `address(this).balance > 0` branch was UNREACHABLE
+    /// dead code — found by the round-4 post-maturity claim test.
+    receive() external payable {}
+
     function setMarket(address market) external onlyOwner nonReentrant {
         require(market != address(0), "Pendle: zero market");
         pendleMarket = market;

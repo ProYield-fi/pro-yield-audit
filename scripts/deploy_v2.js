@@ -82,9 +82,6 @@ async function main() {
   await (await mockUSDC.mint(owner.address, ethers.parseUnits("1000000", 18))).wait();
   await (await mockUSDC.approve(await fundingSource.getAddress(), ethers.parseUnits("1000000", 18))).wait();
   await (await fundingSource.fund(ethers.parseUnits("1000000", 18))).wait();
-  // open a position so accrual has a notional
-  await (await delta.openPosition(ethers.parseUnits("30000", 18))).wait();
-  await (await delta.updateFunding()).wait();
   // fund PYD staking rewards (1M PYD over 30 days) — fee-recycling leg
   await (await pyd.approve(await staking.getAddress(), ethers.parseUnits("1000000", 18))).wait();
   await (await staking.fundRewards(ethers.parseUnits("1000000", 18), 30 * 24 * 3600)).wait();
@@ -128,6 +125,20 @@ async function main() {
   const allocTx = await vault.allocate();
   await allocTx.wait();
   console.log("✅ allocate() works");
+
+  // Open the funding position at (almost) the full allocated capital so the
+  // demo vault's book yield ≈ the funding rate. Only ~90% is deployed by
+  // allocate() (10% reserve), so size the position to match — an undersized
+  // position (old 30k) makes the demo look like 1/3 of the real engine.
+  const allocated = await mockUSDC.balanceOf(await delta.getAddress());
+  if (allocated > 0n) {
+    const positionSize = (allocated * 9n) / 10n; // small buffer stays in the strategy
+    await (await delta.openPosition(positionSize)).wait();
+    console.log("✅ delta position opened at", ethers.formatUnits(positionSize, 18), "USDC");
+  } else {
+    console.log("⚠ allocate deployed 0 to delta — position NOT opened");
+  }
+  await (await delta.updateFunding()).wait();
   
   // Harvest
   const harvestTx = await vault.harvest();
