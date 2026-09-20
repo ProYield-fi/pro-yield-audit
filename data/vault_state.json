@@ -1,11 +1,14 @@
 {
  "idle": "0.000002 USDC",
- "totalAssets": "100488.220590753424657534 USDC",
- "totalYield": "0.007894 USDC",
- "exchangeRate": "1.000256",
+ "totalAssets": "100244.123904109589041096 USDC",
+ "totalYield": "244.123904 USDC",
+ "exchangeRate": "1.002441",
  "deltaApyBps": "1100",
  "strategies": "4",
- "ts": "2026-09-20T00:55:42Z",
- "vault": "0xbd617BAe275Cc166241b08C8A8fbb18797Add0e0",
- "source": "HyperEVM testnet RPC (hardhat run)"
+ "ts": "2026-09-20T02:17:47Z",
+ "vault": "0x9Bb6d143705B6675720cb81B3241fe878809538b",
+ "source": "HyperEVM testnet RPC (hardhat run)",
+ "totalShares": "100000.0 shares",
+ "sharePrice": "1.00244123904109589 USDC",
+ "fdFeesReceived": "27.124878234398782343 USDC"
 }
