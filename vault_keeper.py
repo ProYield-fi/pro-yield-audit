@@ -16,8 +16,10 @@ def _load_addresses():
     """Resolve deployed contract addresses from deployed_addresses.json (written
     by deploy_v2.js). Never hardcode — every redeploy changes addresses and a
     stale constant surfaces as BAD_DATA 0x (T-011 root cause, fixed 2026-09-19)."""
-    for p in ("/home/user/hypervault/deployed_addresses.json",
-              "/home/user/yield_scout/deployed_addresses.json"):
+    import os as _os
+    _m = _os.environ.get("DEPLOY_MANIFEST")
+    for p in ([_m] if _m else ["/home/user/hypervault/deployed_addresses.json",
+              "/home/user/yield_scout/deployed_addresses.json"]):
         try:
             with open(p) as f:
                 j = json.load(f)
@@ -188,11 +190,55 @@ main().catch(e => {{ console.error(e); process.exit(1); }});
     state["vault"] = VAULT
     state["source"] = "HyperEVM testnet RPC (hardhat run)"
     # Shared data dir — render_dashboard.py reads this from /home/user/yield_scout/data/
-    out_path = "/home/user/yield_scout/data/vault_state.json"
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, "w") as f:
-        json.dump(state, f, indent=1)
+    # Only in main mode: cold-start runs (DEPLOY_MANIFEST set) must not overwrite it.
+    if os.environ.get("DEPLOY_MANIFEST"):
+        print("cold-start mode: shared vault_state.json not written")
+    else:
+        out_path = "/home/user/yield_scout/data/vault_state.json"
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "w") as f:
+            json.dump(state, f, indent=1)
     print("vault_state.json:", json.dumps(state))
+    # ── Publish the public vault status for the web app (main deployment only;
+    #    cold-start/test runs with DEPLOY_MANIFEST stay out of the site data).
+    if not os.environ.get("DEPLOY_MANIFEST"):
+        try:
+            rec = {"total": 0.0, "boost": 0.0, "runs": 0, "last": None}
+            led_path = "/home/user/yield_scout/data/recycling.jsonl"
+            if os.path.exists(led_path):
+                for line in open(led_path):
+                    try:
+                        e = json.loads(line)
+                        rec["total"] += float(e.get("total", 0))
+                        rec["boost"] += float(e.get("boost", 0))
+                        rec["runs"] += 1
+                        rec["last"] = e.get("iso")
+                    except Exception:
+                        pass
+            status = {
+                "vault": state.get("vault"),
+                "sharePrice": state.get("sharePrice") or state.get("exchangeRate"),
+                "totalAssets": state.get("totalAssets"),
+                "totalShares": state.get("totalShares"),
+                "targetApyBps": state.get("deltaApyBps"),
+                "recycling": rec,
+                "ts": state.get("ts"),
+                "network": "HyperEVM testnet (chain 998, local anvil)",
+                "source": state.get("source"),
+            }
+            import json as _j2
+            outs = [os.environ.get("VAULT_STATUS_OUT",
+                                   "/home/user/websites/pro-yield-web/public/vault_status.json")]
+            dist = "/home/user/websites/pro-yield-web/dist"
+            if os.path.isdir(dist):
+                outs.append(os.path.join(dist, "vault_status.json"))
+            for out in outs:
+                if os.path.isdir(os.path.dirname(out)):
+                    with open(out, "w") as f:
+                        _j2.dump(status, f, indent=1)
+            print("vault_status.json published:", ", ".join(outs))
+        except Exception as e:
+            print("vault_status publish skipped:", e)
     return True
 
 def track_referral_earnings():
@@ -242,7 +288,7 @@ def check_gas(min_hype=0.01):
     import json as _json
     DEPLOYER = "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D"
     try:
-        req = _urllib.Request("http://localhost:8545", data=_json.dumps({
+        req = _urllib.Request((os.environ.get("HYPEREVM_RPC_URL") or "http://localhost:8545"), data=_json.dumps({
             "jsonrpc":"2.0","id":1,"method":"eth_getBalance",
             "params":[DEPLOYER,"latest"]}).encode(), headers={"Content-Type":"application/json"})
         resp = _urllib.urlopen(req, timeout=10)
@@ -258,7 +304,7 @@ def check_gas(min_hype=0.01):
         print(f"Gas check failed: {e}")
         return False, 0.0
 
-ANVIL_START_CMD = "/home/user/.config/.foundry/bin/anvil --port 8545 --chain-id 998"
+ANVIL_START_CMD = os.environ.get("ANVIL_START_CMD") or "/home/user/.config/.foundry/bin/anvil --port 8545 --chain-id 998"
 
 def check_anvil():
     """Return True if the local Anvil RPC responds. Self-heals: restarts it if down
@@ -268,7 +314,7 @@ def check_anvil():
     import urllib.request as _urllib
     import json as _json
     import subprocess as _sp
-    req = _urllib.Request("http://localhost:8545", data=_json.dumps({
+    req = _urllib.Request((os.environ.get("HYPEREVM_RPC_URL") or "http://localhost:8545"), data=_json.dumps({
         "jsonrpc": "2.0", "id": 1, "method": "eth_blockNumber", "params": []
     }).encode(), headers={"Content-Type": "application/json"})
     try:
