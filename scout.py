@@ -39,6 +39,11 @@ def llama_pools():
             tag = "FIXED"
         elif p.get("stablecoin") and apy >= 10 and tvl >= 50_000_000 and p["project"] in ("accountable", "saturn", "apyx-protocol", "unitas-usdu", "tori-finance"):
             tag = "SATELLITE"
+        # Delta-neutral stablecoin sleeve (vetted funding-backed stables).
+        # Ethena only for now — Resolv excluded (Mar 2026 exploit), Falcon
+        # excluded (Ceffu custody stack). See RESEARCH-OUTSIDE-BOX.md Sep 20.
+        elif p["project"] == "ethena-usde" and p["symbol"] == "SUSDE" and p["chain"] == "Ethereum" and tvl >= 50_000_000:
+            tag = "DN_STABLE"
         if tag:
             out.append({
                 "tag": tag, "project": p["project"], "symbol": p["symbol"], "chain": p["chain"],
@@ -70,20 +75,85 @@ def pm_rewards():
                 "error": f"UNAVAILABLE: {e}", "source": "gamma-api.polymarket.com",
                 "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
+def _hl_post(payload):
+    body = json.dumps(payload).encode()
+    req = urllib.request.Request("https://api.hyperliquid.xyz/info", data=body,
+                                 headers={"Content-Type": "application/json", **UA})
+    return urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+
+def _lenient_json(s):
+    """HL HIP-3 dex payloads can carry raw control characters — sanitize before parse."""
+    import re as _re
+    try:
+        return json.loads(s)
+    except Exception:
+        return json.loads(_re.sub(r"[\x00-\x1f]", "", s))
+
 def hl_funding():
     try:
-        body = json.dumps({"type": "metaAndAssetCtxs"}).encode()
-        req = urllib.request.Request("https://api.hyperliquid.xyz/info", data=body,
-                                     headers={"Content-Type": "application/json", **UA})
-        meta, ctxs = json.loads(urllib.request.urlopen(req, timeout=30).read())
+        meta, ctxs = _lenient_json(_hl_post({"type": "metaAndAssetCtxs"}))
         majors = {}
         for a, c in zip(meta["universe"], ctxs):
             if a["name"] in ("BTC", "ETH"):
                 majors[a["name"]] = round(float(c.get("funding") or 0) * 24 * 365 * 100, 1)
-        return {"majors_funding_apr": majors, "source": "api.hyperliquid.xyz/info",
+        # Size-aware carry scan: main universe + HIP-3 dexes (equities/commodities).
+        # CAPACITY RULE: deployable per name <= 5% of open interest (USD).
+        # openInterest is in COINS — multiply by mark price for USD notional.
+        opps = []
+        for dex in [None, "xyz", "para", "flx", "cash", "km", "mkts", "io", "vntl", "hyna", "abcd"]:
+            try:
+                payload = {"type": "metaAndAssetCtxs"}
+                if dex:
+                    payload["dex"] = dex
+                m, c = _lenient_json(_hl_post(payload))
+                for a, cc in zip(m["universe"], c):
+                    if not cc or cc.get("funding") is None:
+                        continue
+                    aprv = float(cc["funding"]) * 24 * 365 * 100
+                    px = float(cc.get("markPx") or cc.get("oraclePx") or 0)
+                    oi_usd = float(cc.get("openInterest") or 0) * px
+                    # positive funding only (shorts earn); skip dust markets
+                    if aprv >= 25 and oi_usd >= 250_000:
+                        opps.append({
+                            "name": a["name"], "funding_apr": round(aprv, 1),
+                            "oi_usd": round(oi_usd), "cap_usd": round(oi_usd * 0.05),
+                            "capacity_limited": oi_usd < 10_000_000,
+                        })
+            except Exception:
+                continue
+        opps.sort(key=lambda o: -o["funding_apr"])
+        top = opps[:10]
+        # 30d EMPIRICAL VERIFICATION before anything surfaces as sizeable:
+        # spot funding is noise (xyz:CL showed +167% spot vs -49% 30d mean).
+        # Verify the largest-capacity names (top 6 by cap) against 30d hourly.
+        for o in sorted(top, key=lambda o: -(o["cap_usd"] or 0))[:6]:
+            try:
+                start = int((time.time() - 30 * 86400) * 1000)
+                pts, cursor = [], start
+                for _ in range(3):
+                    page = json.loads(_hl_post({"type": "fundingHistory", "coin": o["name"], "startTime": cursor}))
+                    if not page:
+                        break
+                    pts.extend(page)
+                    cursor = page[-1]["time"] + 1
+                    if len(page) < 500:
+                        break
+                if pts:
+                    aprs = [float(p["fundingRate"]) * 24 * 365 * 100 for p in pts]
+                    mean = sum(aprs) / len(aprs)
+                    o["mean_30d_apr"] = round(mean, 1)
+                    o["pos_30d_pct"] = round(sum(1 for x in aprs if x > 0) / len(aprs) * 100, 1)
+                    o["verified"] = mean > 0
+                else:
+                    o["verified"] = None  # no history — never size on spot alone
+            except Exception:
+                o["verified"] = None
+        return {"majors_funding_apr": majors, "opportunities": top,
+                "capacity_rule": "deployable per name <= 5% of OI; verified = 30d mean funding > 0",
+                "source": "api.hyperliquid.xyz/info",
                 "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     except Exception as e:
-        return {"majors_funding_apr": None, "error": f"UNAVAILABLE: {e}",
+        return {"majors_funding_apr": None, "opportunities": None, "error": f"UNAVAILABLE: {e}",
                 "source": "api.hyperliquid.xyz/info", "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
 def blend(pools, hf_funding=None):
@@ -110,17 +180,31 @@ def blend(pools, hf_funding=None):
     majors = (hf_funding or {}).get("majors_funding_apr", {}) or {}
     vals = [v for v in majors.values() if isinstance(v, (int, float))]
     delta_apy = round(sum(vals) / len(vals), 2) if vals else 5.85
+    # DN sleeve alternative implementation: vetted funding-backed stablecoins.
+    # Same economic engine (funding harvest), external-product form factor.
+    dn_stables = [p for p in pools if p["tag"] == "DN_STABLE"]
+    dn_stable_pick = max(dn_stables, key=lambda p: p["tvl_usd"]) if dn_stables else None
     parts = []
     if core_apy is not None: parts.append(("CORE", 0.35, core_apy))
     if fixed_apy is not None: parts.append(("FIXED", 0.10, fixed_apy))
     if sat_apy is not None: parts.append(("SATELLITE", 0.40, sat_apy))
     parts.append(("DELTA_NEUTRAL", 0.15, delta_apy))
     blend_apy = sum(w * a for _, w, a in parts) if parts else None
-    return {
+    out = {
         "blend_apy": round(blend_apy, 2) if blend_apy else None,
         "allocation": {name: {"weight": w, "apy": round(a, 2)} for name, w, a in parts},
         "picks": {"core": core_pick, "fixed": fixed_pick, "satellite": sat_pick},
     }
+    if dn_stable_pick:
+        out["delta_neutral_sUSDe"] = {
+            "project": dn_stable_pick["project"], "symbol": dn_stable_pick["symbol"],
+            "chain": dn_stable_pick["chain"], "apy": dn_stable_pick["apy_base"],
+            "apy_30d": dn_stable_pick.get("apy_30d"), "tvl_usd": dn_stable_pick["tvl_usd"],
+            "note": "funding-backed VARIABLE yield — alternative implementation of the "
+                    "delta-neutral sleeve; satellite-review before core (can run negative)",
+        }
+        out["picks"]["delta_stable"] = [dn_stable_pick]
+    return out
 
 def main():
     snap = {

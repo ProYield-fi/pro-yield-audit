@@ -93,17 +93,45 @@ def pm_rewards():
     except Exception:
         return {"total_daily_usd": None, "reward_markets": None}
 
+def _lenient_json(s):
+    import re as _re
+    try:
+        return json.loads(s)
+    except Exception:
+        return json.loads(_re.sub(r"[\x00-\x1f]", "", s))
+
 def hl_funding():
     try:
-        body = json.dumps({"type": "metaAndAssetCtxs"}).encode()
-        req = urllib.request.Request("https://api.hyperliquid.xyz/info", data=body,
-                                     headers={"Content-Type": "application/json", **UA})
-        meta, ctxs = json.loads(urllib.request.urlopen(req, timeout=30).read())
+        def post(payload):
+            body = json.dumps(payload).encode()
+            req = urllib.request.Request("https://api.hyperliquid.xyz/info", data=body,
+                                         headers={"Content-Type": "application/json", **UA})
+            return urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+        meta, ctxs = _lenient_json(post({"type": "metaAndAssetCtxs"}))
         majors = {}
         for a, c in zip(meta["universe"], ctxs):
             if a["name"] in ("BTC", "ETH"):
                 majors[a["name"]] = round(float(c.get("funding") or 0) * 24 * 365 * 100, 1)
-        return majors
+        # Size-aware carry scan across main + HIP-3 dexes (<=5% of per-name OI)
+        opps = []
+        for dex in [None, "xyz", "para", "flx", "cash", "km", "mkts", "io", "vntl", "hyna", "abcd"]:
+            try:
+                payload = {"type": "metaAndAssetCtxs"}
+                if dex: payload["dex"] = dex
+                m, cc = _lenient_json(post(payload))
+                for a, ctx in zip(m["universe"], cc):
+                    if not ctx or ctx.get("funding") is None: continue
+                    aprv = float(ctx["funding"]) * 24 * 365 * 100
+                    px = float(ctx.get("markPx") or ctx.get("oraclePx") or 0)
+                    oi_usd = float(ctx.get("openInterest") or 0) * px
+                    if aprv >= 25 and oi_usd >= 250_000:
+                        opps.append({"name": a["name"], "funding_apr": round(aprv, 1),
+                                     "oi_usd": round(oi_usd), "cap_usd": round(oi_usd * 0.05),
+                                     "capacity_limited": oi_usd < 10_000_000})
+            except Exception:
+                continue
+        opps.sort(key=lambda o: -o["funding_apr"])
+        return {"majors_funding_apr": majors, "opportunities": opps[:5]}
     except Exception:
         return None
 
@@ -115,7 +143,7 @@ def score_safety(pool):
     chain = pool.get("chain","")
     
     # Tier 1: established DeFi protocols → +4
-    if any(a in proj for a in ("aave","sky","morpho","pendle")) and "USDAI" not in sym and (not pool.get("poolMeta") or "USDAI" not in pool.get("poolMeta","").upper()): s += 4
+    if any(a in proj for a in ("aave","sky","morpho","pendle","ethena")) and "USDAI" not in sym and (not pool.get("poolMeta") or "USDAI" not in pool.get("poolMeta","").upper()): s += 4
     if any(a in proj for a in ("curve","gmx","uniswap","convex","lido","rocketpool","stargate")): s += 3
     # Tier 3: TVL thresholds
     tvl = pool.get("tvl_usd", 0)
@@ -138,7 +166,9 @@ def main():
     
     pools = llama_pools()
     pm = pm_rewards()
-    funding = hl_funding()
+    funding_full = hl_funding() or {}
+    funding = funding_full.get("majors_funding_apr") or {}
+    carry_opps = funding_full.get("opportunities") or []
     
     # Load history
     hist_path = os.path.join(DATA, "history.jsonl")
@@ -321,7 +351,7 @@ def main():
         verdict = "DECLINED" if acc["apy_base"] <= acc.get("apy_30d", 0) else "watch"
         action_lines.append(f"Review: {acc['symbol']} accountable ({acc['chain']}) — {verdict} ({acc['apy_base']}% vs {acc['apy_30d']}% 30d)")
     pm_daily = pm.get("total_daily_usd") or 0
-    action_lines.append(f"Fee recycling: ${pm_daily:,}/day PM rewards tracked, HL rebates pending — routing + distribution code not yet implemented (fee_distributor.py: 0 distributed)")
+    action_lines.append(f"Fee recycling LIVE: vault fees + arrived rebates -> policy split (60% depositor boost via vault.creditYield / 20% treasury / 20% insurance), policy-gated, ledgered; PM rewards ${pm_daily:,}/day tracked for quoting")
     # Momentum-driven strategy (replaces static timing insight)
     mom_path = os.path.join(DATA, "momentum.json")
     if os.path.exists(mom_path):
@@ -359,6 +389,47 @@ def main():
     action_lines.append(f"Risk tiers: 4 profiles available on ProYield Web — conservative to maximum risk")
     pm_cell = f"${pm.get('total_daily_usd', 0):,}/day across {pm.get('reward_markets', 0)} markets" if pm.get("total_daily_usd") else "UNAVAILABLE"
     hl_str = ", ".join(f"{k} {v:+.1f}% (rejected)" for k,v in funding.items()) if funding else "UNAVAILABLE"
+    # Fee recycling totals from the ledger
+    recycle_cell = "UNAVAILABLE"
+    try:
+        import json as _json
+        led = os.path.join(HERE, "data", "recycling.jsonl")
+        if os.path.exists(led):
+            tot = boost = 0.0
+            last = None
+            for line in open(led):
+                try:
+                    e = _json.loads(line)
+                    tot += float(e.get("total", 0)); boost += float(e.get("boost", 0)); last = e.get("iso")
+                except Exception:
+                    pass
+            if last:
+                recycle_cell = f"${tot:,.2f} recycled ({len(open(led).readlines())} runs) · ${boost:,.2f} to depositors · last {last}"
+    except Exception:
+        pass
+    # Delta-neutral alt sleeve (vetted funding-backed stables) from snapshot
+    dnsus = None
+    if isinstance(standard_data, dict):
+        dnsus = (standard_data.get("blend") or {}).get("delta_neutral_sUSDe")
+        # Snapshot opportunities carry 30d empirical verification — prefer them
+        snap_opps = (standard_data.get("hyperliquid_funding") or {}).get("opportunities")
+        if snap_opps:
+            carry_opps = snap_opps
+    dn_alt_row = ""
+    if dnsus:
+        dn_alt_row = (f'<tr><td>Delta-neutral ALT sleeve — {esc(dnsus.get("project",""))} {esc(dnsus.get("symbol",""))}'
+                      f' (funding-backed, VARIABLE yield, can run negative; satellite-review, not core)</td>'
+                      f'<td class="r">{dnsus.get("apy",0):.2f}% · ${dnsus.get("tvl_usd",0)/1e6:,.0f}M TVL · 30d avg {dnsus.get("apy_30d") or "—"}%</td></tr>')
+    carry_rows = ""
+    carry_sorted = sorted(carry_opps, key=lambda o: -(o.get("cap_usd") or 0))
+    for o in carry_sorted[:3]:
+        lim = " · capacity-limited" if o.get("capacity_limited") else ""
+        v = o.get("verified")
+        vtag = "✅30d" if v is True else ("⛔30d-neg" if v is False else "⚠spot-only")
+        m30 = o.get("mean_30d_apr")
+        m30s = f" · 30d {m30:+.1f}%" if isinstance(m30, (int, float)) else ""
+        carry_rows += (f'<tr><td>Carry scan: {esc(o["name"])} (short-earns funding) {vtag}</td>'
+                       f'<td class="r">{o["funding_apr"]:+.1f}% spot{m30s} · OI ${o["oi_usd"]/1e6:,.1f}M · size cap ${o["cap_usd"]/1e3:,.0f}K{lim}</td></tr>')
 
     # CEX benchmarks
     cex_monitor = '<tr><td>CeFi benchmark: Kraken Earn</td><td class="r">USDC 1.75% (custodial)</td></tr>'
@@ -491,6 +562,8 @@ th {{ font-size: 11px; text-transform: uppercase; opacity: .65; }}
 <table>
 <tr><td>Polymarket reward pool (quoting income, not passive)</td><td class="r">{esc(pm_cell)}</td></tr>
 <tr><td>Hyperliquid majors funding APR (HIP-3 carry context, rejected for house money)</td><td class="r">{esc(hl_str)}</td></tr>
+<tr><td>Fee recycling (vault fees + rebates → depositor boost / treasury / insurance)</td><td class="r">{esc(recycle_cell)}</td></tr>
+{dn_alt_row}{carry_rows}
 {cex_monitor}
 </table>
 
