@@ -49,19 +49,10 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
         emit Deposit(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) external virtual nonReentrant {
-        require(amount > 0, "BaseStrategy: zero amount");
-        uint256 userShares = shares[msg.sender];
-        require(userShares > 0, "BaseStrategy: no shares");
-        uint256 totalAssetsVal = totalAssets();
-        require(totalAssetsVal > 0, "BaseStrategy: no assets");
-        uint256 shareAmount = (amount * userShares) / totalAssetsVal;
-        require(shareAmount > 0, "BaseStrategy: insufficient shares");
-        require(shareAmount <= userShares, "BaseStrategy: exceeds shares");
-        shares[msg.sender] -= shareAmount;
-        underlying.safeTransfer(msg.sender, amount);
-        emit Withdraw(msg.sender, amount);
-    }
+    // NOTE: user-facing withdraw lives ONLY in ProYieldVault (1:1 shares +
+    // strategy recall). The former BaseStrategy.withdraw here used broken
+    // proportional share math (under-burned shares on partial withdrawals —
+    // drain vector) and was removed so it can never be inherited again (T-012).
 
     function harvest() external virtual nonReentrant {
         require(isActive, "BaseStrategy: inactive");
