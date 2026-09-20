@@ -1334,14 +1334,22 @@ async function main() {
     (await pyd2.balanceOf(u3.address)) === b4a);
 
   // R5: INTEGER-RATE exactness — 86400 PYD over 86400s (rate = exactly 1 PYD/s),
-  // sole staker claims twice; both claims and total are EXACT with zero dust.
+  // sole staker claims twice; both claims and total are EXACT with zero rounding
+  // dust. Deterministic: the staker joins (T5 − Tf) seconds after the stream
+  // starts, so that many seconds of stream are unclaimable (no staker yet) —
+  // expectations are computed from measured timestamps, not assumed same-second
+  // alignment (was timing-flaky: anvil +1s ticks made T5 − Tf ∈ {0, 1, 2}).
   const st3 = await (await E.getContractFactory("PYDStaking")).deploy(await pyd2.getAddress());
   await st3.waitForDeployment();
   const FUND2 = E.parseUnits("86400", 18), DUR2 = 86400n;
   tx = await pyd2.approve(await st3.getAddress(), FUND2); await tx.wait();
   tx = await st3.fundRewards(FUND2, DUR2); await tx.wait();
+  const Tf5 = await tsOf(tx); // stream start (periodFinish = Tf5 + 86400)
   tx = await pyd2.connect(user1).approve(await st3.getAddress(), s1); await tx.wait();
   const T5 = await tsOf(await st3.connect(user1).stake(s1));
+  const missed5 = T5 - Tf5; // seconds of stream before the stake landed
+  const perSec = FUND2 / DUR2; // exactly 1 PYD/s
+  const total5 = BigInt(86400 - Number(missed5)) * perSec; // claimable from T5
   await E.provider.send("evm_setNextBlockTimestamp", [Number(T5) + 43200]);
   const c1a = await pyd2.balanceOf(user1.address);
   tx = await st3.connect(user1).getReward(); await tx.wait();
@@ -1350,12 +1358,15 @@ async function main() {
   const c2a = await pyd2.balanceOf(user1.address);
   tx = await st3.connect(user1).getReward(); await tx.wait();
   const claim2 = (await pyd2.balanceOf(user1.address)) - c2a;
-  report("R5 integer-rate staking: 43200s + 43200s claims == 86400 PYD exactly",
-    claim1 === E.parseUnits("43200", 18) && claim2 === E.parseUnits("43200", 18),
-    `claims=${fmt(claim1)}+${fmt(claim2)}`);
+  const exp1 = BigInt(43200) * perSec;          // first window fully inside the stream
+  const exp2 = total5 - exp1;                   // remainder, capped at periodFinish
+  report("R5 integer-rate staking: claims exact to the second (deterministic)",
+    claim1 === exp1 && claim2 === exp2 && claim1 + claim2 === total5,
+    `claims=${fmt(claim1)}+${fmt(claim2)} = ${fmt(claim1 + claim2)} (stake joined ${missed5}s after start)`);
   tx = await st3.connect(user1).exit(); await tx.wait();
-  report("R5b zero dust on integer rate: contract empty after exit",
-    (await pyd2.balanceOf(await st3.getAddress())) === 0n);
+  report("R5b no rounding dust: contract holds EXACTLY the unstreamed pre-stake seconds",
+    (await pyd2.balanceOf(await st3.getAddress())) === BigInt(Number(missed5)) * perSec,
+    `remainder=${fmt(await pyd2.balanceOf(await st3.getAddress()))} (${missed5}s unclaimed)`);
 
   // R6: FEE -> STAKER ECONOMY LOOP (testnet stand-in for USDC->PYD conversion)
   // fees arrive at FD -> routed to treasury -> converted (mint stand-in) ->

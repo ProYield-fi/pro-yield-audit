@@ -302,7 +302,7 @@ contract DNCoreStrategy is BaseStrategy {
     }
 
     function marginSummary() public view returns (AccountMarginSummary memory) {
-        (bool ok, bytes memory ret) = HLConstants.ACCOUNT_MARGIN_SUMMARY_PRECOMPILE.staticcall(abi.encode(address(this)));
+        (bool ok, bytes memory ret) = HLConstants.ACCOUNT_MARGIN_SUMMARY_PRECOMPILE.staticcall(abi.encode(uint32(0), address(this)));
         require(ok, "DNCore: margin read failed");
         return abi.decode(ret, (AccountMarginSummary));
     }

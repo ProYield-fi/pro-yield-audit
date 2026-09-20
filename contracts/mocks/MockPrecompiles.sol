@@ -5,6 +5,11 @@ pragma solidity ^0.8.28;
 /// args (no selector) via staticcall; these mocks expose setters for tests and
 /// a fallback that returns the canned struct. Copied to the fixed precompile
 /// addresses (0x810, 0x813, 0x80f, 0x803, 0x80a, 0x807) via anvil_setCode.
+///
+/// Each fallback ASSERTS the real calldata shape (verified against mainnet on
+/// 2026-09-20) so a wrong encoding reverts in tests instead of silently
+/// passing — the exact trap the accountMarginSummary(dex,user) bug slipped
+/// through before real-chain verification.
 
 contract MockCoreUserExists {
     bool public exists;
@@ -13,7 +18,8 @@ contract MockCoreUserExists {
         exists = e;
     }
 
-    fallback(bytes calldata) external returns (bytes memory) {
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 32, "bad calldata shape (exists: address)");
         return abi.encode(exists);
     }
 }
@@ -33,7 +39,8 @@ contract MockPosition2 {
         isIsolated = isIso_;
     }
 
-    fallback(bytes calldata) external returns (bytes memory) {
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 64, "bad calldata shape (position: address,uint32)");
         return abi.encode(szi, entryNtl, isolatedRawUsd, leverage, isIsolated);
     }
 }
@@ -51,7 +58,8 @@ contract MockMarginSummary {
         rawUsd = ru;
     }
 
-    fallback(bytes calldata) external returns (bytes memory) {
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 64, "bad calldata shape (marginSummary: uint32,address)");
         return abi.encode(accountValue, marginUsed, ntlPos, rawUsd);
     }
 }
@@ -63,7 +71,8 @@ contract MockWithdrawable {
         amount = a;
     }
 
-    fallback(bytes calldata) external returns (bytes memory) {
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 32, "bad calldata shape (withdrawable: address)");
         return abi.encode(amount);
     }
 }
@@ -92,9 +101,11 @@ contract MockPerpInfo {
     }
 
     // Dynamic struct: the real precompile returns the 1-tuple encoding
-    // (offset-wrapped). abi.encode(Struct(...)) mirrors that exactly —
-    // direct field encoding would fail the adapter's abi.decode(ret, (Struct)).
-    fallback(bytes calldata) external returns (bytes memory) {
+    // (offset-wrapped) — verified against mainnet. abi.encode(Struct(...))
+    // mirrors that exactly; direct field encoding would fail the contract's
+    // abi.decode(ret, (Struct)).
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 32, "bad calldata shape (perpAssetInfo: uint32)");
         return abi.encode(PerpAssetInfo(coin, marginTableId, szDecimals, maxLeverage, onlyIsolated));
     }
 }
@@ -106,7 +117,8 @@ contract MockOraclePx {
         px = p;
     }
 
-    fallback(bytes calldata) external returns (bytes memory) {
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 32, "bad calldata shape (oraclePx: uint32)");
         return abi.encode(px);
     }
 }

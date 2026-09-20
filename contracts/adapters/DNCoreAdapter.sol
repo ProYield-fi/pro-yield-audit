@@ -232,7 +232,7 @@ contract DNCoreAdapter is Ownable, ReentrancyGuard {
     }
 
     function marginSummary() public view returns (AccountMarginSummary memory) {
-        (bool ok, bytes memory ret) = HLConstants.ACCOUNT_MARGIN_SUMMARY_PRECOMPILE.staticcall(abi.encode(address(this)));
+        (bool ok, bytes memory ret) = HLConstants.ACCOUNT_MARGIN_SUMMARY_PRECOMPILE.staticcall(abi.encode(uint32(0), address(this)));
         require(ok, "adapter: margin read failed");
         return abi.decode(ret, (AccountMarginSummary));
     }
