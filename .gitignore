@@ -7,3 +7,4 @@ crytic-export/
 artifacts/build-info/
 scripts/mint_repro*.js
 scripts/repro_open*.js
+scripts/repro_*.js
