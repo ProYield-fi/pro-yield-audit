@@ -45,11 +45,16 @@ contract PYDStaking is Ownable, ReentrancyGuard {
     // ── Operator: fund the reward pool ──────────────────────────────
     function fundRewards(uint256 amount, uint256 duration) external onlyOwner nonReentrant {
         require(amount > 0 && duration > 0, "PYDStaking: zero");
+        // Bank every reward accrued so far at the OLD rate BEFORE any window
+        // mutation. Without this, resetting lastUpdateTime below silently
+        // ERASES all accrual since the last user interaction (found by the
+        // mid-period top-up test: 33k PYD vanished).
+        rewardPerTokenStored = _rewardPerToken();
         _updatePeriod();
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / duration;
         } else {
-            // top up remaining period
+            // mid-period top-up: unspent remainder rolls into the new window
             uint256 remaining = periodFinish - block.timestamp;
             uint256 leftover = remaining * rewardRate;
             rewardRate = (amount + leftover) / duration;

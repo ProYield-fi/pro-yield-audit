@@ -14,6 +14,7 @@ contract ProYieldVault is BaseStrategy {
     mapping(address => bool) public strategies;
     event PerformanceFeeSet(uint256 fee);
     mapping(address => bool) public strategyActive;   // per-strategy circuit breaker
+    event StrategyHarvestFailed(address indexed strategy);
     uint256 private _totalAssets;
     uint256 private _totalShares;                     // sum of all user shares (ERC-4626 style)
     address[] public strategyList;
@@ -190,7 +191,14 @@ contract ProYieldVault is BaseStrategy {
         for (uint256 i = 0; i < len; i++) {  // calls-loop: vault-authorized strategies only
             address s = strategyList[i];
             if (strategies[s] && strategyActive[s]) {
-                BaseStrategy(s).harvest(); // strategies authorized to sweep to vault
+                // Resilient sweep: ONE broken strategy must never brick the
+                // whole vault's harvest (profits of healthy strategies would
+                // strand, keeper loops, fee loop stalls). Skip + emit; the
+                // strategy stays visible for ops/owner intervention.
+                try BaseStrategy(s).harvest() {
+                } catch {
+                    emit StrategyHarvestFailed(s);
+                }
             }
         }
         uint256 totalProfit = underlying.balanceOf(address(this)) - idleBefore;

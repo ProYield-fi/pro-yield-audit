@@ -5,6 +5,19 @@ const path = require("path");
 async function main() {
   const [owner] = await hre.ethers.getSigners();
   console.log("Deploying with:", owner.address);
+  // OOG-flake killer: pad writes 3x (persistent-anvil estimation drift)
+  for (const s of await hre.ethers.getSigners()) {
+    const origSend = s.sendTransaction.bind(s);
+    s.sendTransaction = async (tx) => {
+      if (tx.gasLimit == null) {
+        try {
+          const est = await hre.ethers.provider.estimateGas({ ...tx, from: s.address });
+          tx = { ...tx, gasLimit: (est * 3n) + 21000n };
+        } catch {}
+      }
+      return origSend(tx);
+    };
+  }
   
   // Deploy MockUSDC
   const MockUSDC = await hre.ethers.getContractFactory("MockUSDC");

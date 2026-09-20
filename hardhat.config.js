@@ -17,6 +17,9 @@ module.exports = {
       url: "http://localhost:8545",
       chainId: 998,
       accounts: [deployerKey, ...anvilDevKeys],
+      // Estimation-vs-execution drift on the persistent anvil caused sporadic
+      // OOG reverts (gasLimit == gasUsed == estimate). 2x padding kills it.
+      gasMultiplier: 2,
     },
   },
   paths: {

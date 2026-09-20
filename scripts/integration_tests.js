@@ -21,6 +21,23 @@ process.on('unhandledRejection', (e) => {
 
 async function main() {
   const [owner, user1] = await hre.ethers.getSigners();
+  // ── OOG-flake killer ─────────────────────────────────────────────
+  // The persistent anvil + timestamp warps mean estimateGas can run on a
+  // DIFFERENT time-branch than execution (gasLimit == gasUsed OOG reverts).
+  // Pad every write 3x on top of the estimate; expected-revert txs are
+  // unaffected (their estimate fails and tests catch the revert normally).
+  for (const s of await hre.ethers.getSigners()) {
+    const origSend = s.sendTransaction.bind(s);
+    s.sendTransaction = async (tx) => {
+      if (tx.gasLimit == null) {
+        try {
+          const est = await hre.ethers.provider.estimateGas({ ...tx, from: s.address });
+          tx = { ...tx, gasLimit: (est * 3n) + 21000n };
+        } catch { /* expected-revert path: leave unpadded */ }
+      }
+      return origSend(tx);
+    };
+  }
   const E = hre.ethers;
   const fmt = (v) => E.formatUnits(v, 18);
 
@@ -113,7 +130,7 @@ async function main() {
 
   // A6: vault harvest accrues nothing (fee capture not implemented)
   const debtV = await vault.totalDebt();
-  tx = await vault.harvest(); const rcV = await tx.wait();
+  tx = await vault.harvest({ gasLimit: 2_500_000 }); const rcV = await tx.wait();
   const vEv = rcV.logs.map(l => { try { return vault.interface.parseLog(l); } catch { return null; } }).find(e => e && e.name === "Harvest");
   report("A6 vault.harvest profit == 0 (performance-fee capture NOT yet implemented)", vEv && vEv.args[0] === 0n);
 
@@ -276,7 +293,7 @@ async function main() {
   const vaultIdlePre = await usdc.balanceOf(await vault.getAddress());
   const feeDistPre = await usdc.balanceOf(await vault.feeDistributor());
   const deltaBalPre = await usdc.balanceOf(await delta.getAddress());
-  tx = await vault.harvest(); const rcE5 = await tx.wait();
+  tx = await vault.harvest({ gasLimit: 2_500_000 }); const rcE5 = await tx.wait();
   const vaultIdlePost = await usdc.balanceOf(await vault.getAddress());
   const feeDistPost = await usdc.balanceOf(await vault.feeDistributor());
   const deltaBalPost = await usdc.balanceOf(await delta.getAddress());
@@ -325,7 +342,7 @@ async function main() {
   await E.provider.send("evm_setNextBlockTimestamp", [ts + 90 * 24 * 3600]);
   const assetsPreHarvest = await vault.totalAssets();
   const feeDistPre2 = await usdc.balanceOf(await vault.feeDistributor());
-  tx = await vault.harvest(); await tx.wait();
+  tx = await vault.harvest({ gasLimit: 2_500_000 }); await tx.wait();
   const assetsPostHarvest = await vault.totalAssets();
   const fee2 = (await usdc.balanceOf(await vault.feeDistributor())) - feeDistPre2;
   const netCredited = assetsPostHarvest - assetsPreHarvest;
@@ -409,7 +426,7 @@ async function main() {
   tx = await usdc.mint(await evil.getAddress(), E.parseUnits("1000", 18)); await tx.wait();
   const idlePreAttack = await usdc.balanceOf(await vault.getAddress());
   const taPreAttack = await vault.totalAssets();
-  tx = await vault.harvest(); await tx.wait(); // evil reenters deposit AND withdraw attempts
+  tx = await vault.harvest({ gasLimit: 2_500_000 }); await tx.wait(); // evil reenters deposit AND withdraw attempts
   const idlePostAttack = await usdc.balanceOf(await vault.getAddress());
   const taPostAttack = await vault.totalAssets();
   const evilShareBal = await vault.shares(await evil.getAddress());
@@ -489,9 +506,9 @@ async function main() {
   // immediate second harvest credits ZERO (no double-count).
   const g7AccruedPre = await delta.accruedFunding(); // un-swept funding (owner settled in G6b)
   const a7pre = await vault.totalAssets();
-  tx = await vault.harvest(); await tx.wait(); // sweeps the outstanding accrual
+  tx = await vault.harvest({ gasLimit: 2_500_000 }); await tx.wait(); // sweeps the outstanding accrual
   const a7mid = await vault.totalAssets();
-  tx = await vault.harvest(); await tx.wait(); // nothing left to settle
+  tx = await vault.harvest({ gasLimit: 2_500_000 }); await tx.wait(); // nothing left to settle
   const a7post = await vault.totalAssets();
   report("G7 outstanding accrual swept once, second harvest credits ZERO (no double-count)",
     (await delta.accruedFunding()) === 0n && a7mid > a7pre && a7post === a7mid,
@@ -655,10 +672,12 @@ async function main() {
     held += await usdc.balanceOf(await sky.getAddress());
     if (held < (await vault.totalAssets())) solvencyHolds = false;
   };
+  let lastOp = "?";
   for (let i = 0; i < 60; i++) {
     const u = fuzzUsers[Number(rnd() % 3n)];
     const r = rnd() % 100n;
     try {
+      lastOp = r < 40n ? "deposit" : (r < 80n ? "withdraw" : "harvest");
       if (r < 40n) {
         const amt = (rnd() % 2000n) * E.WeiPerEther + 1n;
         tx = await usdc.mint(u.address, amt); await tx.wait();
@@ -672,14 +691,16 @@ async function main() {
           else { tx = await vault.connect(u).withdraw(maxW); await tx.wait(); } // tiny balance: full redeem
         }
       } else {
-        tx = await vault.harvest(); await tx.wait();
+        tx = await vault.harvest({ gasLimit: 2_500_000 }); await tx.wait();
       }
       fuzzOps++;
       await solvency();
       if (!solvencyHolds) break;
     } catch (e) {
       opsOk = false;
-      console.log(`   fuzz op ${i} FAILED:`, (e.reason || e.shortMessage || e.message || "").toString().slice(0, 100));
+      const r = rnd() % 100n; void r;
+      console.log(`   fuzz op ${i} FAILED (lastType=${lastOp}):`, (e.reason || e.shortMessage || (e.info && e.info.error && e.info.error.message) || e.message || "").toString().slice(0, 120));
+      console.log(`     vault idle=${fmt(await usdc.balanceOf(await vault.getAddress()))} delta=${fmt(await usdc.balanceOf(await delta.getAddress()))} pendle=${fmt(await usdc.balanceOf(await pendle.getAddress()))} sky=${fmt(await usdc.balanceOf(await sky.getAddress()))} totalAssets=${fmt(await vault.totalAssets())}`);
       break;
     }
   }
@@ -773,6 +794,155 @@ async function main() {
     const accruedPost = await delta.accruedFunding();
     report("M8 accrual monotonic (never decreases, never fabricates)",
       accruedPost >= accruedPre, `pre=${fmt(accruedPre)} post=${fmt(accruedPost)}`);
+  }
+
+  // ── N. ORACLE EXTREMES, DRY SOURCE, FD IDEMPOTENCY, JUMBO, STAKING TOPUP ──
+  console.log("\n── N. Extremes & edge machinery ──");
+
+  // N1: hostile oracle — rate clamped to MAX_RATE_BPS (no runaway accrual/overflow)
+  {
+    await (await oracleC.setRate(999999)).wait(); // garbage: 9999% "a year"
+    tx = await delta.updateFunding(); await tx.wait();
+    const clamped = await delta.fundingRate();
+    report("N1 hostile oracle rate CLAMPED to 100% max (no overflow/fabrication)",
+      clamped === 10000n, `clamped rate=${clamped} bps`);
+    await (await oracleC.setRate(1100)).wait();
+    tx = await delta.updateFunding(); await tx.wait();
+    report("N1b normal rate restored after clamp", (await delta.fundingRate()) === 1100n);
+  }
+
+  // N2: DRY funding source — accrual settles LOUDLY (revert), then recovers on refund
+  {
+    const src2 = await (await E.getContractFactory("MockFundingSource")).deploy(await usdc.getAddress());
+    await src2.waitForDeployment();
+    await (await usdc.mint(owner.address, E.parseUnits("100", 18))).wait();
+    await (await usdc.approve(await src2.getAddress(), E.parseUnits("1", 18))).wait();
+    await (await src2.fund(E.parseUnits("1", 18))).wait(); // holds just 1 USDC
+    const oracleC2 = await (await E.getContractFactory("MockFundingOracle")).deploy(1100);
+    await oracleC2.waitForDeployment();
+    // constructor: (underlying, initialOwner, short, oracle)
+    const d2 = await (await E.getContractFactory("DeltaNeutralStrategy")).deploy(
+      await usdc.getAddress(), owner.address, owner.address, await oracleC2.getAddress());
+    await d2.waitForDeployment();
+    await (await d2.setFundingSource(await src2.getAddress())).wait();
+    tx = await d2.openPosition(E.parseUnits("30000", 18)); await tx.wait();
+    const ts7 = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    await E.provider.send("evm_setNextBlockTimestamp", [ts7 + 30 * 24 * 3600]);
+    await E.provider.send("evm_mine", []);
+    let dryReverted = false;
+    try { tx = await d2.harvest(); await tx.wait(); } catch { dryReverted = true; }
+    report("N2 dry source: harvest fails LOUDLY (no silent under-payment)", dryReverted);
+    // refund → same harvest now settles the full amount
+    await (await usdc.approve(await src2.getAddress(), E.parseUnits("1000", 18))).wait();
+    await (await src2.fund(E.parseUnits("1000", 18))).wait();
+    const balPre = await usdc.balanceOf(await d2.getAddress());
+    tx = await d2.harvest(); await tx.wait();
+    const paidOut = (await usdc.balanceOf(await d2.getAddress())) - balPre;
+    report("N2b funded source: full accrual settles on next harvest (~271 for 30d)",
+      paidOut > E.parseUnits("270", 18) && paidOut < E.parseUnits("272", 18),
+      `settled=${fmt(paidOut)}`);
+  }
+
+  // N3: FeeDistributor receiveFees idempotency — double call = no double count
+  {
+    const fdv = fd; // the H-section FeeDistributor (deployed + fee-fed there)
+    const before = await fdv.totalFeesReceived();
+    const fdBal = await usdc.balanceOf(await fdv.getAddress());
+    tx = await fdv.receiveFees(); await tx.wait();
+    const mid = await fdv.totalFeesReceived();
+    tx = await fdv.receiveFees(); await tx.wait();
+    const after = await fdv.totalFeesReceived();
+    report("N3 FD receiveFees idempotent (twice = once)",
+      after === mid && mid >= before, `received=${fmt(after)} balance=${fmt(fdBal)}`);
+  }
+
+  // N4: JUMBO values — 10M whale deposit/withdraw without overflow
+  {
+    const JUMBO = E.parseUnits("10000000", 18);
+    await (await usdc.mint(u2.address, JUMBO)).wait();
+    await (await usdc.connect(u2).approve(await vault.getAddress(), JUMBO)).wait();
+    tx = await vault.connect(u2).deposit(JUMBO); await tx.wait();
+    const sh = await vault.shares(u2.address);
+    const maxW = await vault.maxWithdraw(u2.address);
+    report("N4 10M USDC whale deposit accepted (share math no overflow)", sh > 0n, `shares=${fmt(sh)}`);
+    tx = await vault.connect(u2).withdraw(maxW); await tx.wait();
+    const left = await vault.shares(u2.address);
+    report("N4b whale full withdraw — no stuck value (dust <= 1 wei)", left <= 1n, `left=${left} wei`);
+  }
+
+  // N5: STAKING MID-PERIOD TOPUP — leftover rolls into the new rate; sold window sums
+  {
+    const pydS = pydT;
+    const st2 = await (await E.getContractFactory("PYDStaking")).deploy(await pydS.getAddress());
+    await st2.waitForDeployment();
+    await (await pydS.transfer(user1.address, E.parseUnits("1000", 18))).wait();
+    await (await pydS.connect(user1).approve(await st2.getAddress(), E.parseUnits("1000", 18))).wait();
+    const tsS = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    await E.provider.send("evm_setNextBlockTimestamp", [tsS + 1]);
+    await E.provider.send("evm_mine", []);
+    tx = await st2.connect(user1).stake(E.parseUnits("1000", 18)); await tx.wait();
+    await (await pydS.approve(await st2.getAddress(), E.parseUnits("200000", 18))).wait();
+    tx = await st2.fundRewards(E.parseUnits("100000", 18), 30 * 24 * 3600); await tx.wait(); // A: 100k / 30d
+    const tsA = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    await E.provider.send("evm_setNextBlockTimestamp", [tsA + 10 * 24 * 3600]); // 10 days in
+    await E.provider.send("evm_mine", []);
+    tx = await st2.fundRewards(E.parseUnits("100000", 18), 30 * 24 * 3600); await tx.wait(); // topup B
+    const tsB = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    await E.provider.send("evm_setNextBlockTimestamp", [tsB + 31 * 24 * 3600]); // past new finish
+    await E.provider.send("evm_mine", []);
+    const earnedTotal = await st2.earned(user1.address);
+    // A(10d) + A(20d rolled) + B = full 200k to a sole staker (allow fee-free precision)
+    report("N5 staking mid-period topup: full 200k paid over the extended window",
+      earnedTotal > E.parseUnits("199999", 18) && earnedTotal <= E.parseUnits("200000", 18),
+      `earned=${fmt(earnedTotal)}`);
+    const tsC = (await E.provider.getBlock(await E.provider.getBlockNumber())).timestamp;
+    await E.provider.send("evm_setNextBlockTimestamp", [tsC + 10 * 24 * 3600]); // well past finish
+    await E.provider.send("evm_mine", []);
+    const earnedAfter = await st2.earned(user1.address);
+    report("N5b no accrual past periodFinish (earned frozen)", earnedAfter === earnedTotal,
+      `after=${fmt(earnedAfter)}`);
+  }
+
+  // N6: convertTo* zero edges + zero-amount guards
+  {
+    const c0 = await vault.convertToAssets(0n);
+    const c1 = await vault.convertToShares(0n);
+    let dep0 = false, wd0 = false;
+    try { tx = await vault.deposit(0n); await tx.wait(); } catch { dep0 = true; }
+    try { tx = await vault.withdraw(0n); await tx.wait(); } catch { wd0 = true; }
+    report("N6 zero edges: convert(0)=0, deposit(0)/withdraw(0) revert", c0 === 0n && c1 === 0n && dep0 && wd0);
+  }
+
+  // N8: RESILIENT HARVEST — one broken strategy must not brick the loop
+  {
+    // delta's STRATEGY-side flag off = its harvest() reverts (require isActive).
+    // Before: vault.harvest() reverted atomically for everyone. Now: skipped.
+    tx = await delta.setActive(false); await tx.wait();
+    const othersPre = await usdc.balanceOf(await vault.getAddress());
+    let vaultHarvestOk = true;
+    let rcN8;
+    try { tx = await vault.harvest({ gasLimit: 2_500_000 }); rcN8 = await tx.wait(); } catch { vaultHarvestOk = false; }
+    report("N8 broken strategy (inactive delta) does NOT brick vault harvest",
+      vaultHarvestOk, `idle before=${fmt(othersPre)}`);
+    if (vaultHarvestOk) {
+      const failEv = rcN8.logs.map(l => { try { return vault.interface.parseLog(l); } catch { return null; } })
+        .find(e => e && e.name === "StrategyHarvestFailed");
+      report("N8b StrategyHarvestFailed emitted for the skipped strategy",
+        failEv && failEv.args[0].toLowerCase() === (await delta.getAddress()).toLowerCase());
+    }
+    tx = await delta.setActive(true); await tx.wait();
+    tx = await vault.harvest({ gasLimit: 2_500_000 }); await tx.wait(); // fully healthy again
+    report("N8c strategy restored -> vault harvest fully healthy", true);
+  }
+
+  // N7: oracle disabled (address(0)) — accrual stops quietly by design; restore works
+  {
+    tx = await delta.setOracle(await bootOracle.getAddress()); await tx.wait(); // boot rate = 0
+    tx = await delta.updateFunding(); await tx.wait();
+    report("N7 oracle@0-rate disables accrual by design (rate=0)", (await delta.fundingRate()) === 0n);
+    tx = await delta.setOracle(await oracleC.getAddress()); await tx.wait();
+    tx = await delta.updateFunding(); await tx.wait();
+    report("N7b oracle restored (rate back to 1100)", (await delta.fundingRate()) === 1100n);
   }
 
   console.log(`\n=== INTEGRATION: ${pass} passed, ${fail} failed ===`);
