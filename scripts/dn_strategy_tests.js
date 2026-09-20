@@ -15,14 +15,30 @@ function report(name, ok, detail = "") {
   if (ok) { pass++; console.log(`✅ ${name}${detail ? " — " + detail : ""}`); }
   else { fail++; console.log(`❌ ${name}${detail ? " — " + detail : ""}`); }
 }
-async function expectRevert(promise, substr, name) {
+const CUSTOM_ERRORS = {
+  // keccak256("ErrorName()")[:4] — verified against live revert data
+  NotKeeper: "0x17315428", Paused: "0xaa3a5cb7", NotInitialized: "0x41ee6c5d",
+  ZeroAmount: "0x918a28db", ZeroOrder: "0x8127db6f", BadTif: "0x967e0969",
+  BelowMinNotional: "0x2f599ebf", WrongAsset: "0xb2d61bc5", Cap: "0x2e7d1a95",
+  ZeroValidator: "0xc7673afa", NotFlat: "0xbdc8ed86", ReadFailed: "0x0ac298f9",
+  SubDust: "0xcd67e235", ExceedsBalance: "0x13073609", ExceedsEquity: "0xc91236c2",
+  BufferTooHigh: "0xa54871fc", Inactive: "0x6699be5d", NotAuthorized: "0x7cdf2b91",
+  DecimalsTooLow: "0x678fa6e4", AdapterZeroKeeper: "0x004b0eb5",
+  AdapterZeroUsdc: "0x7da4ddf4", AdapterZeroAmount: "0x7393954e",
+};
+async function expectRevert(promise, expect, name) {
+  // `expect` = custom-error NAME ("Cap") or raw substring for anything else.
   try {
     const tx = await promise;
     if (tx && tx.wait) await tx.wait();
     report(name, false, "did not revert");
   } catch (e) {
-    const msg = (e.shortMessage || "") + " " + (e.message || "");
-    report(name, msg.includes(substr), msg.includes(substr) ? "" : `wrong reason: ${msg.slice(0, 120)}`);
+    const raw = (e.shortMessage || "") + " " + (e.message || "");
+    const data = e.data || (e.info && e.info.error && e.info.error.data) || "";
+    const selector = typeof data === "string" ? data.slice(0, 10) : "";
+    const wanted = CUSTOM_ERRORS[expect] || "no-selector";
+    const match = selector === wanted || raw.includes(expect);
+    report(name, match, match ? "" : `wrong reason: ${raw.slice(0, 120)} (selector=${selector})`);
   }
 }
 
@@ -113,7 +129,7 @@ async function main() {
   await (await k.bridgeUsdcToCore(U(500))).wait();
   report("bridge-in: corePrincipal6 = 500e6", (await strategy.corePrincipal6()) === 500_000_000n);
   report("bridge-in: funds pulled (strategy 900 -> 400)", (await usdc.balanceOf(sAddr)) === U(400));
-  await expectRevert(k.bridgeUsdcToCore.staticCall(1), "sub-6dp dust", "bridge-in dust guard (non-6dp multiple)");
+  await expectRevert(k.bridgeUsdcToCore.staticCall(1), "SubDust", "bridge-in dust guard (non-6dp multiple)");
 
   // ── 3. Core equity sync (mocked precompiles) ──
   await (await marginAt.set(505_000_000n, 0n, 0n, 0n)).wait(); // 505 USDC: principal 500 + 5 profit
@@ -185,17 +201,17 @@ async function main() {
   report("openShort bytes (action 1)", (await coreWriterAt.lastAction()).toLowerCase() === want3.toLowerCase());
 
   // ── 10. Gates ──
-  await expectRevert(strategy.connect(user2).moveUsdcToPerp.staticCall(1_000_000n), "not keeper", "keeper gate");
+  await expectRevert(strategy.connect(user2).moveUsdcToPerp.staticCall(1_000_000n), "NotKeeper", "keeper gate");
   await (await strategy.setPaused(true)).wait();
-  await expectRevert(k.moveUsdcToPerp.staticCall(1_000_000n), "paused", "pause gate");
+  await expectRevert(k.moveUsdcToPerp.staticCall(1_000_000n), "Paused", "pause gate");
   await (await strategy.setPaused(false)).wait();
   await (await existsAt.setExists(false)).wait();
-  await expectRevert(k.bridgeBackToEvm.staticCall(1_000_000n), "not initialized", "core-account gate");
+  await expectRevert(k.bridgeBackToEvm.staticCall(1_000_000n), "NotInitialized", "core-account gate");
   await (await existsAt.setExists(true)).wait();
-  await expectRevert(k.openShort.staticCall(0, px, 10_000n * 10n ** 8n, 3), "cap", "notional cap");
-  await expectRevert(k.openShort.staticCall(1, px, sz, 3), "wrong asset", "asset whitelist");
+  await expectRevert(k.openShort.staticCall(0, px, 10_000n * 10n ** 8n, 3), "Cap", "notional cap");
+  await expectRevert(k.openShort.staticCall(1, px, sz, 3), "WrongAsset", "asset whitelist");
   await (await positionAt.set(-5_000_000n, 0n, 0n, 10, false)).wait();
-  await expectRevert(strategy.setPerpAsset.staticCall(1), "not flat", "setPerpAsset guard (open position)");
+  await expectRevert(strategy.setPerpAsset.staticCall(1), "NotFlat", "setPerpAsset guard (open position)");
   await (await positionAt.set(0n, 0n, 0n, 10, false)).wait();
   report("permissionless syncCore works", await (async () => { await strategy.syncCore(); return true; })());
 

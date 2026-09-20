@@ -5,14 +5,14 @@ import {BaseStrategy} from "./BaseStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {HLConstants} from "./adapters/HLConstants.sol";
-import {ICoreWriter, ICoreDepositWallet} from "./adapters/HLInterfaces.sol";
+import {DNCoreBase} from "./adapters/DNCoreBase.sol";
 
 /// @title DNCoreStrategy — vault-integrated delta-neutral execution on HyperCore
-/// @notice Production wiring of the CoreWriter adapter pattern into the vault
-/// strategy interface (BaseStrategy). The contract is its own HyperCore actor:
-/// it bridges USDC to Core, class-transfers to perp, places the short hedge,
-/// and reads its Core equity back through the read precompiles.
+/// @notice The vault strategy wrapper over DNCoreBase (the shared execution
+/// layer). The contract is its own HyperCore actor: it bridges USDC to Core,
+/// class-transfers to perp, places the short hedge, and reads its Core equity
+/// back through the read precompiles. Execution lives ONCE in DNCoreBase;
+/// this contract adds the honest-accounting + vault wiring.
 ///
 /// HONEST ACCOUNTING (repo discipline — see SkyStrategy/MorphoStrategy audits):
 /// - `corePrincipal6`  = net USDC we sent to Core (never counted as yield).
@@ -27,24 +27,14 @@ import {ICoreWriter, ICoreDepositWallet} from "./adapters/HLInterfaces.sol";
 ///   recalls (BaseStrategy.recall is vault-only, transfers idle balance).
 /// - Larger recalls: keeper unwinds first (moveUsdcToSpot -> bridgeBackToEvm),
 ///   then the vault recalls. Documented in docs/DN_COREWRITER_ADAPTER.md.
-///
-/// NOTE: execution logic mirrors the tested DNCoreAdapter (26 byte-exact
-/// tests). Consolidate both into a shared execution base before the audit.
-contract DNCoreStrategy is BaseStrategy {
+contract DNCoreStrategy is BaseStrategy, DNCoreBase {
     using SafeERC20 for IERC20;
 
-    ICoreWriter internal constant CORE_WRITER = ICoreWriter(0x3333333333333333333333333333333333333333);
-
     /*//////////////////////// Config ////////////////////////*/
-    uint32 public perpAsset;        // HyperCore perp asset index (0 = BTC, 1 = ETH)
-    uint256 public maxActionUsd6;   // per-action notional cap, USDC 6dp
-    uint256 public bufferBps = 1500; // liquidity buffer (basis points of assets, <= 5000)
-    bool public paused;
     /// @notice Scale from Core 6dp USDC to underlying token units
     /// (1 for real USDC; 1e12 for an 18-decimals test token).
     uint256 public immutable coreScale;
-
-    uint256 public constant MIN_ORDER_USD6 = 10e6;
+    uint256 public bufferBps = 1500; // liquidity buffer (bps of assets, <= 5000)
     uint256 public constant MAX_BUFFER_BPS = 5000;
 
     /*//////////////////////// Core accounting (6dp, Core-native) ////////////////////////*/
@@ -57,98 +47,54 @@ contract DNCoreStrategy is BaseStrategy {
     uint256 public profitRealized;  // profit bridged back to EVM
     uint256 public profitSwept;     // profit already sent to the vault
 
-    /*//////////////////////// Read structs (mirror hyper-evm-lib) ////////////////////////*/
-    struct Position { int64 szi; uint64 entryNtl; int64 isolatedRawUsd; uint32 leverage; bool isIsolated; }
-    struct AccountMarginSummary { int64 accountValue; uint64 marginUsed; uint64 ntlPos; int64 rawUsd; }
-    struct PerpAssetInfo { string coin; uint32 marginTableId; uint8 szDecimals; uint8 maxLeverage; bool onlyIsolated; }
-    struct CoreUserExists { bool exists; }
+    /*//////////////////////// Custom errors (EIP-170 size discipline) ////////////////////////*/
+    error DNCore__DecimalsTooLow();
+    error DNCore__SubDust();
+    error DNCore__ExceedsBalance();
+    error DNCore__ExceedsEquity();
+    error DNCore__BufferTooHigh();
+    error DNCore__Inactive();
+    error DNCore__NotAuthorized();
 
-    /*//////////////////////// Events ////////////////////////*/
+    /*//////////////////////// Events (strategy-specific) ////////////////////////*/
     event BridgeToCore(uint256 evmAmount, uint64 coreAmount6);
     event BridgeToEvm(uint64 amount6, uint64 principalReduced6, uint64 profitRealized6);
-    event ActionSent(uint24 indexed actionId, bytes data);
-    event OrderSent(uint32 asset, bool isBuy, bool reduceOnly, uint64 limitPx, uint64 sz, uint8 tif, uint128 cloid);
-    event OrderCancelled(uint32 asset, uint128 cloid);
     event CoreSynced(int256 equity6, int64 szi, uint256 timestamp);
     event ProfitSwept(uint256 amount);
-    event StakeDeposited(uint64 weiAmount);
-    event StakeWithdrawn(uint64 weiAmount);
-    event Delegated(address indexed validator, uint64 weiAmount, bool undelegate);
-    event PausedSet(bool paused);
     event BufferSet(uint256 bufferBps);
-    event MaxActionSet(uint256 maxActionUsd6);
-    event PerpAssetSet(uint32 perpAsset);
 
     constructor(address _underlying, address initialOwner, uint32 _perpAsset, uint256 _maxActionUsd6)
         BaseStrategy(_underlying, initialOwner, "DeltaNeutralCore")
+        DNCoreBase(_perpAsset, _maxActionUsd6)
     {
         uint8 dec = IERC20Metadata(_underlying).decimals();
-        require(dec >= 6, "DNCore: decimals < 6");
+        if (dec < 6) revert DNCore__DecimalsTooLow();
         coreScale = 10 ** (dec - 6);
-        perpAsset = _perpAsset;
-        maxActionUsd6 = _maxActionUsd6;
     }
 
-    /*//////////////////////// Modifiers ////////////////////////*/
-    modifier onlyKeeper() {
-        require(msg.sender == keeper || msg.sender == owner(), "DNCore: not keeper");
-        _;
-    }
-
-    modifier notPaused() {
-        require(!paused, "DNCore: paused");
-        _;
-    }
-
-    /// @dev CoreWriter actions from an address whose HyperCore account does not
-    /// exist are silently dropped. Gate every action on the 0x810 read.
-    modifier coreAccountRequired() {
-        require(_coreAccountExists(), "DNCore: Core account not initialized (bridge first, earlier block)");
-        _;
+    /*//////////////////////// BaseStrategy seams ////////////////////////*/
+    function _keeper() internal view override returns (address) {
+        return keeper; // BaseStrategy.keeper (owner-set)
     }
 
     /*//////////////////////// Admin ////////////////////////*/
-    function setPaused(bool paused_) external onlyOwner {
-        paused = paused_;
-        emit PausedSet(paused_);
-    }
-
     function setBufferBps(uint256 bufferBps_) external onlyOwner {
-        require(bufferBps_ <= MAX_BUFFER_BPS, "DNCore: buffer too high");
+        if (bufferBps_ > MAX_BUFFER_BPS) revert DNCore__BufferTooHigh();
         bufferBps = bufferBps_;
         emit BufferSet(bufferBps_);
     }
 
-    function setMaxActionUsd6(uint256 maxActionUsd6_) external onlyOwner {
-        maxActionUsd6 = maxActionUsd6_;
-        emit MaxActionSet(maxActionUsd6_);
-    }
-
-    /// @dev Only while flat — avoids reinterpreting an open hedge.
-    function setPerpAsset(uint32 perpAsset_) external onlyOwner {
-        Position memory p = position();
-        require(p.szi == 0, "DNCore: position not flat");
-        perpAsset = perpAsset_;
-        emit PerpAssetSet(perpAsset_);
-    }
-
     /*//////////////////////// Core account lifecycle ////////////////////////*/
-    function coreAccountExists() external view returns (bool) {
-        return _coreAccountExists();
-    }
-
     /// @notice Bridge USDC EVM->Core (lands in the contract's SPOT balance).
     /// Initializes the Core account; actions must be sent in a LATER block.
     function bridgeUsdcToCore(uint256 evmAmount) external onlyKeeper notPaused nonReentrant {
-        require(evmAmount > 0, "DNCore: zero amount");
-        require(evmAmount % coreScale == 0, "DNCore: sub-6dp dust");
-        require(evmAmount <= underlying.balanceOf(address(this)), "DNCore: exceeds balance");
+        if (evmAmount == 0) revert DNCore__ZeroAmount();
+        if (evmAmount % coreScale != 0) revert DNCore__SubDust();
+        if (evmAmount > underlying.balanceOf(address(this))) revert DNCore__ExceedsBalance();
         uint64 core6 = uint64(evmAmount / coreScale);
         corePrincipal6 += core6;
-        address wallet = HLConstants.coreDepositWallet();
-        underlying.forceApprove(wallet, evmAmount);
         emit BridgeToCore(evmAmount, core6);
-        ICoreDepositWallet(wallet).deposit(evmAmount, HLConstants.SPOT_DEX);
+        _bridgeUsdcIn(underlying, evmAmount);
     }
 
     /// @notice Return USDC Core->EVM (sendAsset to the USDC system address).
@@ -156,9 +102,9 @@ contract DNCoreStrategy is BaseStrategy {
     /// vs profit at the FRESHLY-SYNCED equity: profit = amount above remaining
     /// principal. Only realized profit can ever be harvested.
     function bridgeBackToEvm(uint64 amount6) external onlyKeeper notPaused coreAccountRequired nonReentrant {
-        require(amount6 > 0, "DNCore: zero amount");
+        if (amount6 == 0) revert DNCore__ZeroAmount();
         _syncCore();
-        require(int256(uint256(amount6)) <= coreEquity6, "DNCore: exceeds Core equity");
+        if (int256(uint256(amount6)) > coreEquity6) revert DNCore__ExceedsEquity();
         uint64 principalRed = amount6 > corePrincipal6 ? uint64(corePrincipal6) : amount6;
         uint64 profitRed = amount6 - principalRed;
         corePrincipal6 -= principalRed;
@@ -167,77 +113,7 @@ contract DNCoreStrategy is BaseStrategy {
             profitRealized += uint256(profitRed) * coreScale;
         }
         emit BridgeToEvm(amount6, principalRed, profitRed);
-        _send(
-            HLConstants.SEND_ASSET_ACTION,
-            abi.encode(
-                address(HLConstants.BASE_SYSTEM_ADDRESS + HLConstants.USDC_TOKEN_INDEX),
-                address(0),
-                HLConstants.SPOT_DEX,
-                HLConstants.SPOT_DEX,
-                HLConstants.USDC_TOKEN_INDEX,
-                amount6
-            )
-        );
-    }
-
-    /*//////////////////////// Trading ////////////////////////*/
-    function moveUsdcToPerp(uint64 ntl) external onlyKeeper notPaused coreAccountRequired nonReentrant {
-        require(ntl > 0 && uint256(ntl) <= maxActionUsd6, "DNCore: cap");
-        _send(HLConstants.USD_CLASS_TRANSFER_ACTION, abi.encode(ntl, true));
-    }
-
-    function moveUsdcToSpot(uint64 ntl) external onlyKeeper notPaused coreAccountRequired nonReentrant {
-        require(ntl > 0 && uint256(ntl) <= maxActionUsd6, "DNCore: cap");
-        _send(HLConstants.USD_CLASS_TRANSFER_ACTION, abi.encode(ntl, false));
-    }
-
-    /// @notice Open the short hedge (sell perp). limitPx/sz are 10^8 x human
-    /// value; sz must respect szDecimals (read 0x80a before sizing).
-    function openShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
-        _order(asset, false, false, limitPx, sz, tif);
-    }
-
-    /// @notice Unwind — buy back the short (reduceOnly).
-    function closeShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
-        _order(asset, true, true, limitPx, sz, tif);
-    }
-
-    function cancelOrderByCloid(uint32 asset, uint128 cloid) external onlyKeeper notPaused coreAccountRequired nonReentrant {
-        require(asset == perpAsset, "DNCore: wrong asset");
-        emit OrderCancelled(asset, cloid);
-        _send(HLConstants.CANCEL_ORDER_BY_CLOID_ACTION, abi.encode(asset, cloid));
-    }
-
-    /// @dev notional(USDC 6dp) = limitPx * sz / 1e8 / 1e8 * 1e6 = limitPx * sz / 1e10.
-    function _order(uint32 asset, bool isBuy, bool reduceOnly, uint64 limitPx, uint64 sz, uint8 tif) internal {
-        require(asset == perpAsset, "DNCore: wrong asset");
-        require(limitPx > 0 && sz > 0, "DNCore: zero order");
-        require(tif == HLConstants.TIF_ALO || tif == HLConstants.TIF_GTC || tif == HLConstants.TIF_IOC, "DNCore: bad tif");
-        uint256 notional6 = (uint256(limitPx) * uint256(sz)) / 1e10;
-        require(notional6 >= MIN_ORDER_USD6, "DNCore: below $10 min notional");
-        require(notional6 <= maxActionUsd6, "DNCore: cap");
-        uint128 cloid = 0;
-        emit OrderSent(asset, isBuy, reduceOnly, limitPx, sz, tif, cloid);
-        _send(HLConstants.LIMIT_ORDER_ACTION, abi.encode(asset, isBuy, limitPx, sz, reduceOnly, tif, cloid));
-    }
-
-    /*//////////////////////// Staking (fee-discount path) ////////////////////////*/
-    function stakeHype(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
-        require(weiAmount > 0, "DNCore: zero amount");
-        emit StakeDeposited(weiAmount);
-        _send(HLConstants.STAKING_DEPOSIT_ACTION, abi.encode(weiAmount));
-    }
-
-    function delegateHype(address validator, uint64 weiAmount, bool undelegate) external onlyOwner notPaused coreAccountRequired nonReentrant {
-        require(validator != address(0), "DNCore: zero validator");
-        emit Delegated(validator, weiAmount, undelegate);
-        _send(HLConstants.TOKEN_DELEGATE_ACTION, abi.encode(validator, weiAmount, undelegate));
-    }
-
-    function withdrawStake(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
-        require(weiAmount > 0, "DNCore: zero amount");
-        emit StakeWithdrawn(weiAmount);
-        _send(HLConstants.STAKING_WITHDRAW_ACTION, abi.encode(weiAmount));
+        _sendUsdcToEvm(amount6);
     }
 
     /*//////////////////////// Core sync (read precompiles) ////////////////////////*/
@@ -263,7 +139,7 @@ contract DNCoreStrategy is BaseStrategy {
     }
 
     /// @notice Strategy assets in underlying units (synced Core equity + idle).
-    function totalAssets() public view override returns (uint256) {
+    function totalAssets() public view override(BaseStrategy) returns (uint256) {
         uint256 eqU = coreEquity6 > 0 ? uint256(coreEquity6) * coreScale : 0;
         return eqU + underlying.balanceOf(address(this));
     }
@@ -277,12 +153,13 @@ contract DNCoreStrategy is BaseStrategy {
     /// @dev Keeper/owner: sync only (settle). Vault: sync + sweep realized
     /// profit above the liquidity buffer as REAL USDC to the vault.
     function _doHarvest() internal override returns (uint256 profit) {
-        require(isActive, "DNCore: inactive");
-        require(msg.sender == owner() || msg.sender == keeper || msg.sender == vault, "DNCore: not authorized");
+        if (!isActive) revert DNCore__Inactive();
+        if (msg.sender != owner() && msg.sender != keeper && msg.sender != vault) revert DNCore__NotAuthorized();
         _syncCore();
         if (msg.sender != vault) return 0; // keeper settles only; vault sweeps
         uint256 available = profitRealized > profitSwept ? profitRealized - profitSwept : 0;
         if (available == 0) return 0;
+        // buffer = pct of assets kept idle for async recalls
         uint256 bal = underlying.balanceOf(address(this));
         uint256 buffer = (totalAssets() * bufferBps) / 10000;
         uint256 sweepable = bal > buffer ? bal - buffer : 0;
@@ -292,43 +169,5 @@ contract DNCoreStrategy is BaseStrategy {
         underlying.safeTransfer(vault, sweep);
         emit ProfitSwept(sweep);
         return sweep; // BaseStrategy.harvest books it via totalDebt
-    }
-
-    /*//////////////////////// Reads (precompiles) ////////////////////////*/
-    function position() public view returns (Position memory) {
-        (bool ok, bytes memory ret) = HLConstants.POSITION2_PRECOMPILE.staticcall(abi.encode(address(this), perpAsset));
-        require(ok, "DNCore: position read failed");
-        return abi.decode(ret, (Position));
-    }
-
-    function marginSummary() public view returns (AccountMarginSummary memory) {
-        (bool ok, bytes memory ret) = HLConstants.ACCOUNT_MARGIN_SUMMARY_PRECOMPILE.staticcall(abi.encode(uint32(0), address(this)));
-        require(ok, "DNCore: margin read failed");
-        return abi.decode(ret, (AccountMarginSummary));
-    }
-
-    function perpSzDecimals() public view returns (uint8) {
-        (bool ok, bytes memory ret) = HLConstants.PERP_ASSET_INFO_PRECOMPILE.staticcall(abi.encode(perpAsset));
-        require(ok, "DNCore: asset info read failed");
-        return abi.decode(ret, (PerpAssetInfo)).szDecimals;
-    }
-
-    function oraclePx() public view returns (uint64) {
-        (bool ok, bytes memory ret) = HLConstants.ORACLE_PX_PRECOMPILE.staticcall(abi.encode(perpAsset));
-        require(ok, "DNCore: oracle read failed");
-        return abi.decode(ret, (uint64));
-    }
-
-    /*//////////////////////// Internals ////////////////////////*/
-    function _coreAccountExists() internal view returns (bool) {
-        (bool ok, bytes memory ret) = HLConstants.CORE_USER_EXISTS_PRECOMPILE.staticcall(abi.encode(address(this)));
-        require(ok, "DNCore: coreUserExists read failed");
-        return abi.decode(ret, (CoreUserExists)).exists;
-    }
-
-    function _send(uint24 actionId, bytes memory payload) internal {
-        bytes memory data = abi.encodePacked(uint8(1), actionId, payload);
-        emit ActionSent(actionId, data);
-        CORE_WRITER.sendRawAction(data);
     }
 }

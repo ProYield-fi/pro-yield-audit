@@ -14,14 +14,30 @@ function report(name, ok, detail = "") {
   if (ok) { pass++; console.log(`✅ ${name}${detail ? " — " + detail : ""}`); }
   else { fail++; console.log(`❌ ${name}${detail ? " — " + detail : ""}`); }
 }
-async function expectRevert(promise, substr, name) {
+const CUSTOM_ERRORS = {
+  // keccak256("ErrorName()")[:4] — verified against live revert data
+  NotKeeper: "0x17315428", Paused: "0xaa3a5cb7", NotInitialized: "0x41ee6c5d",
+  ZeroAmount: "0x918a28db", ZeroOrder: "0x8127db6f", BadTif: "0x967e0969",
+  BelowMinNotional: "0x2f599ebf", WrongAsset: "0xb2d61bc5", Cap: "0x2e7d1a95",
+  ZeroValidator: "0xc7673afa", NotFlat: "0xbdc8ed86", ReadFailed: "0x0ac298f9",
+  SubDust: "0xcd67e235", ExceedsBalance: "0x13073609", ExceedsEquity: "0xc91236c2",
+  BufferTooHigh: "0xa54871fc", Inactive: "0x6699be5d", NotAuthorized: "0x7cdf2b91",
+  DecimalsTooLow: "0x678fa6e4", AdapterZeroKeeper: "0x004b0eb5",
+  AdapterZeroUsdc: "0x7da4ddf4", AdapterZeroAmount: "0x7393954e",
+};
+async function expectRevert(promise, expect, name) {
+  // `expect` = custom-error NAME ("Cap") or raw substring for anything else.
   try {
     const tx = await promise;
     if (tx && tx.wait) await tx.wait();
     report(name, false, "did not revert");
   } catch (e) {
-    const msg = (e.shortMessage || "") + " " + (e.message || "");
-    report(name, msg.includes(substr), msg.includes(substr) ? "" : `wrong reason: ${msg.slice(0, 120)}`);
+    const raw = (e.shortMessage || "") + " " + (e.message || "");
+    const data = e.data || (e.info && e.info.error && e.info.error.data) || "";
+    const selector = typeof data === "string" ? data.slice(0, 10) : "";
+    const wanted = CUSTOM_ERRORS[expect] || "no-selector";
+    const match = selector === wanted || raw.includes(expect);
+    report(name, match, match ? "" : `wrong reason: ${raw.slice(0, 120)} (selector=${selector})`);
   }
 }
 
@@ -150,28 +166,28 @@ async function main() {
     (await usdc.allowance(adapterAddr, TESTNET_DEPOSIT_WALLET)) === 1_000_000n);
 
   // ── Gates ──
-  await expectRevert(adapter.connect(user1).moveUsdcToPerp.staticCall(1_000_000n), "not keeper", "keeper gate");
+  await expectRevert(adapter.connect(user1).moveUsdcToPerp.staticCall(1_000_000n), "NotKeeper", "keeper gate");
   await (await adapter.setPaused(true)).wait();
-  await expectRevert(a.moveUsdcToPerp.staticCall(1_000_000n), "paused", "pause gate");
+  await expectRevert(a.moveUsdcToPerp.staticCall(1_000_000n), "Paused", "pause gate");
   await (await adapter.setPaused(false)).wait();
   await (await existsAt.setExists(false)).wait();
-  await expectRevert(a.moveUsdcToPerp.staticCall(1_000_000n), "not initialized", "core-account gate (transfer)");
-  await expectRevert(a.openShort.staticCall(0, px, sz, 3), "not initialized", "core-account gate (order)");
+  await expectRevert(a.moveUsdcToPerp.staticCall(1_000_000n), "NotInitialized", "core-account gate (transfer)");
+  await expectRevert(a.openShort.staticCall(0, px, sz, 3), "NotInitialized", "core-account gate (order)");
   await (await existsAt.setExists(true)).wait();
   report("core-account gate restores", (await adapter.coreAccountExists()) === true);
 
   // ── Caps & sanity ──
-  await expectRevert(a.openShort.staticCall(0, px, 10_000n * 10n ** 8n, 3), "cap", "notional cap on orders");
-  await expectRevert(a.openShort.staticCall(0, px, 10_000n, 3), "below $10", "HL $10 min notional");
-  await expectRevert(a.openShort.staticCall(1, px, sz, 3), "wrong asset", "asset whitelist");
-  await expectRevert(a.moveUsdcToPerp.staticCall(200_000n * 10n ** 6n), "cap", "class-transfer cap");
-  await expectRevert(a.openShort.staticCall(0, px, sz, 9), "bad tif", "tif validation");
+  await expectRevert(a.openShort.staticCall(0, px, 10_000n * 10n ** 8n, 3), "Cap", "notional cap on orders");
+  await expectRevert(a.openShort.staticCall(0, px, 10_000n, 3), "BelowMinNotional", "HL $10 min notional");
+  await expectRevert(a.openShort.staticCall(1, px, sz, 3), "WrongAsset", "asset whitelist");
+  await expectRevert(a.moveUsdcToPerp.staticCall(200_000n * 10n ** 6n), "Cap", "class-transfer cap");
+  await expectRevert(a.openShort.staticCall(0, px, sz, 9), "BadTif", "tif validation");
 
   // ── Position + admin ──
   await (await positionAt.set(-5_000_000n, 0n, 0n, 10, false)).wait();
   const p = await adapter.position();
   report("position read (0x813) — szi=-5e6 (short)", p.szi === -5_000_000n);
-  await expectRevert(adapter.setPerpAsset.staticCall(1), "not flat", "setPerpAsset guard (open position)");
+  await expectRevert(adapter.setPerpAsset.staticCall(1), "NotFlat", "setPerpAsset guard (open position)");
   await (await positionAt.set(0n, 0n, 0n, 10, false)).wait();
   tx = await adapter.setPerpAsset(1); await tx.wait();
   report("setPerpAsset allowed when flat", (await adapter.perpAsset()) === 1n);
