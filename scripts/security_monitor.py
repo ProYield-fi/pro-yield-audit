@@ -150,6 +150,58 @@ def run_slither() -> dict[str, Any]:
     return parse_slither_results(data)
 
 
+BASELINE_PATH = PROJECT_ROOT / "security_baseline.json"
+
+
+def load_baseline() -> dict:
+    """Accepted-findings baseline. The monitor alerts ONLY on findings not in
+    this list, so a clean scan means 'nothing new', not 'nothing found'."""
+    if BASELINE_PATH.exists():
+        try:
+            return json.loads(BASELINE_PATH.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def finding_signature(f: dict) -> str:
+    """Stable key `check:Contract` — survives line-number shifts."""
+    desc = f.get("description", "") or ""
+    m = re.search(r"in ([A-Za-z0-9_]+)[.(]", desc)
+    contract = m.group(1) if m else None
+    if not contract:
+        m2 = re.match(r"([A-Za-z0-9_]+)[.(]", desc)
+        contract = m2.group(1) if m2 else None
+    if not contract:
+        for e in (f.get("elements") or []):
+            fname = e.get("file") or ""
+            if fname.endswith(".sol"):
+                contract = fname.split("/")[-1][:-4]
+                break
+    return f"{f.get('check')}:{contract or 'unknown'}"
+
+
+def apply_baseline(summary: dict, baseline: dict) -> dict:
+    """Move baselined findings out of the alert buckets; recompute counts."""
+    accepted = baseline.get("accepted", {}) or {}
+    kept = {"critical": [], "warning": [], "informational": [], "accepted": []}
+    for bucket in ("critical", "warning", "informational"):
+        for f in summary.get(bucket, []):
+            sig = f.get("sig") or finding_signature(f)
+            if sig in accepted:
+                f["accepted_reason"] = accepted[sig]
+                kept["accepted"].append(f)
+            else:
+                kept[bucket].append(f)
+    summary.update(kept)
+    summary["critical_count"] = len(kept["critical"])
+    summary["warning_count"] = len(kept["warning"])
+    summary["info_count"] = len(kept["informational"])
+    summary["accepted_count"] = len(kept["accepted"])
+    summary["baseline_size"] = len(accepted)
+    return summary
+
+
 def parse_slither_results(data: dict) -> dict[str, Any]:
     """Parse raw Slither JSON into a structured security report."""
     findings = data.get("results", {}).get("detectors", [])
@@ -199,6 +251,8 @@ def parse_slither_results(data: dict) -> dict[str, Any]:
                 for e in elements
             ],
         }
+
+        finding_entry["sig"] = finding_signature(finding_entry)
 
         if detector_family in CRITICAL_DETECTORS or "reentrancy" in check.lower():
             finding_entry["severity"] = "CRITICAL"
@@ -324,6 +378,9 @@ def generate_report(slither_results: dict, advisories: dict, output_format: str 
     else:
         lines.append(f"  Files analyzed: {len(slither_results['files_analyzed'])}")
         lines.append(f"  Total findings: {slither_results['total_findings']}")
+        if "accepted_count" in slither_results:
+            lines.append(f"  ✅ Accepted (baselined, justified): {slither_results['accepted_count']} of {slither_results['baseline_size']}")
+            lines.append(f"  → Alerting only on NEW findings (see security_baseline.json)")
         lines.append("")
 
         if slither_results["critical_count"] > 0:
@@ -402,6 +459,8 @@ def main():
     parser.add_argument("--output", "-o", type=str, help="Save report to file")
     parser.add_argument("--quiet", action="store_true", help="Minimal output")
     parser.add_argument("--no-save", action="store_true", help="Don't save report to disk")
+    parser.add_argument("--update-baseline", action="store_true",
+                        help="Rewrite security_baseline.json from the CURRENT findings (review first!)")
     args = parser.parse_args()
 
     start_time = time.time()
@@ -415,6 +474,26 @@ def main():
             print(f"    Found {slither_results['total_findings']} findings "
                   f"({slither_results['critical_count']} critical, "
                   f"{slither_results['warning_count']} warnings)")
+        # --update-baseline: bless current findings after review
+        if args.update_baseline and "error" not in slither_results:
+            allf = (slither_results.get("critical", []) + slither_results.get("warning", [])
+                    + slither_results.get("informational", []))
+            accepted = {}
+            for f in allf:
+                accepted[finding_signature(f)] = "REVIEW REQUIRED — add the justification for this finding"
+            BASELINE_PATH.write_text(json.dumps({
+                "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "note": "Accepted findings — the monitor alerts only on findings NOT listed here.",
+                "accepted": dict(sorted(accepted.items())),
+            }, indent=2) + "\n")
+            print(f"    Baseline updated: {len(accepted)} findings -> {BASELINE_PATH.name} (review reasons!)")
+        # filter against baseline so alerts mean "something NEW"
+        if "error" not in slither_results:
+            slither_results = apply_baseline(slither_results, load_baseline())
+            if not args.quiet:
+                print(f"    vs baseline: {slither_results['critical_count']} new critical, "
+                      f"{slither_results['warning_count']} new warnings, "
+                      f"{slither_results['accepted_count']} accepted across {slither_results['baseline_size']} signatures")
 
     # ── Run Advisory Checks ──
     advisories = {}

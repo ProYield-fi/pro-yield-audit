@@ -14,7 +14,7 @@ module.exports = {
   solidity: "0.8.28",
   networks: {
     hyperTestnet: {
-      url: "http://localhost:8545",
+      url: process.env.HYPEREVM_RPC_URL || "http://localhost:8545",
       chainId: 998,
       accounts: [deployerKey, ...anvilDevKeys],
       // Estimation-vs-execution drift on the persistent anvil caused sporadic

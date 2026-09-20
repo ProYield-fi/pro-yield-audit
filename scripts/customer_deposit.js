@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
-  const deployed = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployed_addresses.json"), "utf8"));
+  const deployed = JSON.parse(fs.readFileSync(process.env.DEPLOY_MANIFEST || process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.json"), "utf8"));
   const customer = (await hre.ethers.getSigners())[3];
   // OOG-flake killer (prototype-level): pad every signer's gas 3x — getSigners()
   // returns fresh instances per call, so per-instance patches miss factory calls.

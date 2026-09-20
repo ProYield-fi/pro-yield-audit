@@ -32,7 +32,7 @@ async function main() {
   
   // Persist deployed addresses — single source of truth for keeper/insurance/monitor.
   // Every redeploy on a fresh chain mints new addresses; hardcoded ones go stale.
-  const ADDRESSES_PATH = path.join(__dirname, "..", "deployed_addresses.json");
+  const ADDRESSES_PATH = process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.json");
   const deployed = { deployed_utc: new Date().toISOString(), chain_id: 998, deployer: owner.address };
 
   // PYD token + fee infrastructure (fee loop: vault perf fee -> FD -> staking/insurance)

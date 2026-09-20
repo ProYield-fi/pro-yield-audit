@@ -27,7 +27,7 @@ async function main() {
     return origSend.call(this, tx);
   };
 
-  const deployed = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployed_addresses.json"), "utf8"));
+  const deployed = JSON.parse(fs.readFileSync(process.env.DEPLOY_MANIFEST || process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.json"), "utf8"));
   const policy = JSON.parse(fs.readFileSync(POLICY_PATH, "utf8"));
   const [owner] = await hre.ethers.getSigners();
 
@@ -100,18 +100,24 @@ async function main() {
   const remainder = await usdc.balanceOf(await fd.getAddress());
   console.log("FD remainder after recycle:", hre.ethers.formatUnits(remainder, 18), "USDC (rounding dust only)");
 
-  // 4) ledger
+  // 4) ledger — main mode only; cold-start runs (DEPLOY_MANIFEST set) must not
+  // append main-chain entries (they once polluted the dashboard totals).
   const entry = {
     ts, iso: new Date(ts * 1000).toISOString(),
     source: process.env.RECYCLE_SOURCE || "fees",
+    vault: await vault.getAddress(),
     total: hre.ethers.formatUnits(bal, 18),
     boost: hre.ethers.formatUnits(boost, 18),
     treasury: hre.ethers.formatUnits(treasury, 18),
     insurance: hre.ethers.formatUnits(insurance, 18),
     remainder: hre.ethers.formatUnits(remainder, 18),
   };
-  fs.appendFileSync(LEDGER_PATH, JSON.stringify(entry) + "\n");
-  console.log("ledger appended ->", LEDGER_PATH);
+  if (process.env.DEPLOY_MANIFEST) {
+    console.log("cold-start mode: ledger append skipped");
+  } else {
+    fs.appendFileSync(LEDGER_PATH, JSON.stringify(entry) + "\n");
+    console.log("ledger appended ->", LEDGER_PATH);
+  }
   console.log("RECYCLE DONE:", JSON.stringify(entry));
 }
 main().catch(e => { console.error(e); process.exit(1); });
