@@ -23,6 +23,7 @@
     "solc-version:Ownable": "OpenZeppelin library pragma \u2014 library code.",
     "timestamp:DeltaNeutralStrategy": "block.timestamp used for funding accrual (time-based yield) \u2014 intentional DeFi pattern.",
     "timestamp:PYDStaking": "block.timestamp used for reward streaming \u2014 intentional DeFi pattern.",
-    "timestamp:PendleStrategy": "block.timestamp used for maturity checks \u2014 intentional DeFi pattern."
+    "timestamp:PendleStrategy": "block.timestamp used for maturity checks \u2014 intentional DeFi pattern.",
+    "reentrancy-balance:PYDFunder": "The swap target is an owner-set swapper (trusted config, like the baselined funding source); nonReentrant blocks re-entry into topUp (the only USDC spender); the swap OUTPUT is verified by balance delta (the return value is advisory); the USDC allowance is revoked immediately after the swap. Slither rates reentrancy-balance Low impact; the monitor's blanket reentrancy-family rule over-elevates it. Re-verified 2026-09-20."
   }
 }
