@@ -33,6 +33,7 @@ const CONFIG = {
   strategy: process.env.DN_STRATEGY || process.env.DN_ADAPTER || null,
   hlInfoUrl: "https://api.hyperliquid.xyz/info",
   fundingAprThreshold: 5.0, // annualized % below which opening a hedge is not justified
+  unwindAprThreshold: parseFloat(process.env.DN_UNWIND_APR || "-2.0"), // short PAYS when funding > 0; below this → close
   rebalanceBandPct: 5,      // |positionDrift| > band → rebalance
   slippageBps: 20n,         // IOC limit vs oracle (0.20%)
   tifIoc: 3,
@@ -41,8 +42,53 @@ const CONFIG = {
   deployPct: parseFloat(process.env.DN_DEPLOY_PCT || "0.90"), // fraction of sleeve bridged to Core
   marginUtilBps: 3300n,  // perp margin needed per 1e4 notional (BTC maxLev 40 → 1/40 = 250bps; pad to 3300 for fees/spread)
   maxSleeveUsd: parseFloat(process.env.DN_MAX_SLEEVE_USD || "0"), // 0 = no override cap
-  dryRun: !process.argv.includes("--execute"),
+  dryRun: !(process.argv.includes("--execute") || process.env.DN_EXECUTE === "1"),
 };
+
+/// @notice Telegram alert — reuses yield_scout's creds chain (env →
+/// ~/.hermes/secrets/telegram.json → ~/.hermes/.env). Never throws: alerts
+/// queue to a file so verification failures are never silently lost.
+async function sendAlert(title, body) {
+  const line = `[dn-keeper] ${title} — ${body}`;
+  console.log(line);
+  try {
+    const fs2 = require("fs");
+    let tok, chat;
+    if (process.env.TELEGRAM_BOT_TOKEN && (process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_HOME_CHANNEL)) {
+      tok = process.env.TELEGRAM_BOT_TOKEN;
+      chat = process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_HOME_CHANNEL;
+    } else if (fs2.existsSync("/home/user/.hermes/secrets/telegram.json")) {
+      const d = JSON.parse(fs2.readFileSync("/home/user/.hermes/secrets/telegram.json", "utf8"));
+      tok = d.bot_token; chat = d.chat_id;
+    } else if (fs2.existsSync("/home/user/.hermes/.env")) {
+      const vals = {};
+      for (const l of fs2.readFileSync("/home/user/.hermes/.env", "utf8").split("\n")) {
+        const m = l.trim();
+        if (m.includes("=") && !m.startsWith("#")) {
+          const i = m.indexOf("=");
+          vals[m.slice(0, i).trim()] = m.slice(i + 1).trim();
+        }
+      }
+      tok = vals.TELEGRAM_BOT_TOKEN; chat = vals.TELEGRAM_HOME_CHANNEL || vals.TELEGRAM_CHAT_ID;
+    }
+    if (!tok || !chat) {
+      fs2.appendFileSync("/home/user/yield_scout/data/pending_notifications.log",
+        `${new Date().toISOString()} ${line}\n`);
+      return;
+    }
+    const res = await fetch(`https://api.telegram.org/bot${tok}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chat, text: `<b>${title}</b>\n${body}`, parse_mode: "HTML" }),
+    });
+    if (!res.ok) throw new Error(`telegram ${res.status}`);
+  } catch (e) {
+    try {
+      require("fs").appendFileSync("/home/user/yield_scout/data/pending_notifications.log",
+        `${new Date().toISOString()} ${line} (send failed: ${e.message})\n`);
+    } catch { /* nothing more we can do */ }
+  }
+}
 
 async function hlInfo(body) {
   const res = await fetch(CONFIG.hlInfoUrl, {
@@ -55,6 +101,8 @@ async function hlInfo(body) {
 
 /// @returns annualized funding % for the strategy's perp asset (BTC=0, ETH=1)
 async function fetchFundingApr(assetIndex) {
+  // Test injection: DN_FORCE_APR overrides the live read (dry-run tests only).
+  if (process.env.DN_FORCE_APR) return parseFloat(process.env.DN_FORCE_APR);
   const predicted = await hlInfo({ type: "predictedFundings" });
   // shape: [[coin, [[venue, {fundingRate, nextFundingTime}], ...]], ...]
   // HlPerp venue = the validator perp book we hedge on. fundingRate is HOURLY.
@@ -141,7 +189,9 @@ async function main() {
 
   // Current notional (USD) from the on-chain position + oracle px.
   const px = BigInt(await strategy.oraclePx());
-  const currentNotionalUsd = Math.abs(Number(szi)) * (Number(px) / 1e8);
+  // szi is 1e8-scaled human units (0.05 BTC → 5_000_000); px is 1e8-scaled
+  // USD. Notional USD = (|szi|/1e8) × (px/1e8) — BOTH normalized.
+  const currentNotionalUsd = (Math.abs(Number(szi)) / 1e8) * (Number(px) / 1e8);
   const driftPct = targetNotionalUsd > 0 ? ((currentNotionalUsd - targetNotionalUsd) / targetNotionalUsd) * 100 : 0;
   console.log(`position: szi=${szi} px=${Number(px) / 1e8} current notional ${currentNotionalUsd.toFixed(2)} USD (drift ${driftPct.toFixed(2)}% vs target)`);
 
@@ -151,8 +201,8 @@ async function main() {
   if (!exists) action = "BRIDGE_FIRST";
   else if (coreProfit6 > 0n && harvestable === 0n) action = "BRIDGE_PROFIT";
   else if (targetNotionalUsd >= 10 && szi === 0n && apr >= CONFIG.fundingAprThreshold) action = "OPEN";
+  else if (szi !== 0n && apr < CONFIG.unwindAprThreshold) action = "UNWIND";
   else if (szi !== 0n && Math.abs(driftPct) > CONFIG.rebalanceBandPct) action = "REBALANCE";
-  else if (szi !== 0n && apr < 0) action = "UNWIND_REVIEW"; // policy TODO
   console.log(`decision: ${action} (dryRun=${CONFIG.dryRun})`);
 
   if (CONFIG.dryRun || action === "HOLD" || action === "BRIDGE_FIRST") {
@@ -178,7 +228,28 @@ async function main() {
       const htx = await vault.harvest();
       await htx.wait();
       console.log("vault.harvest() done — realized profit swept above buffer");
+      await sendAlert("💰 DN profit harvested", `realized profit swept to the vault above the buffer. Check the transparency page for the updated share price.`);
     }
+  }
+
+  if (action === "UNWIND") {
+    // Negative funding: the short PAYS. Close the full position (reduceOnly),
+    // verify, alert. Capital returns to spot → bridge-back handles the rest.
+    const sz = szi < 0n ? -szi : szi; // buy back the exact position size
+    const limitPx = (px * (10000n - CONFIG.slippageBps)) / 10000n; // buy: lower
+    console.log(`unwinding short: sz=${sz} @ IOC ${limitPx} (funding ${apr.toFixed(2)}% < ${CONFIG.unwindAprThreshold}%)`);
+    const tx = await strategy.closeShort(asset, limitPx, sz, CONFIG.tifIoc);
+    await tx.wait();
+    await new Promise((r) => setTimeout(r, 8000));
+    const after = await strategy.position();
+    const flat = after.szi === 0n;
+    console.log(`verified: szi=${after.szi} (flat=${flat})`);
+    await sendAlert(
+      flat ? "🟢 DN unwind complete" : "🔴 DN unwind MISMATCH",
+      `funding ${apr.toFixed(2)}%/yr — short ${flat ? "closed" : "NOT closed (szi=" + after.szi + ")"}; verify on-chain.`
+    );
+    if (!flat) process.exit(3);
+    return;
   }
 
   if ((action === "OPEN" || action === "REBALANCE") && targetNotionalUsd >= 10) {
@@ -197,7 +268,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 8000));
       const after = await strategy.position();
       console.log(`verified: szi=${after.szi}`);
-      if (Math.abs(Number(after.szi)) * (Number(px) / 1e8) < targetNotionalUsd * 0.9) {
+      if ((Math.abs(Number(after.szi)) / 1e8) * (Number(px) / 1e8) < targetNotionalUsd * 0.9) {
         console.error("MISMATCH: position smaller than expected — investigate (drop?)");
         process.exit(3);
       }
@@ -238,6 +309,7 @@ async function main() {
     const after = await strategy.position();
     if (after.szi === 0n) {
       console.error("MISMATCH: order not visible after delay — investigate (drop?)");
+      await sendAlert("🔴 DN order MISMATCH", `order not visible after delay — possible silent drop. asset=${asset} Investigate immediately.`);
       process.exit(3);
     }
     console.log(`verified: szi=${after.szi}`);
