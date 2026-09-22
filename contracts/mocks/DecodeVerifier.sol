@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {DNCoreStrategy} from "../DNCoreStrategy.sol";
+import {DNCoreBase} from "../adapters/DNCoreBase.sol";
 
 /// @notice Feeds RAW production precompile returns through the exact Solidity
 /// decode path used by DNCoreStrategy — verifying the read layer against real
@@ -12,7 +12,7 @@ contract DecodeVerifier {
         pure
         returns (string memory coin, uint32 marginTableId, uint8 szDecimals, uint8 maxLeverage, bool onlyIsolated)
     {
-        DNCoreStrategy.PerpAssetInfo memory info = abi.decode(ret, (DNCoreStrategy.PerpAssetInfo));
+        DNCoreBase.PerpAssetInfo memory info = abi.decode(ret, (DNCoreBase.PerpAssetInfo));
         return (info.coin, info.marginTableId, info.szDecimals, info.maxLeverage, info.onlyIsolated);
     }
 
@@ -21,7 +21,7 @@ contract DecodeVerifier {
         pure
         returns (int64 szi, uint64 entryNtl, int64 isolatedRawUsd, uint32 leverage, bool isIsolated)
     {
-        DNCoreStrategy.Position memory p = abi.decode(ret, (DNCoreStrategy.Position));
+        DNCoreBase.Position memory p = abi.decode(ret, (DNCoreBase.Position));
         return (p.szi, p.entryNtl, p.isolatedRawUsd, p.leverage, p.isIsolated);
     }
 
@@ -30,7 +30,7 @@ contract DecodeVerifier {
         pure
         returns (int64 accountValue, uint64 marginUsed, uint64 ntlPos, int64 rawUsd)
     {
-        DNCoreStrategy.AccountMarginSummary memory m = abi.decode(ret, (DNCoreStrategy.AccountMarginSummary));
+        DNCoreBase.AccountMarginSummary memory m = abi.decode(ret, (DNCoreBase.AccountMarginSummary));
         return (m.accountValue, m.marginUsed, m.ntlPos, m.rawUsd);
     }
 

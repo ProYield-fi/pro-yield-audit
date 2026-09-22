@@ -1300,15 +1300,25 @@ async function main() {
     got2 < got1 * 3n && got3 < got2 * 2n && got1 > 0n && got2 > 0n && got3 > 0n,
     `u1=${fmt(got1)} u2=${fmt(got2)} u3=${fmt(got3)}`);
 
-  // R2: CONSERVATION — every wei accounted: distributed + dust == funded, exactly
+  // R2: CONSERVATION — every wei accounted: distributed + dust == funded, exactly.
+  // Dust decomposes EXACTLY into three measured components:
+  //   (a) unstreamed seconds between fundRewards and the first stake (T1−T0 —
+  //       anvil's +1s tick makes this ≥1s when a second boundary is crossed;
+  //       nobody was staked to earn those seconds, so they stay in the contract);
+  //   (b) the rate-floor remainder (FUND mod DUR is never streamed at all);
+  //   (c) per-window integer-floor remainder (< 1e8 wei by construction).
+  // The identity holds for ANY gap, so the bound stays strict on (c) only.
   const dust = FUND - (e1 + e2 + e3);
   tx = await st2.connect(user1).exit(); await tx.wait();
   tx = await st2.connect(u2).exit(); await tx.wait();
   tx = await st2.connect(u3).exit(); await tx.wait();
   const leftover = await pyd2.balanceOf(await st2.getAddress());
-  report("R2 conservation: contract holds exactly funded - distributed (dust < 1e12 wei)",
-    leftover === dust && dust >= 0n && dust < 1000000000000n,
-    `dust=${dust.toString()} wei`);
+  const gapDust = (BigInt(T1) - BigInt(T0)) * pyRate;   // unstreamed pre-first-stake seconds
+  const rateFloor = FUND - DUR * pyRate;                // never streamed (rate = floor(FUND/DUR))
+  const floorDust = dust - gapDust - rateFloor;         // per-window floor remainder
+  report("R2 conservation: every wei accounted — leftover == funded - distributed, decomposed exactly",
+    leftover === dust && floorDust >= 0n && floorDust < 100000000n,
+    `dust=${dust.toString()} = gap(${(BigInt(T1) - BigInt(T0)).toString()}s)=${gapDust.toString()} + rateFloor=${rateFloor.toString()} + floors=${floorDust.toString()}`);
   report("R2b exits return full principal after claims",
     (await st2.totalSupply()) === 0n, `totalSupply=${await st2.totalSupply()}`);
 
