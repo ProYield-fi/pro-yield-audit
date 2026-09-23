@@ -11,15 +11,23 @@ const path = require("path");
 
 const HOME = process.env.HOME || "/home/user";
 const REPO = path.join(__dirname, "..");
-const SCOUT = path.join(HOME, "yield_scout", "data");
-const WEB = path.join(HOME, "websites", "pro-yield-web");
+const SCOUT = process.env.AUDIT_SCOUT_DIR || path.join(HOME, "yield_scout", "data");
+const WEB = process.env.AUDIT_WEB_DIR || path.join(HOME, "websites", "pro-yield-web");
+// Host-dependent roots: on a machine without the ops dirs (e.g. CI) those
+// checks SKIP loudly instead of reporting phantom drift. Point AUDIT_SCOUT_DIR /
+// AUDIT_WEB_DIR at a checkout to audit them anywhere.
+const HAVE_SCOUT = fs.existsSync(SCOUT);
+const HAVE_WEB = fs.existsSync(WEB);
 
-let pass = 0, fail = 0, warn = 0;
+let pass = 0, fail = 0, warn = 0, skip = 0;
 const rows = [];
 function check(name, status, detail = "") {
-  if (status === "PASS") pass++; else if (status === "FAIL") fail++; else warn++;
+  if (status === "PASS") pass++;
+  else if (status === "FAIL") fail++;
+  else if (status === "SKIP") skip++;
+  else warn++;
   rows.push({ name, status, detail });
-  console.log(`  ${status === "PASS" ? "✓" : status === "FAIL" ? "✗" : "!"} ${name}${detail ? " — " + detail : ""}`);
+  console.log(`  ${status === "PASS" ? "✓" : status === "FAIL" ? "✗" : status === "SKIP" ? "–" : "!"} ${name}${detail ? " — " + detail : ""}`);
 }
 const readJson = (p) => {
   try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return null; }
@@ -36,14 +44,15 @@ async function main() {
   console.log("── 1. artifact inventory + vault identity across generations ──");
   const manifest = readJson(path.join(REPO, "deployed_addresses.json")) || {};
   const canonical = manifest.pro_yield_vault ? String(manifest.pro_yield_vault).toLowerCase() : null;
-  const artifacts = {
-    "repo/deployed_addresses.json": path.join(REPO, "deployed_addresses.json"),
-    "repo/data/vault_state.json": path.join(REPO, "data", "vault_state.json"),
-    "scout/data/vault_state.json": path.join(SCOUT, "vault_state.json"),
-    "web/public/vault_status.json": path.join(WEB, "public", "vault_status.json"),
-  };
+  const artifacts = [
+    ["repo/deployed_addresses.json", path.join(REPO, "deployed_addresses.json"), true],
+    ["repo/data/vault_state.json", path.join(REPO, "data", "vault_state.json"), true],
+    ["scout/data/vault_state.json", path.join(SCOUT, "vault_state.json"), HAVE_SCOUT],
+    ["web/public/vault_status.json", path.join(WEB, "public", "vault_status.json"), HAVE_WEB],
+  ];
   const vaults = {};
-  for (const [name, p] of Object.entries(artifacts)) {
+  for (const [name, p, rootPresent] of artifacts) {
+    if (!rootPresent) { check(`artifact present: ${name}`, "SKIP", "root not on this host (set AUDIT_*_DIR)"); continue; }
     const j = readJson(p);
     if (j == null) { check(`artifact present: ${name}`, "FAIL", `missing/unparsable: ${p}`); continue; }
     const v = j.pro_yield_vault || j.vault || j.vault_address || j.vaults?.[0]?.address || j.vaults?.[0]?.vault_address;
@@ -54,19 +63,22 @@ async function main() {
   const distinct = [...new Set(Object.values(vaults))];
   const divergent = Object.entries(vaults).filter(([, v]) => v !== canonical);
   check("vault address is single-valued across live artifacts",
-    divergent.length === 0 ? "PASS" : "FAIL",
-    divergent.length === 0
-      ? `all artifacts agree on ${short(canonical)}`
-      : `canonical(manifest)=${short(canonical)}; divergent: ${divergent.map(([n, v]) => `${n}=${short(v)}`).join(", ")}`);
+    Object.keys(vaults).length < 2 ? "SKIP" : divergent.length === 0 ? "PASS" : "FAIL",
+    Object.keys(vaults).length < 2
+      ? `only ${Object.keys(vaults).length} artifact(s) on this host — nothing to cross-check`
+      : divergent.length === 0
+        ? `all artifacts agree on ${short(canonical)}`
+        : `canonical(manifest)=${short(canonical)}; divergent: ${divergent.map(([n, v]) => `${n}=${short(v)}`).join(", ")}`);
 
   console.log("\n── 2. staleness / heartbeat of every operating loop ──");
   const loops = [
-    ["vault keeper state (repo)", path.join(REPO, "data", "vault_state.json"), ["ts", "timestamp", "updated"]],
-    ["vault keeper state (scout)", path.join(SCOUT, "vault_state.json"), ["ts", "timestamp", "updated"]],
-    ["scout snapshot (rates)", path.join(SCOUT, "snapshot.json"), ["generated_utc", "ts", "timestamp"]],
-    ["web feed (public)", path.join(WEB, "public", "vault_status.json"), ["ts", "timestamp", "generated_utc"]],
+    ["vault keeper state (repo)", path.join(REPO, "data", "vault_state.json"), ["ts", "timestamp", "updated"], true],
+    ["vault keeper state (scout)", path.join(SCOUT, "vault_state.json"), ["ts", "timestamp", "updated"], HAVE_SCOUT],
+    ["scout snapshot (rates)", path.join(SCOUT, "snapshot.json"), ["generated_utc", "ts", "timestamp"], HAVE_SCOUT],
+    ["web feed (public)", path.join(WEB, "public", "vault_status.json"), ["ts", "timestamp", "generated_utc"], HAVE_WEB],
   ];
-  for (const [name, p, ks] of loops) {
+  for (const [name, p, ks, rootPresent] of loops) {
+    if (!rootPresent) { check(`heartbeat: ${name}`, "SKIP", "root not on this host"); continue; }
     const j = readJson(p);
     if (j == null) { check(`heartbeat: ${name}`, "FAIL", "missing"); continue; }
     let ts = null;
@@ -100,14 +112,16 @@ async function main() {
       pct.boost + pct.treasury + pct.insurance === 100n ? "PASS" : "FAIL",
       `${pct.boost}/${pct.treasury}/${pct.insurance}`);
   } else {
-    check("recycle policy present", "FAIL", "no recycle_policy.json found");
+    check("recycle policy present", HAVE_SCOUT ? "FAIL" : "SKIP",
+      HAVE_SCOUT ? "no recycle_policy.json found" : "no scout root on this host");
   }
   const ledgerPath = path.join(SCOUT, "recycling.jsonl");
   let entries = [];
   try {
     entries = fs.readFileSync(ledgerPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   } catch { /* none yet */ }
-  check("recycling ledger parses", "PASS", `${entries.length} run(s)`);
+  check("recycling ledger parses", HAVE_SCOUT ? "PASS" : "SKIP",
+    HAVE_SCOUT ? `${entries.length} run(s)` : "no scout root on this host");
   // Ledger values are full-precision decimal strings (whole USDC units) —
   // scale to 18dp so the policy split can be verified to the wei.
   const dec = (v) => {
@@ -158,7 +172,8 @@ async function main() {
       /^[\d.]+$/.test(String(feed.sharePrice)) ? "PASS" : "WARN",
       /^[\d.]+$/.test(String(feed.sharePrice)) ? "plain numerics" : `"${feed.sharePrice}" carries a unit suffix`);
   } else {
-    check("web feed readable", "FAIL", "public/vault_status.json unreadable");
+    check("web feed readable", HAVE_WEB ? "FAIL" : "SKIP",
+      HAVE_WEB ? "public/vault_status.json unreadable" : "no web root on this host (set AUDIT_WEB_DIR)");
   }
 
   console.log("\n── 6. rate coherence: website vs scout ──");
@@ -172,8 +187,10 @@ async function main() {
   if (snap) scoutBlend = Number(snap.blend?.blend_apy ?? snap.blend_apy ?? NaN);
   const haveBoth = siteBlend != null && scoutBlend != null && !Number.isNaN(scoutBlend);
   check("website BLEND_TARGET matches the scout's live blend",
-    haveBoth && Math.abs(siteBlend - scoutBlend) <= 0.5 ? "PASS" : "FAIL",
-    haveBoth ? `site=${siteBlend}% scout=${scoutBlend}% Δ=${Math.abs(siteBlend - scoutBlend).toFixed(2)}pp` : "one side unreadable");
+    haveBoth ? (Math.abs(siteBlend - scoutBlend) <= 0.5 ? "PASS" : "FAIL")
+      : (!HAVE_SCOUT || !HAVE_WEB ? "SKIP" : "FAIL"),
+    haveBoth ? `site=${siteBlend}% scout=${scoutBlend}% Δ=${Math.abs(siteBlend - scoutBlend).toFixed(2)}pp`
+      : (!HAVE_SCOUT || !HAVE_WEB ? "site/scout roots not both on this host" : "one side unreadable"));
   if (snap?.tier_apys) {
     const tiers = Object.entries(snap.tier_apys).filter(([, v]) => typeof v === "number");
     check("scout publishes tier APYs (product rates)",
@@ -188,14 +205,15 @@ async function main() {
   const testLeaks = qlines.filter((l) => /test run — telegram silenced/.test(l));
   const real = qlines.filter((l) => !/test run — telegram silenced/.test(l));
   check("operator queue carries no test-generated alerts",
-    testLeaks.length === 0 ? "PASS" : "FAIL",
-    `${real.length} real + ${testLeaks.length} test-origin line(s)`);
+    !HAVE_SCOUT ? "SKIP" : testLeaks.length === 0 ? "PASS" : "FAIL",
+    !HAVE_SCOUT ? "no scout root on this host" : `${real.length} real + ${testLeaks.length} test-origin line(s)`);
   const pendingAge = qlines.length ? ageHours(qlines[qlines.length - 1].split(" ")[0]) : null;
   check("no undelivered alert older than 48h",
-    pendingAge == null || pendingAge <= 48 ? "PASS" : "WARN",
-    pendingAge == null ? "queue empty" : `oldest/last entry ${pendingAge.toFixed(1)}h old (delivery may be broken)`);
+    !HAVE_SCOUT ? "SKIP" : pendingAge == null || pendingAge <= 48 ? "PASS" : "WARN",
+    !HAVE_SCOUT ? "no scout root on this host"
+      : pendingAge == null ? "queue empty" : `oldest/last entry ${pendingAge.toFixed(1)}h old (delivery may be broken)`);
 
-  console.log(`\n══════ AUDIT: ${pass} passed, ${fail} failed, ${warn} warnings ══════`);
+  console.log(`\n══════ AUDIT: ${pass} passed, ${fail} failed, ${skip} skipped, ${warn} warnings ══════`);
   for (const r of rows.filter((x) => x.status !== "PASS")) {
     console.log(`  ${r.status}: ${r.name}${r.detail ? " — " + r.detail : ""}`);
   }

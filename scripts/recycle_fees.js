@@ -1,7 +1,9 @@
 
 // Fee recycling executor: splits USDC sitting in the FeeDistributor per policy
 // (depositor boost -> vault.creditYield, treasury, insurance) and records the
-// result. Policy file: /home/user/yield_scout/data/recycle_policy.json
+// result. Policy file defaults to /home/user/yield_scout/data/recycle_policy.json
+// (override with RECYCLE_POLICY; ledger with RECYCLE_LEDGER — the battery's
+// journey suite points both at scratch files so it runs on any host).
 //
 // Usage:  npx hardhat run scripts/recycle_fees.js --network hyperTestnet
 //         (add --no-apply via env DRY_RUN=1 for a dry run)
@@ -9,10 +11,17 @@ const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
-const POLICY_PATH = "/home/user/yield_scout/data/recycle_policy.json";
-const LEDGER_PATH = "/home/user/yield_scout/data/recycling.jsonl";
+const POLICY_PATH = process.env.RECYCLE_POLICY || "/home/user/yield_scout/data/recycle_policy.json";
+const LEDGER_PATH = process.env.RECYCLE_LEDGER || "/home/user/yield_scout/data/recycling.jsonl";
 
 async function main() {
+  // Chain guard FIRST — before any file read or contract binding. The recycler
+  // moves real USDC; nothing may run off HyperEVM testnet (998), ever.
+  const __net = await hre.ethers.provider.getNetwork();
+  if (Number(__net.chainId) !== 998) {
+    console.error(`REFUSING: chain ${__net.chainId} is not HyperEVM testnet (998) — never mainnet.`);
+    process.exit(3);
+  }
   const { HardhatEthersSigner } = require("@nomicfoundation/hardhat-ethers/signers");
   const origSend = HardhatEthersSigner.prototype.sendTransaction;
   HardhatEthersSigner.prototype.sendTransaction = async function (tx) {
@@ -36,13 +45,6 @@ async function main() {
   const vault = await hre.ethers.getContractAt("ProYieldVault", deployed.pro_yield_vault);
 
   const dryRun = process.env.DRY_RUN === "1";
-
-  // Chain guard — the recycler moves real USDC; refuse anything but 998.
-  const __net = await hre.ethers.provider.getNetwork();
-  if (Number(__net.chainId) !== 998) {
-    console.error(`REFUSING: chain ${__net.chainId} is not HyperEVM testnet (998) — never mainnet.`);
-    process.exit(3);
-  }
 
   // 1) reconcile FD accounting, then read the recyclable balance
   if (!dryRun) {

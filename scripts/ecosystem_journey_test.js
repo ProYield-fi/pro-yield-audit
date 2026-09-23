@@ -93,9 +93,19 @@ async function main() {
 
   // ═══ LEG 3 — recycle: the REAL production script against this chain ═══
   console.log("\n── leg 3: fee recycling (production script, cold-start) ──");
-  const ledgerPath = "/home/user/yield_scout/data/recycling.jsonl";
-  const ledgerBefore = fs.existsSync(ledgerPath)
-    ? fs.readFileSync(ledgerPath, "utf8").split("\n").filter(Boolean).length : 0;
+  // Hermetic: the journey supplies its own policy + ledger so it runs on any
+  // host (CI has no ~/yield_scout). The host's real ledger, when present, must
+  // still come out untouched — cold-start must never append to shared state.
+  const scratchDir = process.env.BATTERY_LOGS || os.tmpdir();
+  const policyPath = path.join(scratchDir, `journey_policy_${process.pid}.json`);
+  const scratchLedger = path.join(scratchDir, `journey_ledger_${process.pid}.jsonl`);
+  fs.writeFileSync(policyPath, JSON.stringify({
+    depositor_boost_pct: 60, treasury_pct: 20, insurance_pct: 20, min_amount: 1,
+  }, null, 2));
+  const countLines = (p) => (fs.existsSync(p)
+    ? fs.readFileSync(p, "utf8").split("\n").filter(Boolean).length : 0);
+  const sharedLedger = "/home/user/yield_scout/data/recycling.jsonl";
+  const sharedBefore = countLines(sharedLedger);
   const manifestPath = path.join(os.tmpdir(), `journey_manifest_${process.pid}.json`);
   fs.writeFileSync(manifestPath, JSON.stringify({
     mock_usdc: await addr(usdc),
@@ -118,6 +128,8 @@ async function main() {
       env: {
         ...process.env,
         DEPLOY_MANIFEST: manifestPath,
+        RECYCLE_POLICY: policyPath,
+        RECYCLE_LEDGER: scratchLedger,
         HYPEREVM_RPC_URL: `http://localhost:${process.env.BATTERY_PORT || 8547}`,
         DEPLOYER_PRIVATE_KEY: process.env.DEPLOYER_PRIVATE_KEY || "",
       },
@@ -141,16 +153,17 @@ async function main() {
   report("FD fully drained (nothing stranded)",
     (await usdc.balanceOf(await addr(fd))) === 0n,
     `fdBalance=${F(await usdc.balanceOf(await addr(fd)))}`);
-  const ledgerAfter = fs.existsSync(ledgerPath)
-    ? fs.readFileSync(ledgerPath, "utf8").split("\n").filter(Boolean).length : 0;
-  report("cold-start recycle does NOT write the shared ledger",
-    ledgerAfter === ledgerBefore, `lines ${ledgerBefore} -> ${ledgerAfter}`);
+  report("cold-start recycle writes NO ledger (scratch ledger stays empty)",
+    countLines(scratchLedger) === 0, `scratch lines=${countLines(scratchLedger)}`);
+  report("host recycling ledger untouched by the journey",
+    countLines(sharedLedger) === sharedBefore,
+    `shared lines ${sharedBefore} -> ${countLines(sharedLedger)}`);
 
   const sp2 = await vault.convertToAssets(U(1));
   report("depositors' share price rose from the boost (profit reached users)",
     sp2 > sp1, `price/share ${F(sp1)} -> ${F(sp2)}`);
 
-  try { fs.unlinkSync(manifestPath); } catch { /* best effort */ }
+  try { fs.unlinkSync(manifestPath); fs.unlinkSync(policyPath); fs.unlinkSync(scratchLedger); } catch { /* best effort */ }
 
   // ═══ LEG 4 — PYD demand: funder converts routed USDC → PYD → real stream ═══
   console.log("\n── leg 4: PYD demand (funder → swapper → staking stream) ──");
