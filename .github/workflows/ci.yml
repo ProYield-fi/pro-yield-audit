@@ -3,8 +3,12 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  # Main-only repo, direct pushes to main: those commits are the ones people
+  # actually run in production, so they must be validated automatically.
+  # (Previously only branches-ignore:[main] + manual workflow_dispatch, which
+  # silently skipped every main commit that wasn't manually dispatched.)
   push:
-    branches-ignore: [main]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
