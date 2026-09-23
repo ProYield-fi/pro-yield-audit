@@ -1,0 +1,24 @@
+# Foundry config — invariant/fuzz suite for the ProYield money path.
+# Tests live in test/forge/*.t.sol. The hardhat battery (scripts/run_battery.sh)
+# remains the integration layer; this suite adds stateful property fuzzing
+# (handlers + invariants) that a script-based suite cannot explore.
+#
+# NOTE: optimizer is ON here (vs hardhat's default off) — faster fuzz runs;
+# semantics are unchanged. Hardhat remains the deployment-accuracy build.
+[profile.default]
+src = "contracts"
+test = "test"
+out = "out"
+libs = ["node_modules", "lib"]
+solc = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+remappings = [
+    "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+    "forge-std/=lib/forge-std/src/",
+]
+
+[invariant]
+runs = 64
+depth = 200
+fail_on_revert = false

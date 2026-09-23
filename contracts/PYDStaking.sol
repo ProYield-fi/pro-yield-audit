@@ -49,8 +49,18 @@ contract PYDStaking is Ownable, ReentrancyGuard {
         // mutation. Without this, resetting lastUpdateTime below silently
         // ERASES all accrual since the last user interaction (found by the
         // mid-period top-up test: 33k PYD vanished).
-        rewardPerTokenStored = _rewardPerToken();
+        //
+        // ORDER MATTERS: _updatePeriod() FIRST — it banks the expired window's
+        // final stretch exactly once (and zeroes the old rate); the following
+        // _rewardPerToken() is then a no-op in that case, and only banks
+        // accrual-to-now for mid-period top-ups. The reversed order
+        // double-counted the whole tail of an expired window whenever
+        // fundRewards ran after a lapse with NO user interaction in between —
+        // rewards became claimable beyond the funded pool, eating staked
+        // principal (caught by the foundry invariant suite: fundRewards after
+        // lapse → balance < totalSupply).
         _updatePeriod();
+        rewardPerTokenStored = _rewardPerToken();
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / duration;
         } else {
