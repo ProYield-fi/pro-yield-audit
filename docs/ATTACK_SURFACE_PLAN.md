@@ -40,9 +40,15 @@ and features ship with their own audits:
 
 Target: **2 in-house contracts live + 1 strategy + external dependencies.**
 
-### Cut 2 — one venue, one adapter
-Lending-first mandate: the strategy surface stays at the audited lending market.
-No adapter farm. Adding a venue becomes a deliberate, budgeted, audited decision.
+### Cut 2 — two venues by explicit owner decision (was: one)
+Owner decision 2026-09-23: the launch set carries **both** the audited lending
+market **and** the delta-neutral sleeve. Cost, stated plainly: the DN sleeve is
+not one contract — it is `DeltaNeutralStrategy` + `DNCoreStrategy` + its
+`DNCoreAdapter` helper (3 contracts), so the launch set becomes
+Vault + FD + lending adapter + DN stack ≈ **5–6 in-house contracts** instead of 2.
+Still down from the 8-contract sandbox stack, every piece independently pausable.
+The discipline that survives: no further venues without a budgeted audit, and the
+DN sleeve is the last thing added, first thing unwound.
 
 ### Cut 3 — no new contracts for treasury/insurance (answers the insurance question)
 Insurance is a BACKUP PLAN: safety first, yield second. Therefore:
@@ -118,15 +124,26 @@ when the sleeve is funded (the "sleeve" line in Cut 1) — not as the vault.
 
 ## 7. Decisions
 
-- **(2) Insurance destination — DECIDED 2026-09-23: dedicated multisig.** Wired as
-  `policy.insurance` when the address exists; until then it remains the ops wallet
-  and the audit prints a standing WARN (`insurance destination is dedicated…`).
-  No new contract; accounting via the recycling ledger (recipient + tx hash/run).
+- **(2) Insurance destination — DECIDED + LIVE 2026-09-23: dedicated multisig.**
+  Safe v1.4.1 `0xFDF3269972DFe490E5c6DF3A0b9eeC6C3a272d88` on HyperEVM testnet,
+  **2-of-3** (owner EOA + ops signer + backup signer), created by
+  `scripts/create_insurance_multisig.js` (deploy tx `0xa7348266…`, 305,907 gas) and
+  verified on-chain by independent readback (VERSION 1.4.1 · threshold 2 · owners
+  match). Wired as `policy.insurance`; the audit check flipped to PASS. Key
+  handling: `~/.proyield/insurance_signer.json` (ops, 0600) and
+  `~/.proyield/insurance_backup_signer.json` — **move the backup key off this
+  machine, then delete the local file**; until that's done this box holds 2 of 3
+  keys = correct wiring, not yet distributed trust. No in-house contract added
+  (Safe is third-party, battle-tested code).
 - **(3) Ops chain — DECIDED 2026-09-23: HyperEVM testnet.** Executed: the manifest
   declares `chain 998` + RPC, vault/asset/strategy repointed to the testnet stack,
   the feed publishes real testnet numbers (`hyperevm-testnet (chain 998, verified)`),
   the sandbox stack moved under `manifest.sandbox`, and the audit verifies code on
   the DECLARED chain.
-- **(1) Launch set — still open:** confirm Vault + FeeDistributor + ONE venue, and
-  which venue (lending-first mandate points at the audited lending market; DN is
-  the alternative if the sleeve is funded at launch).
+- **(1) Launch set — DECIDED 2026-09-23 by owner: BOTH venues** (audited lending
+  market + delta-neutral sleeve), DN funded at launch, no cap beyond "unless it's a
+  huge amount". Sizing is not a fixed number: the keeper targets
+  `vault.totalAssets() × 15%` (scout weight; `DEFAULT_DN_WEIGHT=0.15`), gated by
+  Hyperliquid's **$10 minimum order** — the sleeve goes live from ~$67 TVL and
+  becomes meaningful (≥ ~$1k) around ~$6.7k TVL. Contract cost: the DN stack is 3
+  contracts (strategy + core + adapter) on top of the lending adapter.
