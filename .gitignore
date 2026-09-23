@@ -10,3 +10,9 @@ scripts/repro_open*.js
 scripts/repro_*.js
 __pycache__/
 *.pyc
+.battery_logs/
+.battery_manifest.json
+coverage/
+coverage.json
+mutation_campaign*/
+

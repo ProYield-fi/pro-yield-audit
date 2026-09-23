@@ -1,6 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 const fs = require("fs");
-const deployerKey = fs.readFileSync("/home/user/.hermes/vault_keys/hyperevm_testnet.deployer").toString().trim();
+const deployerKey = process.env.DEPLOYER_PRIVATE_KEY || fs.readFileSync("/home/user/.hermes/vault_keys/hyperevm_testnet.deployer").toString().trim();
 // Anvil well-known dev accounts (default mnemonic) — TESTNET ONLY.
 // Derived here so multi-user tests get real, funded signers.
 const { HDNodeWallet, Mnemonic } = require("ethers");

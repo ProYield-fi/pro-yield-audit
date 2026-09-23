@@ -92,9 +92,14 @@ if [ "$ready" != "1" ]; then
 fi
 
 # ── 4. Fund the deployer (signer[0]) — fresh anvil only funds its dev set ─
+# Key from env (CI) or the local key file (this box).
+DEPLOYER_KEY="${DEPLOYER_PRIVATE_KEY:-}"
 DEPLOYER_KEY_FILE="/home/user/.hermes/vault_keys/hyperevm_testnet.deployer"
-if [ -f "$DEPLOYER_KEY_FILE" ]; then
-  DEPLOYER="$("$CAST_BIN" wallet address --private-key "$(tr -d '\n' < "$DEPLOYER_KEY_FILE")" 2>/dev/null)"
+if [ -z "$DEPLOYER_KEY" ] && [ -f "$DEPLOYER_KEY_FILE" ]; then
+  DEPLOYER_KEY="$(tr -d '\n' < "$DEPLOYER_KEY_FILE")"
+fi
+if [ -n "$DEPLOYER_KEY" ]; then
+  DEPLOYER="$("$CAST_BIN" wallet address --private-key "$DEPLOYER_KEY" 2>/dev/null)"
   if [ -n "$DEPLOYER" ]; then
     rpc anvil_setBalance "$DEPLOYER" "0x3635C9ADC5DEA00000" > /dev/null   # 1000 ETH
     echo "· deployer funded: $DEPLOYER"

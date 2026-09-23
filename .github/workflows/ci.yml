@@ -5,41 +5,53 @@ on:
     branches: [main]
   push:
     branches-ignore: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  slither:
+  # The real gate: all 7 suites (integration 120, dn 28+26, pyd 19,
+  # keeper 8+6, unit 16) on a FRESH anvil chain, cold-start deploy included.
+  # Previously CI ran `npx hardhat test` against an empty test/ dir = 0 tests.
+  battery:
+    name: Contract battery (fresh chain)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Install deps
+        run: npm ci --no-audit --no-fund
+      - name: Run isolated battery
+        run: ./scripts/run_battery.sh --with-deploy
+        env:
+          # Well-known anvil dev key #9 — PUBLIC, testnet-only, funds nothing real.
+          DEPLOYER_PRIVATE_KEY: "0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6"
+
+  slither:
+    name: Slither (baseline-aware)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install deps
+        run: npm ci --no-audit --no-fund
+      - name: Compile contracts
+        run: npx hardhat compile
       - name: Install Slither
         run: pip install slither-analyzer
-      - name: Run Slither
-        run: slither . --exclude-informational --exclude-low --exclude-optimization
-
-  hardhat-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-      - run: npm ci
-      - name: Run Hardhat Tests
-        run: npx hardhat test
-
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-      - run: npm ci
-      - name: Compile Contracts and Type Check
-        run: npx hardhat compile
+      - name: Baseline-aware scan (alerts only on NEW findings)
+        run: python3 scripts/security_monitor.py --slither-only --quiet
