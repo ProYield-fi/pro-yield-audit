@@ -17,7 +17,7 @@ async function main() {
       if (tx.gasLimit == null) {
         try {
           const est = await hre.ethers.provider.estimateGas({ ...tx, from: this.address });
-          tx = { ...tx, gasLimit: (est * 3n) + 21000n };
+          tx = { ...tx, gasLimit: est + 21000n };
         } catch {
           tx = { ...tx, gasLimit: 1_000_000n };
         }

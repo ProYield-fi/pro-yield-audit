@@ -1,4 +1,8 @@
 require("@nomicfoundation/hardhat-toolbox");
+// Widens every gas estimate (anvil eth_estimateGas can under-report by a few
+// percent → sporadic OutOfGas reverts; see scripts/gas_guard.js). Must load
+// before any provider is created.
+require("./scripts/gas_guard.js");
 const fs = require("fs");
 // Anvil well-known dev accounts (default mnemonic) — TESTNET ONLY.
 // Derived here so multi-user tests get real, funded signers.
@@ -22,9 +26,11 @@ module.exports = {
       url: process.env.HYPEREVM_RPC_URL || "http://localhost:8545",
       chainId: 998,
       accounts: [deployerKey, ...anvilDevKeys],
-      // Estimation-vs-execution drift on the persistent anvil caused sporadic
-      // OOG reverts (gasLimit == gasUsed == estimate). 2x padding kills it.
-      gasMultiplier: 2,
+      // NOTE: `gasMultiplier` does NOT apply to http-type networks (hardhat
+      // only wires it into its in-process/local provider wrappers) — verified
+      // 2026-09-23 when a raw anvil estimate went out unmultiplied and OOG'd
+      // mid-execution. The margin now lives in scripts/gas_guard.js (3x,
+      // provider-level, covers every send and subprocess).
     },
   },
   paths: {
