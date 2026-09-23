@@ -32,7 +32,10 @@ async function main() {
   
   // Persist deployed addresses — single source of truth for keeper/insurance/monitor.
   // Every redeploy on a fresh chain mints new addresses; hardcoded ones go stale.
-  const ADDRESSES_PATH = process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.json");
+  // The repo manifest deployed_addresses.json belongs to the OPS chain (HyperEVM
+  // testnet — owner decision 2026-09-23). A bare local deploy must never clobber
+  // it: without an explicit DEPLOY_MANIFEST the sandbox manifest is written.
+  const ADDRESSES_PATH = process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.sandbox.json");
   const deployed = { deployed_utc: new Date().toISOString(), chain_id: 998, deployer: owner.address };
 
   // PYD token + fee infrastructure (fee loop: vault perf fee -> FD -> staking/insurance)
@@ -100,7 +103,7 @@ async function main() {
   
   // Persist BEFORE the tx sequence so a mid-run failure still leaves usable addresses
   fs.writeFileSync(ADDRESSES_PATH, JSON.stringify(deployed, null, 2));
-  console.log("Addresses saved to deployed_addresses.json");
+  console.log(`Addresses saved to ${path.basename(ADDRESSES_PATH)}`);
   
   // Add strategy
   const addTx = await vault.addStrategy(await delta.getAddress());

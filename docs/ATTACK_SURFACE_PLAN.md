@@ -80,8 +80,53 @@ Insurance is a BACKUP PLAN: safety first, yield second. Therefore:
 - Far fewer cross-contract approval/accounting edges to reason about.
 - Insurance stops being either an unaccounted slice or a new contract: it is a multisig + a ledger.
 
-## 6. Decisions requested
+## 6. Why the DN stack is a strategy, not part of ProYieldVault (asked 2026-09-23)
 
-1. Confirm the launch set = Vault + FD + one venue (and which venue).
-2. Confirm the insurance destination: dedicated multisig (recommended) vs the ops wallet (testnet placeholder).
-3. Confirm the ops chain going forward (testnet recommended; local = sandbox only).
+**1. EIP-170 makes it physically impossible (measured today).**
+Runtime bytecode: `ProYieldVault` 8,415 B · `DeltaNeutralStrategy` 6,680 B ·
+`DNCoreStrategy` 12,471 B · `DNCoreAdapter` 8,353 B (a helper the DN path already
+needs). Merged: 8,415 + 12,471 + 8,353 = **29,239 B vs the 24,576 B limit** — the
+deploy fails outright. The only ways to force it in (proxy, diamond, delegatecall
+libraries) *add* the admin/delegatecall surface this plan exists to remove; a
+diamond is more attack surface than three separate contracts, not less.
+
+**2. Failure isolation is the point of a strategy.**
+DN holds perp shorts on HyperCore. Pause/unwind/brick one strategy and the vault
+keeps operating — the vault's `setStrategyActive` circuit breaker plus the
+paused-strategy-not-swept invariant (mutation-tested) is exactly that mechanism.
+Embedded DN would make a HyperCore-side problem a vault problem, i.e. a depositor
+problem.
+
+**3. Valuation must not live in the core.**
+The vault's accounting is deliberately dumb: `totalAssets = idle + Σ strategy
+balances`. DN's value is the exchange rate of a leveraged basis position (perp
+marks, funding accrual, oracle). Mark-to-market math belongs as far from the
+share-minting core as possible.
+
+**4. Swappable without migration.**
+Strategies are added/removed by owner call; depositor funds never migrate. When
+funding flips (the keeper already has unwind alerts; the test suite forces −5%/yr
+to prove the unwind path), one strategy unwinds and the vault is untouched.
+
+**On "it brings the highest APY":** the ~11%/yr figure is the funding APR *on
+notional*. The productized DN tier is **5.74%** (scout `tier_apys`) — below fixed
+(9.73%) and satellite (10.67%), and the satellite tier is the unverified-protocol
+sleeve the advisor recommended cutting. Funding is also two-sided: it pays today,
+it can flip. So DN is neither the highest-yielding nor the lowest-complexity tier —
+it is the highest complexity per unit of yield. It ships as ONE audited strategy
+when the sleeve is funded (the "sleeve" line in Cut 1) — not as the vault.
+
+## 7. Decisions
+
+- **(2) Insurance destination — DECIDED 2026-09-23: dedicated multisig.** Wired as
+  `policy.insurance` when the address exists; until then it remains the ops wallet
+  and the audit prints a standing WARN (`insurance destination is dedicated…`).
+  No new contract; accounting via the recycling ledger (recipient + tx hash/run).
+- **(3) Ops chain — DECIDED 2026-09-23: HyperEVM testnet.** Executed: the manifest
+  declares `chain 998` + RPC, vault/asset/strategy repointed to the testnet stack,
+  the feed publishes real testnet numbers (`hyperevm-testnet (chain 998, verified)`),
+  the sandbox stack moved under `manifest.sandbox`, and the audit verifies code on
+  the DECLARED chain.
+- **(1) Launch set — still open:** confirm Vault + FeeDistributor + ONE venue, and
+  which venue (lending-first mandate points at the audited lending market; DN is
+  the alternative if the sleeve is funded at launch).

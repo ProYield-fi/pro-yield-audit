@@ -1,13 +1,37 @@
 {
-  "deployed_utc": "2026-09-20T11:54:26.204Z",
-  "chain_id": 998,
+  "chain": {
+    "id": 998,
+    "name": "hyperevm-testnet",
+    "rpc": "https://rpc.hyperliquid-testnet.xyz/evm"
+  },
+  "deployed_utc": "2026-09-23T14:30:00Z",
   "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
-  "pyd_token": "0xBf268e5a691bb2338231A2154edb54A489Cf8Cba",
-  "fee_distributor": "0x874d5171A6E2F681511e7328A13De563158962ce",
-  "pyd_staking": "0x588fD88bDF75ae734a56DF10512eDE1b40257c6f",
-  "mock_usdc": "0xdaeD65B9943BDc34bca78AE223A24c572453D87E",
-  "pro_yield_vault": "0xa3f4338B5E8Ea90219AEB0d23e81bA89E6836e11",
-  "delta_neutral": "0x90a3C8d47aEDb1A47d9B6FB5aed5939A2fA8e360",
-  "funding_oracle": "0x5eB922e49bfd2a3A9969a396081503C69212DDab",
-  "funding_source": "0xd004CF582F0bf5a70F9b56a71F4912C5A0F4c1C9"
+  "pro_yield_vault": "0x42237e98aD8918401F898cb453ef714B64e5B3Bf",
+  "vault_asset": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+  "mock_usdc": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+  "delta_neutral": "0xB59226930edeF5bAFA8E802B03AEd03feA726DE2",
+  "fee_distributor": null,
+  "pyd_token": null,
+  "pyd_staking": null,
+  "funding_oracle": null,
+  "funding_source": null,
+  "_notes": {
+    "chain": "Ops chain = HyperEVM testnet (owner decision 2026-09-23: beyond the sandbox phase). Producers must name this RPC explicitly; implicit-RPC runs are refused by the money-movers.",
+    "mock_usdc": "LEGACY KEY NAME — this is the vault's underlying asset (testnet USDC, 6dp, 0x8954a73B…). vault_asset is the honest alias; both point at the same token.",
+    "nulls": "fee_distributor / pyd_* / funding_* are NOT deployed on the testnet yet (launch set = vault + fee distributor + one strategy). The audit reports them as PENDING, never as drift.",
+    "sandbox": "The old local anvil (:8545, chain-id spoofed 998) stack moved under sandbox — dev-only, never a source of published numbers."
+  },
+  "sandbox": {
+    "chain_id": 998,
+    "deployed_utc": "2026-09-20T11:54:26.204Z",
+    "note": "local anvil :8545 — sandbox only",
+    "mock_usdc": "0xdaeD65B9943BDc34bca78AE223A24c572453D87E",
+    "pro_yield_vault": "0xa3f4338B5E8Ea90219AEB0d23e81bA89E6836e11",
+    "fee_distributor": "0x874d5171A6E2F681511e7328A13De563158962ce",
+    "pyd_token": "0xBf268e5a691bb2338231A2154edb54A489Cf8Cba",
+    "pyd_staking": "0x588fD88bDF75ae734a56DF10512eDE1b40257c6f",
+    "delta_neutral": "0x90a3C8d47aEDb1A47d9B6FB5aed5939A2fA8e360",
+    "funding_oracle": "0x5eB922e49bfd2a3A9969a396081503C69212DDab",
+    "funding_source": "0xd004CF582F0bf5a70F9b56a71F4912C5A0F4c1C9"
+  }
 }

@@ -47,7 +47,10 @@ async function main() {
   const canonical = manifest.pro_yield_vault ? String(manifest.pro_yield_vault).toLowerCase() : null;
   const artifacts = [
     ["repo/deployed_addresses.json", path.join(REPO, "deployed_addresses.json"), true],
-    ["repo/data/vault_state.json", path.join(REPO, "data", "vault_state.json"), true],
+    // NOTE: repo/data/vault_state.json was a producer-less fossil from the
+    // sandbox era (it labelled local-chain numbers "HyperEVM testnet" and no
+    // script writes it). Removed 2026-09-23 — ops state lives in the scout tree,
+    // written by the keeper.
     ["scout/data/vault_state.json", path.join(SCOUT, "vault_state.json"), HAVE_SCOUT],
     ["web/public/vault_status.json", path.join(WEB, "public", "vault_status.json"), HAVE_WEB],
   ];
@@ -73,7 +76,6 @@ async function main() {
 
   console.log("\n── 2. staleness / heartbeat of every operating loop ──");
   const loops = [
-    ["vault keeper state (repo)", path.join(REPO, "data", "vault_state.json"), ["ts", "timestamp", "updated"], true],
     ["vault keeper state (scout)", path.join(SCOUT, "vault_state.json"), ["ts", "timestamp", "updated"], HAVE_SCOUT],
     ["scout snapshot (rates)", path.join(SCOUT, "snapshot.json"), ["generated_utc", "ts", "timestamp"], HAVE_SCOUT],
     ["web feed (public)", path.join(WEB, "public", "vault_status.json"), ["ts", "timestamp", "generated_utc"], HAVE_WEB],
@@ -91,12 +93,27 @@ async function main() {
   }
 
   console.log("\n── 3. deploy manifest completeness ──");
-  const required = ["mock_usdc", "fee_distributor", "pro_yield_vault"];
-  const missing = required.filter((k) => !manifest[k] || /^0x0+$/.test(String(manifest[k])));
-  check("manifest has the core contract set (non-zero)",
+  // The manifest declares what EXISTS on ITS chain: `chain.id`/`chain.rpc` name
+  // the ops chain, `null` marks a contract that is deliberately not deployed
+  // there yet (launch set = vault + fee distributor + one strategy), and
+  // `sandbox` holds the old local-anvil stack. Checked against that shape.
+  const declared = manifest.chain || null;
+  check("manifest declares its chain (id + rpc)",
+    declared?.id ? "PASS" : "WARN",
+    declared?.id ? `${declared.name || "?"} · chain ${declared.id} — ${declared.rpc ? "rpc named" : "NO RPC"}`
+                 : "no chain block — producers cannot verify what they read");
+  const core = ["pro_yield_vault", "vault_asset"];
+  const missing = core.filter((k) => !manifest[k] || /^0x0+$/.test(String(manifest[k])));
+  check("manifest has the core set for its chain (non-zero)",
     missing.length === 0 ? "PASS" : "FAIL",
-    missing.length ? `missing/zero: ${missing.join(", ")}` : `${Object.keys(manifest).length} keys`);
-  const zeroKeys = Object.entries(manifest).filter(([, v]) => /^0x0+$/.test(String(v))).map(([k]) => k);
+    missing.length ? `missing/zero: ${missing.join(", ")}` : `vault + asset named (${Object.keys(manifest).length} keys)`);
+  const pending = ["fee_distributor", "pyd_token", "pyd_staking", "funding_oracle", "funding_source"]
+    .filter((k) => manifest[k] == null);
+  if (pending.length) {
+    check("manifest marks not-yet-deployed contracts explicitly (null, not stale)", "PASS",
+      `pending on this chain: ${pending.join(", ")}`);
+  }
+  const zeroKeys = Object.entries(manifest).filter(([, v]) => typeof v === "string" && /^0x0+$/.test(v)).map(([k]) => k);
   check("no zero-address entries in manifest", zeroKeys.length === 0 ? "PASS" : "WARN",
     zeroKeys.length ? zeroKeys.join(", ") : "clean");
 
@@ -157,8 +174,10 @@ async function main() {
       "vault address (0x…)": /^0x[0-9a-fA-F]{40}$/.test(String(feed.vault || "")),
       "sharePrice field": feed.sharePrice != null,
       "totalAssets field": feed.totalAssets != null,
+      // `last` is present-but-null until the first recycle on this chain — the
+      // reader renders "never", so presence is the contract, not non-null.
       "recycling{total,runs,last}": !!feed.recycling && feed.recycling.total != null &&
-        feed.recycling.runs != null && feed.recycling.last != null,
+        feed.recycling.runs != null && "last" in feed.recycling,
       "ts field": !!feed.ts,
     };
     const badShape = Object.entries(shape).filter(([, ok]) => !ok).map(([k]) => k);
@@ -244,26 +263,42 @@ async function main() {
   const TESTNET_RPC = "https://rpc.hyperliquid-testnet.xyz/evm";
   const LOCAL_RPC = "http://localhost:8545";
   const readIf = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return ""; } };
+  const DECLARED_RPC = declared?.rpc || null;
 
-  const t = await rpcProbe(TESTNET_RPC);
-  check("canonical testnet RPC answers as chain 998",
-    t.ok ? (t.chainId === 998 ? "PASS" : "FAIL") : "SKIP",
-    t.ok ? `chainId=${t.chainId}` : `unreachable (${t.err})`);
-
-  const local = await rpcProbe(LOCAL_RPC);
-  if (local.ok && local.chainId === 998) {
-    const c = await rpcCode(LOCAL_RPC, canonical || "");
-    check("manifest vault has code on the chain the ops actually read (local anvil)",
-      c.ok ? (c.hasCode ? "PASS" : "FAIL") : "SKIP",
-      c.ok ? (c.hasCode ? `${short(canonical)} deployed there` : "NO CODE — stale manifest / wrong chain")
-           : `probe failed (${c.err})`);
-    check("local anvil spoofs chain-id 998 (chain-id alone cannot detect it)",
-      "WARN", "localhost:8545 reports 998 — artifacts must pin the RPC, never trust the id");
+  // 8a) the chain this manifest SWEARS it is on must answer as declared.
+  const d = DECLARED_RPC ? await rpcProbe(DECLARED_RPC) : null;
+  if (DECLARED_RPC) {
+    check("declared chain RPC answers as declared",
+      d.ok ? (Number(declared.id) === d.chainId ? "PASS" : "FAIL") : "SKIP",
+      d.ok ? `chainId=${d.chainId}${Number(declared.id) === d.chainId ? " = declared" : ` ≠ declared ${declared.id}`}`
+           : `unreachable (${d.err})`);
   } else {
-    check("manifest vault code on the ops chain", "SKIP",
-      local.ok ? `localhost:8545 answered chain ${local.chainId}` : "no local chain on this host");
+    check("declared chain RPC answers as declared", "WARN", "manifest declares no rpc");
   }
 
+  // 8b) the manifest's vault must have code on the DECLARED chain — not merely
+  // on some chain that happens to report the same id.
+  if (d?.ok) {
+    const c = await rpcCode(DECLARED_RPC, canonical || "");
+    check("manifest vault has code on its declared chain",
+      c.ok ? (c.hasCode ? "PASS" : "FAIL") : "SKIP",
+      c.ok ? (c.hasCode ? `${short(canonical)} deployed on chain ${d.chainId}`
+                        : `NO CODE at ${short(canonical)} — stale manifest or wrong chain`)
+           : `probe failed (${c.err})`);
+  } else {
+    check("manifest vault code on its declared chain", "SKIP",
+      DECLARED_RPC ? "declared RPC unreachable" : "no chain declared in manifest");
+  }
+
+  // 8c) the local sandbox may still exist — informational; it is not an ops chain.
+  const local = await rpcProbe(LOCAL_RPC);
+  check("sandbox chain present (informational — not an ops chain)",
+    local.ok && local.chainId === 998 ? "PASS" : "SKIP",
+    local.ok ? `localhost:8545 answers ${local.chainId} (id is spoofable — producers pin the RPC, never trust the id)`
+             : "no local chain on this host");
+
+  // 8d) the keeper's vault on the canonical testnet (the money loop's target).
+  const t = await rpcProbe(TESTNET_RPC);
   if (t.ok) {
     const c2 = await rpcCode(TESTNET_RPC, "0x42237e98aD8918401F898cb453ef714B64e5B3Bf");
     check("keeper's vault has code on the real testnet",
@@ -273,13 +308,20 @@ async function main() {
     check("keeper's vault code on the real testnet", "SKIP", "testnet RPC unreachable");
   }
 
-  // Chain map for every vault generation found: which chain does each live on?
-  if ((t.ok || local.ok) && (distinct.length || canonical)) {
+  // 8e) chain map for every vault generation found: which chain has its code?
+  const probes = [
+    ["declared", d?.ok ? DECLARED_RPC : null],
+    ["sandbox", local.ok ? LOCAL_RPC : null],
+  ].filter(([, u]) => u);
+  if (probes.length && (distinct.length || canonical)) {
     const map = [];
     for (const v of (distinct.length ? distinct : [canonical])) {
-      const onT = t.ok ? await rpcCode(TESTNET_RPC, v) : { ok: false };
-      const onL = local.ok ? await rpcCode(LOCAL_RPC, v) : { ok: false };
-      map.push(`${short(v)} testnet=${onT.ok ? (onT.hasCode ? "✓" : "—") : "?"} local=${onL.ok ? (onL.hasCode ? "✓" : "—") : "?"}`);
+      const cells = [];
+      for (const [label, url] of probes) {
+        const c = await rpcCode(url, v);
+        cells.push(`${label}=${c.ok ? (c.hasCode ? "✓" : "—") : "?"}`);
+      }
+      map.push(`${short(v)} ${cells.join(" ")}`);
     }
     check("vault chain map (where each generation actually lives)", "PASS", map.join(" | "));
   }
@@ -308,6 +350,22 @@ async function main() {
       hasTrace ? "PASS" : "WARN",
       hasTrace ? `last run names recipients + ${Object.keys(lastEntry.txs || {}).length} tx(s)`
                : "last entry predates the traceability fix — next recycle will carry recipients+txs");
+  }
+
+  // Insurance destination: the slice must not land in the operator wallet (it did
+  // for every run so far because policy.insurance was null; owner decision
+  // 2026-09-23 = dedicated multisig, wired when the address exists).
+  const policyIns = HAVE_SCOUT ? readJson(path.join(SCOUT, "recycle_policy.json")) : null;
+  if (policyIns) {
+    const dest = policyIns.insurance ? String(policyIns.insurance).toLowerCase() : null;
+    const op = manifest.deployer ? String(manifest.deployer).toLowerCase() : null;
+    check("insurance destination is dedicated (not the operator EOA)",
+      !dest ? "FAIL" : op && dest === op ? "WARN" : "PASS",
+      !dest ? "policy has no insurance address — slices would default to the signer"
+            : dest === op ? `${short(dest)} is the operator EOA — replace with the dedicated multisig (owner decision 2026-09-23)`
+            : `${short(dest)} dedicated`);
+  } else {
+    check("insurance destination is dedicated (not the operator EOA)", "SKIP", "no scout root on this host");
   }
 
   console.log(`\n══════ AUDIT: ${pass} passed, ${fail} failed, ${skip} skipped, ${warn} warnings ══════`);

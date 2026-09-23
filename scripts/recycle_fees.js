@@ -46,7 +46,15 @@ async function main() {
     return origSend.call(this, tx);
   };
 
-  const deployed = JSON.parse(fs.readFileSync(process.env.DEPLOY_MANIFEST || process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.json"), "utf8"));
+  const deployed = JSON.parse(fs.readFileSync(process.env.DEPLOY_MANIFEST || path.join(__dirname, "..", "deployed_addresses.json"), "utf8"));
+  // A manifest that declares no fee loop for THIS chain (nulls = deliberately
+  // not deployed yet, e.g. the testnet launch set) has nothing to recycle —
+  // refuse clearly instead of binding to a null address.
+  const need = ["fee_distributor", "pro_yield_vault", "mock_usdc"].filter((k) => !deployed[k]);
+  if (need.length) {
+    console.error(`REFUSING: manifest declares no ${need.join(", ")} — nothing to recycle on this chain.`);
+    process.exit(3);
+  }
   const policy = JSON.parse(fs.readFileSync(POLICY_PATH, "utf8"));
   const [owner] = await hre.ethers.getSigners();
 

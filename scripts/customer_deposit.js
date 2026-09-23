@@ -26,6 +26,13 @@ async function main() {
   }
  // separate wallet = "customer"
 
+  // Sandbox tool: it MINTS test USDC, which only exists on the local anvil stack.
+  // With a manifest that declares a real chain, refuse — against the testnet's
+  // 6dp USDC this would otherwise revert confusingly.
+  if (deployed.chain) {
+    console.error("REFUSING: customer_deposit is a sandbox tool (minting test USDC) — the manifest targets a real chain.");
+    process.exit(3);
+  }
   const usdc = await hre.ethers.getContractAt("MockUSDC", deployed.mock_usdc);
   const vault = await hre.ethers.getContractAt("ProYieldVault", deployed.pro_yield_vault);
 
