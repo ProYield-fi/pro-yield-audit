@@ -136,6 +136,7 @@ unswept yield) and fee deltas, plus the share-price floor.
 | `scripts/dn_adapter_tests.js` | Byte-exact CoreWriter encodings + all gates | 26/26 |
 | `scripts/dn_realread_check.js` | Read layer vs LIVE mainnet precompiles (read-only, manual) | 15/15 |
 | `scripts/dn_realread_replay.js` | Read-layer decoders (JS + real Solidity structs) vs FROZEN real mainnet bytes at block 46644202 — offline, in the battery + CI (`dn_realread_capture.js` refreshes the fixture) | 13/13 |
+| `scripts/web_smoke.sh` + `pro-yield-web/web-smoke-local.mjs` | Web-app data path vs local chain: `vault_status.json` → rendered `/account` + `/transparency` (marker + TVL + share price + no console/page/request errors), with a real customer deposit→withdraw round-trip visibly updating the UI | PASS ($100k → $105k → $100k) |
 | `scripts/dn_keeper_dryrun_test.js` | Keeper sizing policy end-to-end (subprocess) | 8/8 |
 | `scripts/dn_keeper_unwind_test.js` | Keeper unwind policy end-to-end (subprocess) | 6/6 |
 | `scripts/pyd_demand_tests.js` | PYD demand layer: discount tiers/accrual/claims + funder conversion → real staking stream | 19/19 |
