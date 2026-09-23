@@ -32,6 +32,23 @@ tvls() { python3 -c 'import json,sys; print(json.loads([l for l in sys.stdin if 
 [ -f "$DEPLOY_MANIFEST" ] || { echo "manifest missing: $DEPLOY_MANIFEST (run the battery with --with-deploy --keep first)"; exit 1; }
 cast chain-id --rpc-url "$RPC" >/dev/null || { echo "no chain at $RPC"; exit 1; }
 
+# The smoke publishes LOCAL numbers into the app's public/ + dist/ feed (that IS
+# the path under test). The live feed must survive the test: back it up here and
+# restore on exit, pass or fail (same rule as test alerts never reaching Telegram).
+FEED_FILES=("$WEB/public/vault_status.json" "$WEB/dist/vault_status.json")
+BACKUP_DIR=$(mktemp -d)
+for f in "${FEED_FILES[@]}"; do
+  [ -f "$f" ] && cp "$f" "$BACKUP_DIR/$(echo "$f" | tr '/' '_')"
+done
+restore_feed() {
+  for f in "${FEED_FILES[@]}"; do
+    b="$BACKUP_DIR/$(echo "$f" | tr '/' '_')"
+    if [ -f "$b" ]; then cp "$b" "$f"; echo "   feed restored: $f"; fi
+  done
+  rm -rf "$BACKUP_DIR"
+}
+trap restore_feed EXIT
+
 # The battery's adversarial/drain suites spend dev-account balances — refill the
 # customer signer (hardhat accounts[3] = anvil well-known dev key #2) for gas.
 CUSTOMER=0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
