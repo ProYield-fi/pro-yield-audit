@@ -96,6 +96,12 @@ containment, one broken strategy never bricks harvest).
 `invariant_stake_sum_to_total`, plus tier boundaries, budget-capped claims,
 zero-share/below-tier stakers, no accrual past the window, mid-period top-up,
 and the rollover regression above.
+`Vault.differential.t.sol` — an independent integer model (written from the
+spec, no vault code) runs the same randomized op sequence as the contract
+(deposit/withdraw/yield/harvest/recycle/warp; 1200 deterministic ops + fuzzed
+seeds) and asserts EXACT equality after every op: totalAssets, totalShares,
+per-user shares, cash conservation (vault + strategies == modeled assets +
+unswept yield) and fee deltas, plus the share-price floor.
 
 ## 4. Threat model highlights
 
@@ -133,7 +139,7 @@ and the rollover regression above.
 | `scripts/dn_keeper_unwind_test.js` | Keeper unwind policy end-to-end (subprocess) | 6/6 |
 | `scripts/pyd_demand_tests.js` | PYD demand layer: discount tiers/accrual/claims + funder conversion → real staking stream | 19/19 |
 | `scripts/test_all.js` | Unit suite | 16/16 |
-| `forge test` (`test/forge/*.t.sol`) | Stateful invariants + adversarial/edge cases (mapping in §3) | 21 tests + 10 invariants |
+| `forge test` (`test/forge/*.t.sol`) | Stateful invariants + adversarial/edge cases (mapping in §3) + independent-model differential sim (1200 ops, exact-equality after every op) | 23 tests + 10 invariants |
 | Slither (vs `security_baseline.json`) | 0 critical, no NEW findings (22 accepted, each justified) | clean |
 | CI (`.github/workflows/ci.yml`) | battery + slither + forge on a fresh runner, every push/PR | green |
 | `slither-mutate` (RR,ROR,LOR,AOR,UOR,LIR,SBR,ASOR) | Mutation kill-rate on core contracts — tests must KILL injected bugs | running |
