@@ -10,6 +10,7 @@
   "vault_asset": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
   "mock_usdc": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
   "delta_neutral": "0xB59226930edeF5bAFA8E802B03AEd03feA726DE2",
+  "vault_fee_collector": "0xA6c93FeD858b636eE1D5d354C7BC00506Ff7898d",
   "fee_distributor": null,
   "pyd_token": null,
   "pyd_staking": null,
