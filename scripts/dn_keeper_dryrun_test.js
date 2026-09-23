@@ -105,7 +105,7 @@ async function main() {
   // ── Run the keeper DRY-RUN against this state ──
   console.log("\n── keeper dry-run (subprocess) ──");
   const out = execSync(
-    `DN_STRATEGY=${sAddr} npx hardhat run scripts/dn_keeper.js --network hyperTestnet`,
+    `DN_STRATEGY=${sAddr} DN_SILENCE_TELEGRAM=1 DN_ALERT_LOG=/tmp/dn_dryrun_alerts.log npx hardhat run scripts/dn_keeper.js --network hyperTestnet`,
     { cwd: process.cwd(), encoding: "utf8", timeout: 120000, stdio: ["pipe", "pipe", "pipe"] }
   );
   console.log(out);

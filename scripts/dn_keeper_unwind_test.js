@@ -109,7 +109,7 @@ async function main() {
   let exitCode = 0;
   try {
     out = execSync(
-      `DN_STRATEGY=${sAddr} DN_FORCE_APR=-5.0 DN_EXECUTE=1 npx hardhat run scripts/dn_keeper.js --network hyperTestnet`,
+      `DN_STRATEGY=${sAddr} DN_FORCE_APR=-5.0 DN_EXECUTE=1 DN_SILENCE_TELEGRAM=1 DN_ALERT_LOG=/tmp/dn_unwind_alerts.log npx hardhat run scripts/dn_keeper.js --network hyperTestnet`,
       { cwd: process.cwd(), encoding: "utf8", timeout: 180000, stdio: ["pipe", "pipe", "pipe"] }
     );
   } catch (e) {

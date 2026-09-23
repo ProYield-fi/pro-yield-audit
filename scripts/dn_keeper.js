@@ -51,6 +51,15 @@ const CONFIG = {
 async function sendAlert(title, body) {
   const line = `[dn-keeper] ${title} — ${body}`;
   console.log(line);
+  const QLOG = process.env.DN_ALERT_LOG || "/home/user/yield_scout/data/pending_notifications.log";
+  // Test runs (DN_SILENCE_TELEGRAM=1) must never touch the real alert channel:
+  // the unwind/dryrun suites intentionally provoke alerts, and every battery
+  // run (and every mutation-campaign mutant) would otherwise spam Telegram +
+  // the operator queue with fake red MISMATCH messages.
+  if (process.env.DN_SILENCE_TELEGRAM === "1") {
+    try { require("fs").appendFileSync(QLOG, `${new Date().toISOString()} ${line} (test run — telegram silenced)\n`); } catch { /* best effort */ }
+    return;
+  }
   try {
     const fs2 = require("fs");
     let tok, chat;
@@ -72,7 +81,7 @@ async function sendAlert(title, body) {
       tok = vals.TELEGRAM_BOT_TOKEN; chat = vals.TELEGRAM_HOME_CHANNEL || vals.TELEGRAM_CHAT_ID;
     }
     if (!tok || !chat) {
-      fs2.appendFileSync("/home/user/yield_scout/data/pending_notifications.log",
+      fs2.appendFileSync(QLOG,
         `${new Date().toISOString()} ${line}\n`);
       return;
     }
@@ -84,7 +93,7 @@ async function sendAlert(title, body) {
     if (!res.ok) throw new Error(`telegram ${res.status}`);
   } catch (e) {
     try {
-      require("fs").appendFileSync("/home/user/yield_scout/data/pending_notifications.log",
+      require("fs").appendFileSync(QLOG,
         `${new Date().toISOString()} ${line} (send failed: ${e.message})\n`);
     } catch { /* nothing more we can do */ }
   }
