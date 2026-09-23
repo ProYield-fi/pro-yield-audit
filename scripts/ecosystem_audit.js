@@ -5,7 +5,8 @@
 // website's rates match the scout's live rates, and every scheduled loop has a
 // fresh heartbeat. Answers "is everything the way it should be?" in one run.
 //
-// Exit 0 iff no FAIL (WARNs are informational). No chain access needed.
+// Exit 0 iff no FAIL (WARNs are informational). Chain probes are used for
+// identity checks and SKIP when unreachable.
 const fs = require("fs");
 const path = require("path");
 
@@ -212,6 +213,102 @@ async function main() {
     !HAVE_SCOUT ? "SKIP" : pendingAge == null || pendingAge <= 48 ? "PASS" : "WARN",
     !HAVE_SCOUT ? "no scout root on this host"
       : pendingAge == null ? "queue empty" : `oldest/last entry ${pendingAge.toFixed(1)}h old (delivery may be broken)`);
+
+  console.log("\n── 8. chain identity (claimed vs actually read) ──");
+  // The class this catches: an artifact that LABELS a read "on-chain" while
+  // hardhat silently serves a local chain that spoofs chain-id 998 — that is how
+  // every fee recycling (and the insurance slice) ended up on a dev chain.
+  const rpcProbe = async (url, timeoutMs = 4000) => {
+    try {
+      const res = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const j = await res.json();
+      return { ok: true, chainId: Number(BigInt(j.result)) };
+    } catch (e) { return { ok: false, err: String(e.message || e).slice(0, 60) }; }
+  };
+  const rpcCode = async (url, addr, timeoutMs = 4000) => {
+    try {
+      const res = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getCode", params: [addr, "latest"] }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const j = await res.json();
+      return { ok: true, hasCode: !!j.result && j.result !== "0x" };
+    } catch (e) { return { ok: false, err: String(e.message || e).slice(0, 60) }; }
+  };
+
+  const TESTNET_RPC = "https://rpc.hyperliquid-testnet.xyz/evm";
+  const LOCAL_RPC = "http://localhost:8545";
+  const readIf = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return ""; } };
+
+  const t = await rpcProbe(TESTNET_RPC);
+  check("canonical testnet RPC answers as chain 998",
+    t.ok ? (t.chainId === 998 ? "PASS" : "FAIL") : "SKIP",
+    t.ok ? `chainId=${t.chainId}` : `unreachable (${t.err})`);
+
+  const local = await rpcProbe(LOCAL_RPC);
+  if (local.ok && local.chainId === 998) {
+    const c = await rpcCode(LOCAL_RPC, canonical || "");
+    check("manifest vault has code on the chain the ops actually read (local anvil)",
+      c.ok ? (c.hasCode ? "PASS" : "FAIL") : "SKIP",
+      c.ok ? (c.hasCode ? `${short(canonical)} deployed there` : "NO CODE — stale manifest / wrong chain")
+           : `probe failed (${c.err})`);
+    check("local anvil spoofs chain-id 998 (chain-id alone cannot detect it)",
+      "WARN", "localhost:8545 reports 998 — artifacts must pin the RPC, never trust the id");
+  } else {
+    check("manifest vault code on the ops chain", "SKIP",
+      local.ok ? `localhost:8545 answered chain ${local.chainId}` : "no local chain on this host");
+  }
+
+  if (t.ok) {
+    const c2 = await rpcCode(TESTNET_RPC, "0x42237e98aD8918401F898cb453ef714B64e5B3Bf");
+    check("keeper's vault has code on the real testnet",
+      c2.ok ? (c2.hasCode ? "PASS" : "FAIL") : "SKIP",
+      c2.ok ? (c2.hasCode ? "0x42237e98… deployed" : "NO CODE") : `probe failed (${c2.err})`);
+  } else {
+    check("keeper's vault code on the real testnet", "SKIP", "testnet RPC unreachable");
+  }
+
+  // Chain map for every vault generation found: which chain does each live on?
+  if ((t.ok || local.ok) && (distinct.length || canonical)) {
+    const map = [];
+    for (const v of (distinct.length ? distinct : [canonical])) {
+      const onT = t.ok ? await rpcCode(TESTNET_RPC, v) : { ok: false };
+      const onL = local.ok ? await rpcCode(LOCAL_RPC, v) : { ok: false };
+      map.push(`${short(v)} testnet=${onT.ok ? (onT.hasCode ? "✓" : "—") : "?"} local=${onL.ok ? (onL.hasCode ? "✓" : "—") : "?"}`);
+    }
+    check("vault chain map (where each generation actually lives)", "PASS", map.join(" | "));
+  }
+
+  // Static (behavioural coverage lives in chainid_guard_test.js).
+  const recyclerSrc = readIf(path.join(REPO, "scripts", "recycle_fees.js"));
+  check("recycler source refuses an implicit RPC (defence in depth)",
+    /REFUSING: HYPEREVM_RPC_URL is not set/.test(recyclerSrc) ? "PASS" : "FAIL",
+    /REFUSING: HYPEREVM_RPC_URL is not set/.test(recyclerSrc) ? "guard present" : "guard missing");
+  const insSrc = readIf(path.join(HOME, "yield_scout", "insurance_fund.py"));
+  if (insSrc) {
+    check("insurance module pins its RPC + verifies the chain",
+      /rpc\.hyperliquid-testnet\.xyz/.test(insSrc) && /def verify_chain/.test(insSrc) ? "PASS" : "FAIL",
+      /def verify_chain/.test(insSrc) ? "pinned + chain-verified" : "missing pin/verification");
+    check("insurance reserves come from the recycling ledger (not a hardcoded stub)",
+      /read_ledger_insurance/.test(insSrc) ? "PASS" : "FAIL",
+      /read_ledger_insurance/.test(insSrc) ? "ledger-sourced" : "still a stub");
+  } else {
+    check("insurance module chain pinning", "SKIP", "yield_scout not on this host");
+  }
+
+  if (entries.length) {
+    const lastEntry = entries[entries.length - 1];
+    const hasTrace = !!(lastEntry.recipients && lastEntry.txs);
+    check("ledger entries are traceable (recipients + tx hashes)",
+      hasTrace ? "PASS" : "WARN",
+      hasTrace ? `last run names recipients + ${Object.keys(lastEntry.txs || {}).length} tx(s)`
+               : "last entry predates the traceability fix — next recycle will carry recipients+txs");
+  }
 
   console.log(`\n══════ AUDIT: ${pass} passed, ${fail} failed, ${skip} skipped, ${warn} warnings ══════`);
   for (const r of rows.filter((x) => x.status !== "PASS")) {

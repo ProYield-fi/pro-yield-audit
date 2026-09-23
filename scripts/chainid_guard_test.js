@@ -85,6 +85,16 @@ async function main() {
     process.exit(fail === 0 ? 0 : 1);
   }
 
+  // Implicit-RPC class: hardhat silently falls back to http://localhost:8545 when
+  // HYPEREVM_RPC_URL is unset — the exact trap that ran every fee recycling (and
+  // the insurance slice) on a local chain spoofing chain-id 998. Must refuse,
+  // and must refuse before touching the network at all.
+  const implicit = runScript("npx hardhat run scripts/recycle_fees.js --network hyperTestnet", "",
+    { HYPEREVM_RPC_URL: "" });
+  report("recycler refuses an IMPLICIT RPC (unset HYPEREVM_RPC_URL) before touching the network",
+    implicit.rc === 3 && /REFUSING: HYPEREVM_RPC_URL is not set/.test(implicit.out),
+    `rc=${implicit.rc}`);
+
   const manifest = path.join(REPO, "deployed_addresses.json");
   const manifestExists = fs.existsSync(manifest);
   let child = null;
@@ -154,6 +164,12 @@ async function main() {
               env: { ...process.env, HYPEREVM_RPC_URL: `http://localhost:${REAL_PORT}` } }));
         } catch (e) { return String((e.stdout || "") + (e.stderr || "")); }
       })();
+      const explicit = runScript("npx hardhat run scripts/recycle_fees.js --network hyperTestnet",
+        `http://localhost:${REAL_PORT}`, { RECYCLE_POLICY: "/nonexistent/policy.json" });
+      report("recycler with an EXPLICIT RPC passes the implicit-RPC check (not a brick)",
+        explicit.rc !== 0 && !/REFUSING: HYPEREVM_RPC_URL/.test(explicit.out)
+          && /(ENOENT|no such file|no FeeDistributor code)/i.test(explicit.out),
+        `rc=${explicit.rc} (failed at a downstream layer, as expected)`);
       report("python guard ALLOWS chain 998", /ALLOWED/.test(pyOk), pyOk.trim().split("\n").pop().slice(0, 120));
     } else {
       report("positive control available", false, `no 998 chain on port ${REAL_PORT} (got ${realChain})`);
