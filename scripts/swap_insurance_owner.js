@@ -93,7 +93,8 @@ async function main() {
     .sort((x, y) => (x[0] < y[0] ? -1 : 1));
   const signatures = "0x" + pairs.map(([, s]) => s.slice(2)).join("");
 
-  const tx = await safe.execTransaction(...args, signatures);
+  // execTransaction takes NO nonce arg (unlike getTransactionHash) — drop args[9].
+  const tx = await safe.execTransaction(...args.slice(0, 9), signatures);
   const rc = await tx.wait();
   console.log("swapped ✓ | tx:", rc.hash, "| gas:", rc.gasUsed.toString());
 
