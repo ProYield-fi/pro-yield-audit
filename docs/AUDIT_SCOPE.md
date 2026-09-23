@@ -72,6 +72,30 @@ Target chain: **HyperEVM mainnet (chainId 999)**; test runs on local anvil 8545
    `coreAccountRequired`).
 9. **Fixed supply.** PYD has no mint path; staking rewards are transferred, not
    minted.
+10. **Staking rewards never exceed the funded pool.** `PYDStaking` holds
+   `balance ≥ totalSupply` at all times; claims are bounded by
+   `balance − totalSupply` (funded minus already claimed); accrual stops at
+   `periodFinish`. A rollover bug (a keeper top-up after a lapsed window with
+   no user interaction double-banked the tail — rewards could be paid out of
+   staked principal) was FOUND by the forge invariant suite and fixed;
+   `test_rollover_without_interaction_no_double_accrual` pins it.
+11. **Vault solvency + share-price floor.** The backing (vault plus every
+   strategy's USDC) is ≥ `totalAssets` at all times, and
+   `totalAssets ≥ totalShares` — the share price never falls below 1 except
+   through the explicit `emergencyWithdraw()` loss path.
+
+Items 2, 3, 5, 10, 11 have executable counterparts in `test/forge/`:
+`Vault.invariants.t.sol` — `invariant_solvency`,
+`invariant_price_never_below_one`, `invariant_user_shares_sum_to_total`,
+`invariant_no_zero_valued_depositor`, `invariant_fd_bookkeeping`, plus
+adversarial cases (donation attack neutralized by the offset, emergency-exit
+dilution semantics, dust deposits, strategy recall, paused-strategy
+containment, one broken strategy never bricks harvest).
+`PYD.invariants.t.sol` — `invariant_principal_intact`,
+`invariant_claims_bounded_by_pool`, `invariant_accrual_bounded_by_pool`,
+`invariant_stake_sum_to_total`, plus tier boundaries, budget-capped claims,
+zero-share/below-tier stakers, no accrual past the window, mid-period top-up,
+and the rollover regression above.
 
 ## 4. Threat model highlights
 
@@ -100,13 +124,26 @@ Target chain: **HyperEVM mainnet (chainId 999)**; test runs on local anvil 8545
 
 | Suite | What it proves | Result |
 |---|---|---|
+| `scripts/run_battery.sh` | Every suite below on a FRESH isolated anvil (cold-start deploy, per-suite exit codes, disposable chain) | 7/7 suites |
 | `scripts/integration_tests.js` | Full protocol: deposit→harvest→withdraw, fee→staker loop, token invariants | 120/120 |
 | `scripts/dn_strategy_tests.js` | Vault DN money loop: allocate→bridge→sync→split→harvest→withdraw; loss case | 28/28 |
 | `scripts/dn_adapter_tests.js` | Byte-exact CoreWriter encodings + all gates | 26/26 |
 | `scripts/dn_realread_check.js` | Read layer vs LIVE mainnet precompiles (read-only) | 15/15 |
 | `scripts/dn_keeper_dryrun_test.js` | Keeper sizing policy end-to-end (subprocess) | 8/8 |
+| `scripts/dn_keeper_unwind_test.js` | Keeper unwind policy end-to-end (subprocess) | 6/6 |
+| `scripts/pyd_demand_tests.js` | PYD demand layer: discount tiers/accrual/claims + funder conversion → real staking stream | 19/19 |
 | `scripts/test_all.js` | Unit suite | 16/16 |
+| `forge test` (`test/forge/*.t.sol`) | Stateful invariants + adversarial/edge cases (mapping in §3) | 21 tests + 10 invariants |
 | Slither (vs `security_baseline.json`) | 0 critical, no NEW findings (22 accepted, each justified) | clean |
+| CI (`.github/workflows/ci.yml`) | battery + slither + forge on a fresh runner, every push/PR | green |
+| `slither-mutate` (RR,ROR,LOR,AOR,UOR,LIR,SBR,ASOR) | Mutation kill-rate on core contracts — tests must KILL injected bugs | running |
+
+**Bug found by the new invariant suite and fixed** (commit `3111a6d6`):
+`PYDStaking.fundRewards` double-banked an expired reward window on rollover
+(keeper top-up after a lull with no user interaction in between) — rewards
+became claimable beyond the funded pool and paid out of staked principal.
+Fixed by ordering `_updatePeriod()` before the reward-per-token banking;
+regression test `test_rollover_without_interaction_no_double_accrual`.
 
 Mocks assert calldata shapes (a wrong precompile encoding reverts in tests
 rather than silently passing — this exact trap was caught by real-chain
@@ -137,5 +174,8 @@ owner-managed strategy list.
   `hypervault/` is the contracts root).
 - `cd hypervault && npx hardhat compile && python3 scripts/security_monitor.py`
   reproduces the static-analysis gate.
+- `cd hypervault && forge test` reproduces the stateful invariant suite
+  (Foundry; `lib/forge-std` is vendored). `./scripts/run_battery.sh
+  --with-deploy` reproduces the full isolated battery end-to-end.
 - Questions/findings: open a GitHub issue with the `audit` label, or contact
   `proyield@pyd.fi` (see SECURITY.md).
