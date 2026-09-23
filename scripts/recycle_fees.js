@@ -37,6 +37,13 @@ async function main() {
 
   const dryRun = process.env.DRY_RUN === "1";
 
+  // Chain guard — the recycler moves real USDC; refuse anything but 998.
+  const __net = await hre.ethers.provider.getNetwork();
+  if (Number(__net.chainId) !== 998) {
+    console.error(`REFUSING: chain ${__net.chainId} is not HyperEVM testnet (998) — never mainnet.`);
+    process.exit(3);
+  }
+
   // 1) reconcile FD accounting, then read the recyclable balance
   if (!dryRun) {
     await (await fd.receiveFees()).wait();

@@ -151,6 +151,12 @@ function computeTargetNotionalUsd(vaultTotalAssetsUsd, dnWeight) {
 }
 
 async function main() {
+  // Chain guard FIRST — never act off HyperEVM testnet (998), even in dry-run.
+  const __net = await hre.ethers.provider.getNetwork();
+  if (Number(__net.chainId) !== 998) {
+    console.error(`REFUSING: chain ${__net.chainId} is not HyperEVM testnet (998) — never mainnet.`);
+    process.exit(3);
+  }
   const [signer] = await hre.ethers.getSigners();
   if (!CONFIG.strategy) {
     console.log("DN_STRATEGY unset — nothing to do. Set it to the deployed DNCoreStrategy.");

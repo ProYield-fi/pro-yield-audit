@@ -38,7 +38,7 @@ LOG_DIR="${BATTERY_LOGS:-$ROOT/.battery_logs}"
 mkdir -p "$LOG_DIR"
 
 KEEP=0; WITH_DEPLOY="${BATTERY_WITH_DEPLOY:-0}"
-SUITES="${BATTERY_SUITES:-integration_tests.js dn_strategy_tests.js dn_adapter_tests.js pyd_demand_tests.js dn_keeper_dryrun_test.js dn_keeper_unwind_test.js test_all.js dn_realread_replay.js}"
+SUITES="${BATTERY_SUITES:-integration_tests.js dn_strategy_tests.js dn_adapter_tests.js pyd_demand_tests.js dn_keeper_dryrun_test.js dn_keeper_unwind_test.js test_all.js dn_realread_replay.js ecosystem_journey_test.js ecosystem_audit.js chainid_guard_test.js}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1 ;;

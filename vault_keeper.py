@@ -304,6 +304,27 @@ def check_gas(min_hype=0.01):
         print(f"Gas check failed: {e}")
         return False, 0.0
 
+def check_chain(allowed=(998,)):
+    """Refuse to run against any chain outside `allowed` — 'never mainnet' is
+    enforced here, not by convention. A mispointed HYPEREVM_RPC_URL must abort
+    before any on-chain action."""
+    import urllib.request as _urllib
+    import json as _json
+    try:
+        req = _urllib.Request((os.environ.get("HYPEREVM_RPC_URL") or "http://localhost:8545"), data=_json.dumps({
+            "jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []}).encode(),
+            headers={"Content-Type": "application/json"})
+        r = _json.loads(_urllib.urlopen(req, timeout=10).read())
+        cid = int(r["result"], 16)
+    except Exception as e:
+        print(f"Chain check failed: {e}")
+        return False
+    if cid not in allowed:
+        print(f"⛔ REFUSING: chain {cid} is not HyperEVM testnet {sorted(allowed)} — never mainnet.")
+        return False
+    print(f"Chain guard ok: chain {cid}")
+    return True
+
 ANVIL_START_CMD = os.environ.get("ANVIL_START_CMD") or "/home/user/.config/.foundry/bin/anvil --port 8545 --chain-id 998"
 
 def check_anvil():
@@ -344,6 +365,9 @@ def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     # Pre-flight: abort if wallet lacks gas for on-chain ops
     anvil_ok = check_anvil()
+    if not check_chain():
+        print("⚠ Keeper aborted: wrong chain (never mainnet).")
+        sys.exit(2)
     gas_ok, gas_bal = check_gas(min_hype=0.01)
     if not gas_ok:
         print(f"⚠ Keeper aborted: insufficient gas ({gas_bal:.6f} HYPE). Top up at https://www.gas.zip/faucet/hyperevm")

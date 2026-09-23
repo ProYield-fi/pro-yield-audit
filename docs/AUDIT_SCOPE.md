@@ -178,6 +178,19 @@ owner-managed strategy list.
 5. On-chain DN rate must exceed the blended rate before the sleeve allocates
    (keeper-enforced sizing policy is live).
 
+## 7b. Ecosystem-level testing (the whole product, not one module)
+
+Beyond the per-module suites, three angles cover the ecosystem as a system:
+
+| Angle | Artifact | What it proves |
+|---|---|---|
+| **Journey — one continuous customer path** | `scripts/ecosystem_journey_test.js` (24 checks) | on-ramp → deposit → fee income → FD reconcile → **the real `recycle_fees.js` run against the test chain** (60/20/20 split to the wei, FD fully drained, cold-start must not touch the shared ledger) → PYD demand (funder converts, documented swapper delivers, stream pays over time, `getReward` transfers) → tier + `snapshotHarvest` on a real fee delta → `claimRebate` equals the documented formula exactly → redemption (pays the exact quote, no cross-user leakage, floor dust bounded) → **USDC conservation to the wei summed over every ecosystem contract**. |
+| **Cross-artifact integrity audit** | `scripts/ecosystem_audit.js` (22 checks, offline) | every artifact names the same canonical vault; no operating loop is silently stale; the deploy manifest is complete and non-zero; **every recycling ledger run matches the live policy split to the wei**; the web feed matches the reader's schema; website blend == scout's live blend; the operator alert queue carries no test-generated alerts. `AUDIT_MODE=strict` turns findings into a non-zero exit (CI gate); default info mode reports operator-state drift without failing contract-correctness suites. |
+| **Chain guard — "never mainnet", enforced** | `scripts/chain_guard.js` + `scripts/chainid_guard_test.js` (10 checks) | a decoy anvil with **chain id 1 (mainnet's id)** is stood up and every money-mover is pointed at it: hardhat's own config chainId check refuses first (HH101), an explicit `REFUSING` guard is present in `dn_keeper.js` and `recycle_fees.js`, and `vault_keeper.check_chain()` (raw JSON-RPC path — no hardhat layer) refuses outright before any on-chain action. Positive control: chain 998 is still allowed, so the guard can never brick legitimate runs. |
+
+All three run inside the default battery (`./scripts/run_battery.sh`,
+11 suites / ~290 checks / ~91s).
+
 ## 8. How to review
 
 - `git clone https://github.com/ProYield-fi/pro-yield-fi` (shared repo;
