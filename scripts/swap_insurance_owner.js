@@ -21,7 +21,13 @@ const path = require("path");
 const os = require("os");
 
 const KEY_DIR = path.join(os.homedir(), ".proyield");
-const RECORD = path.join(KEY_DIR, "insurance_multisig.json");
+// Defaults to the insurance Safe; point SAFE_RECORD/SIGNER_FILE/BACKUP_FILE at the
+// treasury records to run the same swap for the treasury Safe.
+const RECORD = process.env.SAFE_RECORD
+  ? path.resolve(process.env.SAFE_RECORD)
+  : path.join(KEY_DIR, "insurance_multisig.json");
+const SIGNER_FILE = process.env.SIGNER_FILE || "insurance_signer.json";
+const BACKUP_FILE = process.env.BACKUP_FILE || "insurance_backup_signer.json";
 const SENTINEL = "0x0000000000000000000000000000000000000001";
 
 async function main() {
@@ -71,8 +77,8 @@ async function main() {
   if (localHash !== onchainHash) { console.error("REFUSING: signing scheme mismatch — do NOT execute. (investigate domain/types)"); process.exit(3); }
   console.log("hash match ✓ — signing scheme validated against the live Safe");
 
-  const ops = new hre.ethers.Wallet(JSON.parse(fs.readFileSync(path.join(KEY_DIR, "insurance_signer.json"), "utf8")).private_key);
-  const backup = new hre.ethers.Wallet(JSON.parse(fs.readFileSync(path.join(KEY_DIR, "insurance_backup_signer.json"), "utf8")).private_key);
+  const ops = new hre.ethers.Wallet(JSON.parse(fs.readFileSync(path.join(KEY_DIR, SIGNER_FILE), "utf8")).private_key);
+  const backup = new hre.ethers.Wallet(JSON.parse(fs.readFileSync(path.join(KEY_DIR, BACKUP_FILE), "utf8")).private_key);
   const sigs = await Promise.all([ops, backup].map((w) => w.signTypedData(domain, types, value)));
 
   if (dryRun) {
