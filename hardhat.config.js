@@ -1,6 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
 const fs = require("fs");
-const deployerKey = process.env.DEPLOYER_PRIVATE_KEY || fs.readFileSync("/home/user/.hermes/vault_keys/hyperevm_testnet.deployer").toString().trim();
 // Anvil well-known dev accounts (default mnemonic) — TESTNET ONLY.
 // Derived here so multi-user tests get real, funded signers.
 const { HDNodeWallet, Mnemonic } = require("ethers");
@@ -8,6 +7,12 @@ const anvilMnemonic = Mnemonic.fromPhrase("test test test test test test test te
 const anvilDevKeys = [0, 1, 2, 3].map(i =>
   HDNodeWallet.fromMnemonic(anvilMnemonic, `m/44'/60'/0'/0/${i}`).privateKey
 );
+// Deployer key resolution order: env override (CI) → local key file →
+// well-known anvil dev key #0 (CI compile/slither jobs carry neither, and
+// reading a missing file crashed the whole config load with ENOENT).
+const KEY_FILE = "/home/user/.hermes/vault_keys/hyperevm_testnet.deployer";
+const deployerKey = process.env.DEPLOYER_PRIVATE_KEY ||
+  (fs.existsSync(KEY_FILE) ? fs.readFileSync(KEY_FILE).toString().trim() : anvilDevKeys[0]);
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {

@@ -55,3 +55,24 @@ jobs:
         run: pip install slither-analyzer
       - name: Baseline-aware scan (alerts only on NEW findings)
         run: python3 scripts/security_monitor.py --slither-only --quiet
+
+  # Stateful invariant + targeted suite (forge): vault share accounting,
+  # fee routing, strategy recall/resilience, PYD staking/discount properties.
+  # Found this campaign's first real bug: PYDStaking double-banked an expired
+  # reward window on rollover (fundRewards after a lapse, no user interaction)
+  # and paid rewards out of staked principal.
+  foundry:
+    name: Foundry invariants (fresh chain)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install deps (OpenZeppelin remapping target)
+        run: npm ci --no-audit --no-fund
+      - name: Run forge suite (invariants, targeted, regressions)
+        run: forge test

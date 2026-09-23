@@ -109,16 +109,35 @@ async function main() {
   // Staker stakes PYD and claims from the REAL stream (25K PYD over 86400s).
   // Deterministic: stake lands (T5−Tf) seconds after stream start; measure
   // timestamps (same off-by-one discipline as integration R5/R6).
+  console.log("  [s0] pre-window state:", JSON.stringify({
+    staker1Pyd: (await pyd.balanceOf(staker1.address)).toString(),
+    allowance: (await pyd.allowance(staker1.address, await staking.getAddress())).toString(),
+    totalSupply: (await staking.totalSupply()).toString(),
+    lastUpdateTime: (await staking.lastUpdateTime()).toString(),
+    periodFinish: (await staking.periodFinish()).toString(),
+    blockTime: Number((await E.provider.getBlock("latest")).timestamp),
+  }));
   await (await pyd.connect(owner).transfer(staker1.address, U(5_000))).wait();
+  console.log("  [s1] transfer ok");
   await (await pyd.connect(staker1).approve(await staking.getAddress(), U(5_000))).wait();
+  console.log("  [s2] approve ok");
   const pf = await staking.periodFinish(); // stream end (started at pf−86400)
   const txStake = await staking.connect(staker1).stake(U(5_000));
+  console.log("  [s3] stake sent");
   await txStake.wait();
+  console.log("  [s4] stake mined");
   const stakedAt = await staking.lastUpdateTime();
   const missed = stakedAt - (pf - 86_400n); // seconds of stream before the stake
   await E.provider.send("evm_setNextBlockTimestamp", [Number(stakedAt) + 43_200]);
+  console.log("  [s5] warped to", stakedAt + 43_200n, "(stakedAt", stakedAt.toString() + ")");
   const stBefore = await pyd.balanceOf(staker1.address); // AFTER stake → rewards-only delta
+  console.log("  [s6] pre-claim state:", JSON.stringify({
+    stakingPyd: (await pyd.balanceOf(await staking.getAddress())).toString(),
+    earned: (await staking.earned(staker1.address)).toString(),
+    blockTime: Number((await E.provider.getBlock("latest")).timestamp),
+  }));
   await (await staking.connect(staker1).getReward()).wait();
+  console.log("  [s7] getReward ok");
   const got = (await pyd.balanceOf(staker1.address)) - stBefore;
   const perSec = U(25_000) / 86_400n;
   // Timeline: fund at T0 (periodFinish = T0+86400); stake at T0+k (anvil
@@ -213,6 +232,18 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error("pyd_demand_tests error:", e.message?.slice(0, 400));
-  process.exit(2);
+  const stack = (e && e.stack) || String(e);
+  let done = false;
+  const bail = () => {
+    if (done) return;
+    done = true;
+    // stderr writes are synchronous for files → this survives the exit
+    console.error("pyd_demand_tests error (full stack):\n" + stack);
+    process.exit(2);
+  };
+  // process.exit() DROPS buffered stdout — flush it first, otherwise the CI
+  // log loses the step markers written just before the failure and the last
+  // visible line is NOT the failing one (cost a multi-hour blind debug).
+  setTimeout(bail, 1500).unref();
+  process.stdout.write("", bail);
 });
