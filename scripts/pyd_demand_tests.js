@@ -227,6 +227,140 @@ async function main() {
   const badTiers = [[U(10_000), 500], [U(1_000), 1000]];
   await expectRevert(d.setTiers(badTiers), "BadTier", "setTiers non-ascending reverts");
 
+  /* ═══════ K: mutation-survivor regression ═══════
+   * Targeted kills for the slither-mutate survivors (campaign 2026-09-23):
+   * RR bodies in setTiers/unstake/exit/claim/loop-continues, AOR on the
+   * snapshot/rebate math, ASOR on the accumulators. WHY these exist: a test
+   * that ASSERTS a revert cannot kill a `body ==> revert()` mutant (the
+   * mutant still reverts — same observable). Only SUCCESS-path execution
+   * with exact-value assertions kills them, plus exact-formula checks for
+   * the math mutants. Keep this section in lockstep with the campaign.
+   */
+  console.log("\n── K: mutation-survivor regression ──");
+  const discountAddr = await discount.getAddress();
+
+  const givePyd = async (to, amt) => {
+    await (await pyd.connect(owner).transfer(to, amt)).wait();
+  };
+  const depositVault = async (who, amount18) => {
+    const amount = U(amount18);
+    await (await usdc.mint(who.address, amount)).wait();
+    await (await usdc.connect(who).approve(await vault.getAddress(), amount)).wait();
+    await (await vault.connect(who).deposit(amount)).wait();
+  };
+
+  // K1 — stall accumulation + partial unstake.
+  // Kills: RR unstake body ['stakedBy -= amount' / safeTransfer / emit → revert]
+  //        ASOR on 'stakedBy[msg.sender] += amount' ('=', '|=', '^='):
+  //        2000+1000 must read 3000 (OR gives 2040, XOR gives 1080, '=' gives 1000).
+  await givePyd(user1.address, U(3000));
+  await (await pyd.connect(user1).approve(discountAddr, U(3000))).wait();
+  await (await discount.connect(user1).stake(U(2000))).wait();
+  await (await discount.connect(user1).stake(U(1000))).wait();
+  report("K1 stakedBy accumulates across stakes (2000+1000=3000)",
+    (await discount.stakedBy(user1.address)) === U(3000));
+  const u1pydBefore = await pyd.balanceOf(user1.address);
+  await (await discount.connect(user1).unstake(U(500))).wait();
+  report("K1 unstake(500) decrements ledger + transfers exactly",
+    (await discount.stakedBy(user1.address)) === U(2500) &&
+      (await pyd.balanceOf(user1.address)) - u1pydBefore === U(500));
+
+  // K2 — exit(): full return + zeroed ledger + idempotent repeat.
+  // Kills: RR exit body [141-143 → revert]; ASOR 'stakedBy[msg.sender] = 0'.
+  // user1 keeps VAULT SHARES (deposited below) so the snapshot loop reaches
+  // his tierBps==0 branch — the second `continue` kill — in K3/K5.
+  await depositVault(user1, 10_000);
+  const u1pydBeforeExit = await pyd.balanceOf(user1.address);
+  await (await discount.connect(user1).exit()).wait();
+  report("K2 exit() zeros the stake and returns all PYD",
+    (await discount.stakedBy(user1.address)) === 0n &&
+      (await pyd.balanceOf(user1.address)) - u1pydBeforeExit === U(2500));
+  await (await discount.connect(user1).exit()).wait();
+  report("K2 exit() again is a clean no-op (staked==0 guard)", (await discount.stakedBy(user1.address)) === 0n);
+
+  // K3 — snapshot accrual, EXACT formula value, with zero-entry stakers present.
+  // Subject dummy: vault shares + stake above tier 1.
+  await depositVault(dummy, 10_000);
+  await givePyd(dummy.address, U(2000));
+  await (await pyd.connect(dummy).approve(discountAddr, U(2000))).wait();
+  await (await discount.connect(dummy).stake(U(2000))).wait();
+  // staker2 = stake without vault shares → first `continue` (shares_i == 0) kill.
+  if ((await vault.shares(staker2.address)) > 0n) {
+    const w = await vault.maxWithdraw(staker2.address);
+    if (w > 0n) await (await vault.connect(staker2).withdraw(w)).wait();
+  }
+  if ((await discount.stakedBy(staker2.address)) === 0n) {
+    await givePyd(staker2.address, U(2));
+    await (await pyd.connect(staker2).approve(discountAddr, U(2))).wait();
+    await (await discount.connect(staker2).stake(U(2))).wait();
+  }
+  // Kills: AOR feeDelta '+' [177]; rebate formula AORs [195] ('+', '*', '-', '%');
+  //        RR loop `continue` [194]; RR SnapshotHarvested emit [183];
+  //        RR 'return 0' no-op [220]-class via exact non-zero expectations.
+  const kSnap0 = await discount.lastFeeSnapshot();
+  await (await usdc.mint(fdAddr, U(3_000_000))).wait(); // fresh fees for THIS snapshot (large, so K4's budget cap is forced: owed > any prior discount balance)
+  const fdBal1 = await usdc.balanceOf(fdAddr);
+  const totalSh1 = await vault.totalShares();
+  const dSh = await vault.shares(dummy.address);
+  const dBps = await discount.tierBpsOf(dummy.address);
+  const dPrev = await discount.rebateOf(dummy.address);
+  await (await d.snapshotHarvest()).wait();
+  const expRebate1 = (dSh * (fdBal1 - kSnap0) * dBps) / (totalSh1 * 10000n);
+  report("K3 snapshot accrues the EXACT rebate formula + records the snapshot",
+    expRebate1 > 0n &&
+      (await discount.rebateOf(dummy.address)) === dPrev + expRebate1 &&
+      (await discount.lastFeeSnapshot()) === fdBal1,
+    `delta=${E.formatUnits(fdBal1 - snap0, 0)} expected=${E.formatUnits(expRebate1, 0)}`);
+
+  // K4 — claim bounded by the budget actually held; remainder stays accrued.
+  // Kills: RR 'amount = budget' [213]; RR claim body [216] (both the pay and
+  //        the ledger decrement are exact-asserted).
+  const owed1 = await discount.rebateOf(dummy.address);
+  const dBudget0 = await usdc.balanceOf(discountAddr);
+  const targetBudget = owed1 / 2n;
+  if (dBudget0 < targetBudget) await (await usdc.mint(discountAddr, targetBudget - dBudget0)).wait();
+  const budgetNow = await usdc.balanceOf(discountAddr);
+  const expectPaid = owed1 < budgetNow ? owed1 : budgetNow;
+  const dUsdcBefore = await usdc.balanceOf(dummy.address);
+  await (await discount.connect(dummy).claimRebate()).wait();
+  report("K4 claimRebate pays min(owed, budget) exactly, keeps the remainder",
+    (await usdc.balanceOf(dummy.address)) - dUsdcBefore === expectPaid &&
+      (await discount.rebateOf(dummy.address)) === owed1 - expectPaid,
+    `owed=${E.formatUnits(owed1, 0)} budget=${E.formatUnits(budgetNow, 0)} paid=${E.formatUnits(expectPaid, 0)}`);
+
+  // K5 — second snapshot: delta = ONLY the new fees; accrual ADDS to remainder.
+  // Kills: feeDelta '+' thoroughly (both the ledger assert and lastFeeSnapshot);
+  //        ASOR 'rebateOf[staker] = rebate' (remainder must survive the add).
+  const snapAfterK4 = await discount.lastFeeSnapshot();
+  await (await usdc.mint(fdAddr, U(50_000))).wait();
+  const fdBal2 = await usdc.balanceOf(fdAddr);
+  const owedBeforeK5 = await discount.rebateOf(dummy.address);
+  const totalSh2 = await vault.totalShares();
+  await (await d.snapshotHarvest()).wait();
+  const expRebate2 = (dSh * (fdBal2 - snapAfterK4) * dBps) / (totalSh2 * 10000n);
+  report("K5 second snapshot: only NEW fees, rebate ADDS to the remainder",
+    expRebate2 > 0n &&
+      (await discount.rebateOf(dummy.address)) === owedBeforeK5 + expRebate2 &&
+      (await discount.lastFeeSnapshot()) === fdBal2);
+
+  // K6 — full claim with adequate budget drains the ledger exactly.
+  const owed2 = await discount.rebateOf(dummy.address);
+  const dBudget2 = await usdc.balanceOf(discountAddr);
+  if (dBudget2 < owed2) await (await usdc.mint(discountAddr, owed2 - dBudget2)).wait();
+  const dUsdc2 = await usdc.balanceOf(dummy.address);
+  await (await discount.connect(dummy).claimRebate()).wait();
+  report("K6 full claim pays owed exactly and zeroes rebateOf",
+    (await usdc.balanceOf(dummy.address)) - dUsdc2 === owed2 &&
+      (await discount.rebateOf(dummy.address)) === 0n);
+
+  // K7 — setTiers SUCCESS path (kills RR bodies [107-112 → revert]); then
+  // restore the default schedule so any later run state is unchanged.
+  await (await d.setTiers([[U(500), 100], [U(5_000), 500], [U(50_000), 1000]])).wait();
+  report("K7 setTiers replaces the schedule (success path)",
+    (await discount.tiers(0, 0)) === U(500) && (await discount.tiers(2, 1)) === 1000n);
+  await (await d.setTiers([[U(1000), 500], [U(10_000), 1000], [U(100_000), 1500], [U(1_000_000), 2000]])).wait();
+  report("K7 default schedule restored", (await discount.tiers(3, 1)) === 2000n);
+
   console.log(`\n══════ ${pass} passed, ${fail} failed ══════`);
   process.exit(fail ? 1 : 0);
 }
