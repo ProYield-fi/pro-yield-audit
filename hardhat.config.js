@@ -20,7 +20,18 @@ const deployerKey = process.env.DEPLOYER_PRIVATE_KEY ||
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.28",
+  solidity: {
+    version: "0.8.28",
+    settings: {
+      // Optimizer ON for the deployment build. Rationale (2026-09-24): HyperEVM
+      // hard-caps a tx at 3,000,000 gas (block gas limit). The unoptimized vault
+      // runtime grew to 15,304 bytes → code deposit alone = 3.06M gas → the
+      // deploy tx can never fit. Foundry already builds optimized (runs=200);
+      // putting hardhat on the same footing makes the deployment build match
+      // the bytecode the whole fuzz/invariant suite exercises.
+      optimizer: { enabled: true, runs: 200 },
+    },
+  },
   networks: {
     hyperTestnet: {
       url: process.env.HYPEREVM_RPC_URL || "http://localhost:8545",
@@ -31,6 +42,16 @@ module.exports = {
       // 2026-09-23 when a raw anvil estimate went out unmultiplied and OOG'd
       // mid-execution. The margin now lives in scripts/gas_guard.js (3x,
       // provider-level, covers every send and subprocess).
+    },
+    hyperMainnet: {
+      // HyperEVM mainnet (999). The key file is the same ops EOA as testnet
+      // (0xaDD8f267…), which is the sanctioned mainnet deployer. Deploys only
+      // happen through scripts/deploy_mainnet.js, which carries its own
+      // guards (MAINNET_OK=1, chain 999, expected-deployer check, manifest
+      // absent). The RPC override exists for anvil fork dry-runs.
+      url: process.env.HYPEREVM_MAINNET_RPC_URL || "https://rpc.hyperliquid.xyz/evm",
+      chainId: 999,
+      accounts: [deployerKey],
     },
   },
   paths: {

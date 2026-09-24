@@ -63,6 +63,13 @@ Caps live in code (vault + keeper action bounds), not in policy prose. Site copy
   classified, real gaps closed.
 - Slither: no critical, no NEW vs `security_baseline.json` (fresh pass 2026-09-24 —
   reproduce with `python3 scripts/security_monitor.py`). CI green on every push.
+- Mainnet deploy rehearsed on a live anvil fork (chain 999): `scripts/deploy_mainnet.js`
+  (guards: MAINNET_OK=1 + chain 999 + expected-deployer + manifest + USDC sanity)
+  deployed FeeDistributor + ProYieldVault + setCaps, all 10 read-back checks green
+  (run 2026-09-24). Hard constraint discovered: **HyperEVM caps a tx at 3,000,000
+  gas** (block gas limit) — the unoptimized vault runtime (15.3KB) could never fit
+  (code deposit alone = 3.06M); hardhat now builds optimized (runtime 9.2KB, deploy
+  ≈ 2.20M, FD ≈ 0.53M). Battery 12/12 + forge 50/50 re-run on the optimized build.
 
 ## 4. Audit funding ladder (fees pay — not the owner's pocket)
 
@@ -107,7 +114,11 @@ way to honor it.
 - [ ] Mainnet Safes (2-of-3, phone backup owner) + **vault ownership transfer**
       (owner is an EOA today — flagged in `docs/AUDIT_SCOPE.md` §4)
 - [ ] Minimal deploy set: `ProYieldVault` + lending strategy + `DNCoreStrategy` +
-      `FeeDistributor`. **PYD suite stays undeployed until needed** (attack-surface rule)
+      `FeeDistributor`. **PYD suite stays undeployed until needed** (attack-surface rule).
+      Script ready + fork-verified (`scripts/deploy_mainnet.js`); first real deploy will
+      be **vault + FeeDistributor only** — no venue adapter exists for HyperEVM yet
+      (HyperLend adapter is its own future increment), so the team-stage vault holds
+      idle USDC: zero venue risk while the money path is proven end-to-end.
 - [x] Caps in code per §2 — vault `tvlCap` / `perUserCap` / `depositsPaused` shipped
       2026-09-24 (+ existing per-strategy pause and keeper bounds); stage values set at deploy
 - [ ] Insurance fund seeded; 20% fee stream wired

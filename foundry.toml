@@ -3,8 +3,11 @@
 # remains the integration layer; this suite adds stateful property fuzzing
 # (handlers + invariants) that a script-based suite cannot explore.
 #
-# NOTE: optimizer is ON here (vs hardhat's default off) — faster fuzz runs;
-# semantics are unchanged. Hardhat remains the deployment-accuracy build.
+# NOTE: optimizer is ON here (and, since 2026-09-24, ON for the hardhat build
+# too — the unoptimized vault runtime (15,304B) exceeded HyperEVM's 3,000,000
+# gas per-tx cap at code-deposit cost alone (200 gas/byte), making the deploy
+# impossible; optimized runtime is 9,248B, deploy ≈ 2.20M gas. Both toolchains
+# now build the same semantics; foundry was already optimized.
 [profile.default]
 src = "contracts"
 test = "test"
