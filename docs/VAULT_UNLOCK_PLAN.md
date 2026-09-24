@@ -99,9 +99,11 @@ way to honor it.
 - [x] Community pack files — `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
       `AUDIT-LOG.md` (shipped 2026-09-24)
 - [ ] Bounty live (paid-on-fix wording) + kickoff announcement
-- [ ] 🚧 **Fund deployer with HYPE on HyperEVM mainnet** — recon 2026-09-24: ops EOA
-      balance is 0; USDC confirmed at `0xb88339CB7199b77E23DB6E890353E22632Ba630f`
-      (6dp). Needs ≈ 0.02–0.05 HYPE (a few dollars) for deploy + test-deposit gas
+- [x] **Deployer gas funded (2026-09-24)** — ops EOA holds **0.05 HYPE** on HyperEVM
+      (path: test-wallet USDC → HYPE spot swap → Core→EVM bridge → forward;
+      `scripts/hl_fund_ops_hype.py`, receipt `~/.proyield/hype_funding_receipt.json`).
+      Test wallet also holds **10 USDC on HyperEVM** — the team-test deposit is
+      EVM-ready. Vault asset = Circle-native USDC `0xb88339CB…` (6dp, per Circle docs)
 - [ ] Mainnet Safes (2-of-3, phone backup owner) + **vault ownership transfer**
       (owner is an EOA today — flagged in `docs/AUDIT_SCOPE.md` §4)
 - [ ] Minimal deploy set: `ProYieldVault` + lending strategy + `DNCoreStrategy` +
