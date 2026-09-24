@@ -119,8 +119,10 @@ unswept yield) and fee deltas, plus the share-price floor.
   SHARE_OFFSET; the vault tracks assets/shares atomically.
 - **Keeper compromise**: keepers can execute the policy set (orders within
   caps, bridges within caps) but cannot change caps, fees, or ownership.
-  Worst case is bounded by `maxActionUsd6` per action. Owner is an EOA today
-  (multisig deferred — flagged).
+  Worst case is bounded by `maxActionUsd6` per action. Ownership is behind a
+  2-of-3 Safe on mainnet (treasury `0x8A1b107e…`, transferred 2026-09-24 —
+  ops EOA + box signer + user-held phone backup; the testnet demo vault keeps
+  its generation's EOA owner).
 - **Oracle/precompile trust**: reads come from HyperCore precompiles (verified
   against mainnet — `scripts/dn_realread_check.js`, 15/15). The read layer's
   encoding was validated against LIVE mainnet bytes through the contract's own

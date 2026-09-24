@@ -111,8 +111,14 @@ way to honor it.
       `scripts/hl_fund_ops_hype.py`, receipt `~/.proyield/hype_funding_receipt.json`).
       Test wallet also holds **10 USDC on HyperEVM** — the team-test deposit is
       EVM-ready. Vault asset = Circle-native USDC `0xb88339CB…` (6dp, per Circle docs)
-- [ ] Mainnet Safes (2-of-3, phone backup owner) + **vault ownership transfer**
-      (owner is an EOA today — flagged in `docs/AUDIT_SCOPE.md` §4)
+- [x] **Mainnet Safes + ownership transfer — done 2026-09-24.** Treasury Safe
+      `0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB` now owns the vault and the
+      FeeDistributor (transfer txs `0xf5a5a42b…` / `0x46e6264a…`); insurance Safe
+      `0x091a1cFE247A041d400B6Fd57c14A652Bb865f67`. Both v1.4.1, 2-of-3:
+      ops EOA + fresh box signer + **the user's phone as backup owner — set at
+      creation; unlike testnet, the box never generated a backup key**
+      (deploy txs `0xa8391283…` / `0x1e49652b…`; records in
+      `~/.proyield/{treasury,insurance}_multisig_mainnet.json`).
 - [x] Minimal deploy set — **deployed 2026-09-24: `ProYieldVault` + `FeeDistributor`**
       on HyperEVM mainnet (strategies/PYD suite deliberately deferred — attack-surface
       rule; no HyperEVM venue adapter exists yet, so the team-stage vault holds idle
