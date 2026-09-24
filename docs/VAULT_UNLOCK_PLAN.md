@@ -134,7 +134,11 @@ way to honor it.
       2026-09-24 (+ existing per-strategy pause and keeper bounds); stage values set at deploy
 - [ ] Insurance fund seeded; 20% fee stream wired
 - [ ] Mainnet keeper configs + alerts + gas tank
-- [ ] Attestation flips testnet → mainnet (config); `/transparency` fills; Dune public
+- [x] Attestation flipped testnet → mainnet (config) — done 2026-09-24. Daily job
+      now reads the mainnet vault + Safes; `/transparency` shows the live mainnet
+      state (empty vault, $0, caps in code — honest pre-deposit). Series entries
+      carry `chain_id` so charts never mix deployments silently. Dune public —
+      later (public tracker; not launch-blocking).
 - [x] **Team E2E on mainnet passed 2026-09-24** — real money round trip from the team
       test wallet (10 USDC): approve `0xc72755a4…` → deposit `0xf539c243…` (139,317 gas;
       10,000,000 shares @ price 1.0) → withdraw `0xefc4b699…` (71,876 gas; funds returned,
