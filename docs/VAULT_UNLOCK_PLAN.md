@@ -1,40 +1,56 @@
 # Vault Unlock Plan — from pre-mainnet to open deposits
 
-Status: 2026-09-24. Owner question: *"How do we unlock the vault — self-audit at first?"*
+Status: 2026-09-24 (rev 2). Owner questions: *"How do we unlock the vault — self-audit at
+first?"* … *"There is no community yet, and I doubt I can afford an external audit.
+What would you do?"*
 
-**Short answer: yes.** Self-audit → public/community review → capped beta is the launch
-path. The paid external audit is the gate to **scale**, not to start (typical cost
-$50–150K — affordable post-revenue; see open questions in `BETA-LAUNCH-CHECKLIST.md`).
+**Short answer (rev 2):** unlock in **safe mode** — self-audit evidence + open review
+artifacts + deferred-payment bounty + **hard caps** + insurance first-loss — and let
+**fees pay for the eventual external audit**. Don't wait for a community that doesn't
+exist yet; don't buy a fake audit; don't leave a fully test-green vault idle either.
+Trust is built by *provable operation*: open code, daily attestations, published
+findings, and caps small enough that a mistake is survivable. Caps rise only as
+evidence (time + revenue + audit tier) accumulates.
 
-## 1. Gate decision (the only thing that needs an owner call)
+## 1. Unlock gate (rev 2 — replaces "external audit first")
 
-The standing rule is "no product contracts on mainnet until the audit passes." "The
-audit" now needs a concrete definition:
+The gate to open deposits = ALL of:
 
-- **Option A (recommended) — self + community audit + hard caps = unlock.**
-  Internal program (done, §3) + published evidence pack + community review window +
-  live bounty + hard caps (TVL / per-user / keeper action bounds / pause) + insurance
-  first-loss. Unlocks a **capped beta, staged in cohorts** — exactly what the site
-  already promises ("early access opening in staged cohorts").
-- **Option B — wait for a paid external audit before any mainnet deploy.**
-  Strongest external trust signal; blocks launch for weeks at a cost not yet budgeted.
+1. Self-audit evidence live & reproducible (done — §3).
+2. Public artifacts in place (done): open repo, `SECURITY.md`, `CONTRIBUTING.md`,
+   `AUDIT-LOG.md`, `docs/AUDIT_SCOPE.md`, audit issue #1 open.
+3. Bounty **live on a paid-on-acknowledged-fix basis**: recognition immediately;
+   USDC paid when revenue exists; **never PYD**; vesting 14–90 days.
+4. Hard caps shipped in code (§2) + insurance first-loss + pause paths.
+5. Team money test passed on mainnet (deposit → allocate → harvest → withdraw, real
+   money, small).
 
-**Recommendation: A now, B before raising caps / institutional scale.** Every artifact
-already assumes this path: the community-audit framework explicitly replaces the paid
-audit at beta stage, and `SECURITY.md` gates on "the audited mainnet deployment" where
-"audited" = the published, reproducible program below.
+The paid external audit is **not on the critical path for the capped beta**. It is
+the gate for **raising caps beyond the beta band** (§4).
 
-## 2. Stage ladder
+### Why not "wait for a community"? Why not Fiverr?
 
-| Stage | What | When | Exit condition |
-|---|---|---|---|
-| **S0 · Self-audit** | Internal program (§3) | **DONE** | All suites green in CI |
-| **S1 · Community review open** | Pack published, audit issue #1 updated, bounty live, announcement | This week | Review window opened publicly |
-| **S2 · Mainnet deploy + team money test** | Minimal deploy set, ownership → Safe, caps, insurance, attestation flip, small real deposit→withdraw E2E | Days after S1 | E2E verified with real funds |
-| **S3 · Cohort 1 (early access)** | "Vault deposit — opens with early access" turns real; caps + monitoring hold | Staged cohorts | Caps stable, attestations daily |
-| **S4 · Scale** | Post external audit: raise caps, institutional outreach | Post-revenue | External audit passed |
+- A community is an *output* of operating publicly, not a prerequisite. The artifacts
+  are open today; reviewers show up when there is something real to review.
+- A cut-price "audit" from a generalist is worse than none: it produces a certificate
+  nobody credible accepts and manufactures false confidence internally. When we pay,
+  we pay a known-good reviewer with a public track record.
+- Unaudited-but-capped-and-transparent is a legitimate, well-trodden launch posture
+  (guarded launch / canary deploy). Unaudited-and-uncapped is how projects die.
 
-## 3. Evidence the gate is met (S0 — all reproducible)
+## 2. Caps ladder (safe mode — concrete defaults, adjust freely)
+
+| Stage | Who | Per-user cap | Total TVL cap | Notes |
+|---|---|---|---|---|
+| S2 | Team (own money) | — | **~$500** | Mainnet E2E money test, real funds, small |
+| S3a | Friends / first cohort | **$1,000** | **$10,000** | Insurance first-loss; pause paths tested |
+| S3b | Early access (public) | **$5,000** | **$50,000** | Requires 30+ clean daily attestations |
+| S4 | Scale | audit-dependent | **$250K → uncapped** | Raise only after the matching audit tier (§4) |
+
+Caps live in code (vault + keeper action bounds), not in policy prose. Site copy
+("early access opening in staged cohorts") already matches this ladder.
+
+## 3. What is already true (S0 evidence — all reproducible)
 
 - Battery: 11 suites / ~290 checks on a fresh isolated anvil (integration 120/120,
   DN 28/28 + 26/26, keeper 8/8 + 6/6, PYD demand 29/29, unit 16/16, web smoke PASS,
@@ -47,24 +63,53 @@ audit at beta stage, and `SECURITY.md` gates on "the audited mainnet deployment"
 - Slither: no critical, no NEW vs `security_baseline.json` (fresh pass 2026-09-24 —
   reproduce with `python3 scripts/security_monitor.py`). CI green on every push.
 
-## 4. Launch-mechanics checklist (S2/S3)
+## 4. Audit funding ladder (fees pay — not the owner's pocket)
 
-- [ ] **Owner decision on §1** (the one blocker)
+Policy: **the treasury fee share accumulates first toward audit tiers.** (Fee model:
+10% performance fee on profits only; 20% of fees → treasury.) Engage by size of money
+at risk — never before it's justified:
+
+| Tier | Trigger | Cost ballpark | What you get |
+|---|---|---|---|
+| T0 — deferred bounty | At launch | **$0 now** | Recognition now; USDC on acknowledged fixes once revenue exists |
+| T1 — focused freelancer review | ~$5–15K budget available | 3–7 days, one senior auditor, **small frozen scope** (lending core first) | Report + fix list, publishable |
+| T2 — competitive mini-contest | TVL ≥ $250K / ~$15–40K budget | Codehawks / Sherlock / Cantina-style format | Many eyes, public report, marketing value |
+| T3 — boutique audit | Before uncapping / institutional | $50K+ | Full protocol incl. DN sleeve + off-chain keepers |
+
+The site's standing promise ("fee contract audited before any fee is charged") stays
+satisfiable: `FeeDistributor` is a ~60-line contract — a T1-tier review is a realistic
+way to honor it.
+
+## 5. Free assurance while the budget is zero
+
+- **Symbolic/equivalence checks** (Halmos / hevm) on the core invariants — spend
+  compute, not money. Next free hardening item after S2 mechanics.
+- **Scope freeze after S2**: every change re-runs the full battery + CI and re-logs
+  in `AUDIT-LOG.md`. A frozen, small, reviewable surface is the product.
+- **Optional staged unlock**: lending core first (standard ERC-4626 — the most
+  reviewable mechanics), DN sleeve opens as a second cohort after a clean month.
+  Both are battery-green; staging is about the reviewability story, not bug counts.
+- **The attestation streak is the trust graph**: every clean day is publishable,
+  verifiable evidence. Time + honesty is the cheapest security marketing there is.
+
+## 6. Launch-mechanics checklist (S2/S3)
+
+- [ ] Owner decision on §1 (this rev 2 gate)
 - [x] Community pack files — `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
       `AUDIT-LOG.md` (shipped 2026-09-24)
-- [ ] Bounty: flip site "Bug Bounty (Coming Soon)" → live; announcement post
+- [ ] Bounty live (paid-on-fix wording) + kickoff announcement
 - [ ] Mainnet Safes (2-of-3, phone backup owner) + **vault ownership transfer**
       (owner is an EOA today — flagged in `docs/AUDIT_SCOPE.md` §4)
 - [ ] Minimal deploy set: `ProYieldVault` + lending strategy + `DNCoreStrategy` +
       `FeeDistributor`. **PYD suite stays undeployed until needed** (attack-surface rule)
-- [ ] Caps in code: total TVL cap, per-user cap, keeper `maxActionUsd6`, pause paths
-- [ ] Insurance fund seeded + 20% fee stream wired
+- [ ] Caps in code per §2 + pause paths + keeper bounds
+- [ ] Insurance fund seeded; 20% fee stream wired
 - [ ] Mainnet keeper configs + alerts + gas tank
 - [ ] Attestation flips testnet → mainnet (config); `/transparency` fills; Dune public
-- [ ] Team E2E on mainnet: deposit → allocate → harvest → withdraw (real money, small)
+- [ ] Team E2E on mainnet (S2), then cohort 1 opens (S3a)
 - [ ] Comms: "how to verify" page, evidence links, cohort invites
 
-## 5. Deliberately deferred (attack-surface rule)
+## 7. Deliberately deferred (attack-surface rule)
 
 PYD suite (token / staking / discount / funder), extra venue adapters, satellite
 expansion — deploy only when the product needs them; each addition re-runs the full
