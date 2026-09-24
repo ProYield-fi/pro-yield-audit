@@ -83,8 +83,12 @@ Target chain: **HyperEVM mainnet (chainId 999)**; test runs on local anvil 8545
    strategy's USDC) is ≥ `totalAssets` at all times, and
    `totalAssets ≥ totalShares` — the share price never falls below 1 except
    through the explicit `emergencyWithdraw()` loss path.
+12. **Caps are rails, not traps.** Deposits are bounded by owner-set `tvlCap` /
+    `perUserCap` (0 = uncapped; per-user is value-based) and can be paused
+    (`depositsPaused`). Neither the caps nor the pause ever gate withdrawals — a
+    capped or paused vault still lets every user exit.
 
-Items 2, 3, 5, 10, 11 have executable counterparts in `test/forge/`:
+Items 2, 3, 5, 10, 11, 12 have executable counterparts in `test/forge/`:
 `Vault.invariants.t.sol` — `invariant_solvency`,
 `invariant_price_never_below_one`, `invariant_user_shares_sum_to_total`,
 `invariant_no_zero_valued_depositor`, `invariant_fd_bookkeeping`, plus
@@ -96,6 +100,9 @@ containment, one broken strategy never bricks harvest).
 `invariant_stake_sum_to_total`, plus tier boundaries, budget-capped claims,
 zero-share/below-tier stakers, no accrual past the window, mid-period top-up,
 and the rollover regression above.
+`Vault.caps.t.sol` — S2 beta safety rails: a deposit at the EXACT cap passes, one
+wei over reverts (message-asserted), withdrawal paths stay open while paused / above
+cap, setters owner-only.
 `Vault.differential.t.sol` — an independent integer model (written from the
 spec, no vault code) runs the same randomized op sequence as the contract
 (deposit/withdraw/yield/harvest/recycle/warp; 1200 deterministic ops + fuzzed
@@ -130,7 +137,7 @@ unswept yield) and fee deltas, plus the share-price floor.
 
 | Suite | What it proves | Result |
 |---|---|---|
-| `scripts/run_battery.sh` | Every suite below on a FRESH isolated anvil (cold-start deploy, per-suite exit codes, disposable chain) | 7/7 suites |
+| `scripts/run_battery.sh` | Every suite below on a FRESH isolated anvil (cold-start deploy, per-suite exit codes, disposable chain) | 12/12 suites |
 | `scripts/integration_tests.js` | Full protocol: deposit→harvest→withdraw, fee→staker loop, token invariants | 120/120 |
 | `scripts/dn_strategy_tests.js` | Vault DN money loop: allocate→bridge→sync→split→harvest→withdraw; loss case | 28/28 |
 | `scripts/dn_adapter_tests.js` | Byte-exact CoreWriter encodings + all gates | 26/26 |
@@ -141,7 +148,8 @@ unswept yield) and fee deltas, plus the share-price floor.
 | `scripts/dn_keeper_unwind_test.js` | Keeper unwind policy end-to-end (subprocess) | 6/6 |
 | `scripts/pyd_demand_tests.js` | PYD demand layer: discount tiers/accrual/claims + funder conversion → real staking stream + **K: mutation-survivor regression** (exact-value kills for the campaign survivors) | 29/29 |
 | `scripts/test_all.js` | Unit suite | 16/16 |
-| `forge test` (`test/forge/*.t.sol`) | Stateful invariants + adversarial/edge cases (mapping in §3) + independent-model differential sim (1200 ops, exact-equality after every op) + mutation-survivor coverage (`Vault.coverage.t.sol`, `PYD.coverage.t.sol`) | 43 tests + 10 invariants |
+| `scripts/vault_caps_test.js` | Beta safety rails: TVL + per-user caps at their boundaries, pause blocks deposits but never withdrawals | 12/12 |
+| `forge test` (`test/forge/*.t.sol`) | Stateful invariants + adversarial/edge cases (mapping in §3) + independent-model differential sim (1200 ops, exact-equality after every op) + mutation-survivor coverage (`Vault.coverage.t.sol`, `PYD.coverage.t.sol`) | 50 tests + 10 invariants |
 | Slither (vs `security_baseline.json`) | 0 critical, no NEW findings (22 accepted, each justified) | clean |
 | CI (`.github/workflows/ci.yml`) | battery + slither + forge on a fresh runner, every push/PR | green |
 | `slither-mutate` (RR,ROR,LOR,AOR,UOR,LIR,SBR,ASOR) | Mutation kill-rate on core contracts — tests must KILL injected bugs | vault 85.5% · PYD 82.7% (all survivors triaged) |
@@ -196,7 +204,7 @@ Beyond the per-module suites, three angles cover the ecosystem as a system:
 | **Chain guard — "never mainnet", enforced** | `scripts/chain_guard.js` + `scripts/chainid_guard_test.js` (12 checks) | a decoy anvil with **chain id 1 (mainnet's id)** is stood up and every money-mover is pointed at it: hardhat's own config chainId check refuses first (HH101), an explicit `REFUSING` guard is present in `dn_keeper.js` and `recycle_fees.js`, and `vault_keeper.check_chain()` (raw JSON-RPC path — no hardhat layer) refuses outright before any on-chain action. **Implicit-RPC class** (which put real recycling on a local chain spoofing chain-id 998): the recycler must refuse an unset `HYPEREVM_RPC_URL` before touching the network, while an explicit RPC passes the check — controls proving the guard is neither a brick nor a rubber stamp. Positive control: chain 998 is still allowed. |
 
 All three run inside the default battery (`./scripts/run_battery.sh`,
-11 suites / ~290 checks / ~91s).
+12 suites / ~300 checks / ~96s).
 
 ## 8. How to review
 

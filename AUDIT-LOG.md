@@ -29,12 +29,12 @@ risk; the launch gate is the audited mainnet deployment.
   informational findings, all baselined and justified; alerts only on NEW findings —
   reproduce with `python3 scripts/security_monitor.py`.
 
-- **Battery**: 11 suites / ~290 checks / ~91s on a fresh isolated anvil, per-suite
+- **Battery**: 12 suites / ~300 checks / ~96s on a fresh isolated anvil, per-suite
   exit codes — integration 120/120 · DN strategy 28/28 · adapter 26/26 · keeper
-  dry-runs 8/8 + 6/6 · PYD demand 29/29 · unit 16/16 · web smoke PASS ($100k →
-  $105k → $100k) · journey 24 checks (USDC conserved to the wei) · ecosystem
-  audit · chain guard 12/12 ("never mainnet" enforced).
-- **Foundry**: 43 tests + 10 invariants; differential model (independent integer
+  dry-runs 8/8 + 6/6 · PYD demand 29/29 · vault caps 12/12 · unit 16/16 · web smoke
+  PASS ($100k → $105k → $100k) · journey 25 checks (USDC conserved to the wei) ·
+  ecosystem audit · chain guard 12/12 ("never mainnet" enforced).
+- **Foundry**: 50 tests + 10 invariants; differential model (independent integer
   implementation) asserts exact equality after every op across 1200 randomized
   operations + fuzzed seeds.
 - **Real-chain reads**: 15/15 against LIVE mainnet precompiles (manual) + 13/13

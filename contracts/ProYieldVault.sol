@@ -15,6 +15,14 @@ contract ProYieldVault is BaseStrategy {
     event PerformanceFeeSet(uint256 fee);
     mapping(address => bool) public strategyActive;   // per-strategy circuit breaker
     event StrategyHarvestFailed(address indexed strategy);
+    // ── Beta safety rails (S2 unlock plan): hard limits live in code, not policy.
+    // Caps are owner-set; 0 = uncapped. The pause blocks NEW deposits only —
+    // withdrawals always stay open so users are never trapped.
+    uint256 public tvlCap;         // max totalAssets() in asset units
+    uint256 public perUserCap;     // max per-user VALUE in asset units (value, not principal)
+    bool public depositsPaused;
+    event CapsSet(uint256 tvlCap, uint256 perUserCap);
+    event DepositsPausedSet(bool paused);
     uint256 private _totalAssets;
     uint256 private _totalShares;                     // sum of all user shares (ERC-4626 style)
     address[] public strategyList;
@@ -86,8 +94,28 @@ contract ProYieldVault is BaseStrategy {
         strategyActive[strategy] = active;
     }
 
+    /// @notice Set the beta safety rails. 0 = uncapped; takes effect immediately.
+    function setCaps(uint256 _tvlCap, uint256 _perUserCap) external onlyOwner {
+        tvlCap = _tvlCap;
+        perUserCap = _perUserCap;
+        emit CapsSet(_tvlCap, _perUserCap);
+    }
+
+    /// @notice Pause/unpause NEW deposits (withdrawals stay open by design).
+    function setDepositsPaused(bool paused) external onlyOwner {
+        depositsPaused = paused;
+        emit DepositsPausedSet(paused);
+    }
+
     function deposit(uint256 amount) external override nonReentrant {
+        require(!depositsPaused, "ProYieldVault: deposits paused");
         require(amount > 0, "ProYieldVault: zero amount");
+        if (tvlCap > 0) {
+            require(_totalAssets + amount <= tvlCap, "ProYieldVault: TVL cap reached");
+        }
+        if (perUserCap > 0) {
+            require(_toAssets(shares[msg.sender]) + amount <= perUserCap, "ProYieldVault: per-user cap reached");
+        }
         uint256 sh = _toShares(amount); // price-aware mint (4626-style)
         require(sh > 0, "ProYieldVault: zero shares"); // dust guard — no free deposits
         shares[msg.sender] += sh;

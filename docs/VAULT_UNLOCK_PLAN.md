@@ -52,10 +52,11 @@ Caps live in code (vault + keeper action bounds), not in policy prose. Site copy
 
 ## 3. What is already true (S0 evidence — all reproducible)
 
-- Battery: 11 suites / ~290 checks on a fresh isolated anvil (integration 120/120,
+- Battery: 12 suites / ~300 checks on a fresh isolated anvil (integration 120/120,
   DN 28/28 + 26/26, keeper 8/8 + 6/6, PYD demand 29/29, unit 16/16, web smoke PASS,
-  journey 24 checks — USDC conserved to the wei, chain guard 12/12).
-- Foundry: 43 tests + 10 invariants + independent differential model (1200 ops,
+  journey 25 checks — USDC conserved to the wei, chain guard 12/12, vault caps 12/12).
+- Foundry: 50 tests (incl. `Vault.caps.t.sol`) + 10 invariants + independent differential
+  model (1200 ops,
   exact equality after every op).
 - Real-chain reads: 15/15 live precompiles + 13/13 frozen-byte replay in CI.
 - Mutation testing: vault 64/64 revert mutants caught, 82.9% tweaks; survivors
@@ -102,7 +103,8 @@ way to honor it.
       (owner is an EOA today — flagged in `docs/AUDIT_SCOPE.md` §4)
 - [ ] Minimal deploy set: `ProYieldVault` + lending strategy + `DNCoreStrategy` +
       `FeeDistributor`. **PYD suite stays undeployed until needed** (attack-surface rule)
-- [ ] Caps in code per §2 + pause paths + keeper bounds
+- [x] Caps in code per §2 — vault `tvlCap` / `perUserCap` / `depositsPaused` shipped
+      2026-09-24 (+ existing per-strategy pause and keeper bounds); stage values set at deploy
 - [ ] Insurance fund seeded; 20% fee stream wired
 - [ ] Mainnet keeper configs + alerts + gas tank
 - [ ] Attestation flips testnet → mainnet (config); `/transparency` fills; Dune public
