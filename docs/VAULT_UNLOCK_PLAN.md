@@ -113,18 +113,27 @@ way to honor it.
       EVM-ready. Vault asset = Circle-native USDC `0xb88339CB…` (6dp, per Circle docs)
 - [ ] Mainnet Safes (2-of-3, phone backup owner) + **vault ownership transfer**
       (owner is an EOA today — flagged in `docs/AUDIT_SCOPE.md` §4)
-- [ ] Minimal deploy set: `ProYieldVault` + lending strategy + `DNCoreStrategy` +
-      `FeeDistributor`. **PYD suite stays undeployed until needed** (attack-surface rule).
-      Script ready + fork-verified (`scripts/deploy_mainnet.js`); first real deploy will
-      be **vault + FeeDistributor only** — no venue adapter exists for HyperEVM yet
-      (HyperLend adapter is its own future increment), so the team-stage vault holds
-      idle USDC: zero venue risk while the money path is proven end-to-end.
+- [x] Minimal deploy set — **deployed 2026-09-24: `ProYieldVault` + `FeeDistributor`**
+      on HyperEVM mainnet (strategies/PYD suite deliberately deferred — attack-surface
+      rule; no HyperEVM venue adapter exists yet, so the team-stage vault holds idle
+      USDC: zero venue risk while the money path is proven end-to-end).
+      - Vault `0xadaE15e23b0007de2A85b1F3874332762Bc23bb0` · FeeDistributor
+        `0xAa67940672047EcE44db2876378b182C1Fc4217C` (see `deployed_addresses.mainnet.json`)
+      - caps: TVL $500 · per-user $500; perf fee 1000 bps; withdrawal fee 0; deposits open
+      - deploy txs (blocks 46,757,859 / 46,757,867):
+        FD `0x3e2331656dc0d3adcd37f70d1ded79338cbe0b79e6aad7912c2cc533926843dc` (gasUsed 531,049)
+        · vault `0x968d90b3a468588cdb20186cb14ec25377d8ba62963bbce3bc6c1a19375008d8` (gasUsed 2,201,231)
+        — both under the 3,000,000-gas HyperEVM tx cap; setCaps `0x0a6203df…`
 - [x] Caps in code per §2 — vault `tvlCap` / `perUserCap` / `depositsPaused` shipped
       2026-09-24 (+ existing per-strategy pause and keeper bounds); stage values set at deploy
 - [ ] Insurance fund seeded; 20% fee stream wired
 - [ ] Mainnet keeper configs + alerts + gas tank
 - [ ] Attestation flips testnet → mainnet (config); `/transparency` fills; Dune public
-- [ ] Team E2E on mainnet (S2), then cohort 1 opens (S3a)
+- [x] **Team E2E on mainnet passed 2026-09-24** — real money round trip from the team
+      test wallet (10 USDC): approve `0xc72755a4…` → deposit `0xf539c243…` (139,317 gas;
+      10,000,000 shares @ price 1.0) → withdraw `0xefc4b699…` (71,876 gas; funds returned,
+      vault back to empty). Script: `scripts/team_e2e_mainnet.js`
+- [ ] Cohort 1 opens (S3a) — next after Safes/ownership transfer + keeper configs
 - [ ] Comms: "how to verify" page, evidence links, cohort invites
 
 ## 7. Deliberately deferred (attack-surface rule)
