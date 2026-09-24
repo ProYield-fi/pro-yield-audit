@@ -1,0 +1,24 @@
+{
+  "chain": "hyperevm-mainnet",
+  "chain_id": 999,
+  "deployed_utc": "2026-09-24T11:03:15.107Z",
+  "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "owner": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "vault_asset": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+  "fee_distributor": "0xAa67940672047EcE44db2876378b182C1Fc4217C",
+  "pro_yield_vault": "0xadaE15e23b0007de2A85b1F3874332762Bc23bb0",
+  "caps": {
+    "tvl_cap_usdc": "500.0",
+    "per_user_cap_usdc": "500.0"
+  },
+  "fees": {
+    "performance_fee_bps": 1000,
+    "withdrawal_fee_bps": 0
+  },
+  "stage": "S2-team",
+  "_notes": [
+    "Minimal set — vault + FeeDistributor only; strategies/PYD suite deliberately absent (VAULT_UNLOCK_PLAN §7).",
+    "Owner is an EOA at deploy time — transfer to the treasury Safe before cohorts open.",
+    "team E2E: deposit → shares → withdraw via scripts/customer_deposit.js / customer_withdraw.js patterns."
+  ]
+}
