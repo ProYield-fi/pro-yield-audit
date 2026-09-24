@@ -1,5 +1,9 @@
 {
-  "chain": "hyperevm-mainnet",
+  "chain": {
+    "id": 999,
+    "name": "hyperevm-mainnet",
+    "rpc": "https://rpc.hyperliquid.xyz/evm"
+  },
   "chain_id": 999,
   "deployed_utc": "2026-09-24T11:03:15.107Z",
   "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
