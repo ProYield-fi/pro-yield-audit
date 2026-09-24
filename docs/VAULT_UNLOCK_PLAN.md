@@ -133,7 +133,12 @@ way to honor it.
 - [x] Caps in code per §2 — vault `tvlCap` / `perUserCap` / `depositsPaused` shipped
       2026-09-24 (+ existing per-strategy pause and keeper bounds); stage values set at deploy
 - [ ] Insurance fund seeded; 20% fee stream wired
-- [ ] Mainnet keeper configs + alerts + gas tank
+- [x] Mainnet alerts live — vault sentinel (`scripts/vault_watch_mainnet.js`),
+      every 10 min via cron → Telegram: deposits, withdrawals, owner/caps/pause
+      changes, and "TVL moved with no event" as a should-be-impossible alarm.
+      Armed 2026-09-24 (the arming message doubles as an end-to-end proof of the
+      alert path). Keeper *actions* N/A while the vault is idle (no strategies
+      wired); gas tank fine (ops 0.05 HYPE). Revisit at venue wiring.
 - [x] Attestation flipped testnet → mainnet (config) — done 2026-09-24. Daily job
       now reads the mainnet vault + Safes; `/transparency` shows the live mainnet
       state (empty vault, $0, caps in code — honest pre-deposit). Series entries
@@ -143,7 +148,8 @@ way to honor it.
       test wallet (10 USDC): approve `0xc72755a4…` → deposit `0xf539c243…` (139,317 gas;
       10,000,000 shares @ price 1.0) → withdraw `0xefc4b699…` (71,876 gas; funds returned,
       vault back to empty). Script: `scripts/team_e2e_mainnet.js`
-- [ ] Cohort 1 opens (S3a) — next after Safes/ownership transfer + keeper configs
+- [ ] Cohort 1 opens (S3a) — next after Safes/ownership transfer + alerts (both
+      done 2026-09-24). Invite mechanics + platform setup: `docs/COMMUNITY_PLAN.md`.
 - [ ] Comms: "how to verify" page, evidence links, cohort invites
 
 ## 7. Deliberately deferred (attack-surface rule)
