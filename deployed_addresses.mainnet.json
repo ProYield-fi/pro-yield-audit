@@ -1,33 +1,25 @@
 {
-  "chain": {
-    "id": 999,
-    "name": "hyperevm-mainnet",
-    "rpc": "https://rpc.hyperliquid.xyz/evm"
-  },
-  "chain_id": 999,
-  "deployed_utc": "2026-09-24T11:03:15.107Z",
-  "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
-  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
-  "vault_asset": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
-  "fee_distributor": "0xAa67940672047EcE44db2876378b182C1Fc4217C",
-  "pro_yield_vault": "0xadaE15e23b0007de2A85b1F3874332762Bc23bb0",
-  "caps": {
-    "tvl_cap_usdc": "500.0",
-    "per_user_cap_usdc": "500.0"
-  },
-  "fees": {
-    "performance_fee_bps": 1000,
-    "withdrawal_fee_bps": 0
-  },
-  "stage": "S2-team",
-  "_notes": [
-    "Minimal set \u2014 vault + FeeDistributor only; strategies/PYD suite deliberately absent (VAULT_UNLOCK_PLAN \u00a77).",
-    "Owner is an EOA at deploy time \u2014 transfer to the treasury Safe before cohorts open.",
-    "team E2E: deposit \u2192 shares \u2192 withdraw via scripts/customer_deposit.js / customer_withdraw.js patterns.",
-    "Ownership (vault + FeeDistributor) transferred to the treasury Safe 2026-09-24 (2-of-3; user's phone is the backup owner)."
-  ],
-  "safes": {
-    "treasury": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
-    "insurance": "0x091a1cFE247A041d400B6Fd57c14A652Bb865f67"
-  }
+ "chain": "hyperevm-mainnet",
+ "chain_id": 999,
+ "deployed_utc": "2026-09-25T17:43:23.308Z",
+ "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "owner": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "vault_asset": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+ "fee_distributor": "0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9",
+ "pro_yield_vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+ "caps": {
+  "tvl_cap_usdc": "500.0",
+  "per_user_cap_usdc": "500.0"
+ },
+ "fees": {
+  "performance_fee_bps": 1000,
+  "withdrawal_fee_bps": 0
+ },
+ "stage": "S2-team",
+ "_notes": [
+  "Minimal set \u2014 vault + FeeDistributor only; strategies/PYD suite deliberately absent (VAULT_UNLOCK_PLAN \u00a77).",
+  "Deployed 2026-09-25 carrying the round-2 audit fixes (profit-first DN bridge split; vault loss accounting) \u2014 supersedes the 2026-09-24 r0 set (vault 0xadaE15e2\u2026, FD 0xAa6794\u2026), archived in deployed_addresses.mainnet.r0-09024.json; r0 held 0 TVL.",
+  "Ownership (vault + FeeDistributor) transferred to the treasury Safe 2026-09-25 (2-of-3; user's phone is the backup owner).",
+  "team E2E: deposit \u2192 shares \u2192 withdraw via scripts/customer_deposit.js / customer_withdraw.js patterns."
+ ]
 }

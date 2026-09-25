@@ -123,8 +123,9 @@ way to honor it.
       on HyperEVM mainnet (strategies/PYD suite deliberately deferred — attack-surface
       rule; no HyperEVM venue adapter exists yet, so the team-stage vault holds idle
       USDC: zero venue risk while the money path is proven end-to-end).
-      - Vault `0xadaE15e23b0007de2A85b1F3874332762Bc23bb0` · FeeDistributor
-        `0xAa67940672047EcE44db2876378b182C1Fc4217C` (see `deployed_addresses.mainnet.json`)
+      - Vault `0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1` · FeeDistributor
+        `0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9` (see `deployed_addresses.mainnet.json`;
+        redeployed 2026-09-25 with the round-2 fixes, superseding the 2026-09-24 set)
       - caps: TVL $500 · per-user $500; perf fee 1000 bps; withdrawal fee 0; deposits open
       - deploy txs (blocks 46,757,859 / 46,757,867):
         FD `0x3e2331656dc0d3adcd37f70d1ded79338cbe0b79e6aad7912c2cc533926843dc` (gasUsed 531,049)
