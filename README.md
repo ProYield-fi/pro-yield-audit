@@ -1,44 +1,43 @@
-Yield Strategy Scout
-===================
+# Pro Yield — community audit repository
 
-Daily at 09:00 (no_agent) → collects live rates from DeFiLlama (735+ pools),
-protocol revenues (Aave/Sky/Morpho/Pendle), funding rates. Writes:
-  strategy_data/latest.json (current snapshot)
+Pro Yield is a **non-custodial, stablecoin-lending vault on HyperEVM**. This repository is the public **audit surface**: everything needed to review and reproduce the vault's security claims lives here — and nothing else.
 
-At 09:05 → yield-strategy-evaluator.py scores all pools 0-5 safety,
-filters by criteria (audited/non-custodial/no leverage/TVL≥$50M),
-writes strategy_data/evaluation_YYYY-MM-DD.json
+## Start here
 
-At 09:15 → yield-strategy-advisor.py generates daily recommendation
-(8 strategy categories, safety gates) → strategy_data/daily_report.md
+- **`docs/AUDIT_SCOPE.md`** — the reviewer's front door: scope, architecture, invariants, threat model, evidence index.
+- **`CONTRIBUTING.md`** — reproduction commands (static analysis, Foundry invariants, the full isolated battery), how to report, reward terms.
+- **`AUDIT-LOG.md`** — public findings/fixes record with the evidence index.
+- **`docs/VAULT_UNLOCK_PLAN.md`** — the staged unlock: self-audit → community review → capped beta → external audit before scaling.
+- **`attestations/`** — daily on-chain attestations (chain 999).
 
-Composite run:
-  yield-strategy-chain.py → runs scout + evaluator in sequence
-  (used by cron at 09:00)
+## Reproduce
 
-Single dashboard:
-  yield_scout/dashboard.html → renders EVERYTHING from live data
-  (run: cd yield_scout && python3 render_dashboard.py)
+```bash
+git clone https://github.com/ProYield-fi/pro-yield-fi
+cd pro-yield-fi
 
-Safety criteria (TIGHT):
-  - Audited protocols: Aave, Sky, Morpho, Pendle → +4 safety pts
-  - Known DeFi (Curve, GMX, Uniswap, Lido): +3
-  - TVL ≥ $500M + stablecoin: +3
-  - TVL ≥ $50M + stablecoin: +2
-  - TVL ≥ $50M non-stablecoin: +1
-  - Blue-chip stablecoin (USDC/USDT/DAI/etc): +1
-  - CUTOFF: ≥ 3 to appear as opportunity; ≥ 4 to auto-portfolio
-  - All strategies: non-custodial, no leverage, TVL ≥ $50M minimum
+npx hardhat compile
+python3 scripts/security_monitor.py   # static gate: 0 critical vs justified baseline
+forge test                            # invariants + adversarial + differential model
+./scripts/run_battery.sh              # full isolated battery (~11 suites, fresh anvil each)
+```
 
-Strategy Categories evaluated:
-  1. Maker/Taker fee capture (volume-dependent)
-  2. Delta-neutral (funding rate arb)
-  3. Cross-chain arbitrage
-  4. Fixed yield (Pendle PT tokens)
-  5. Protocol fee capture (ve-model)
-  6. RWA yields (tokenized bills, T-bills)
-  7. LST staking rewards (synthetic)
-  8. Incentive liquidity mining (short-term, MATIC risk)
+CI runs the battery + Slither + forge on every push — a green badge is reproducible locally with the commands above.
 
-Standards: live-data-verification, no synthesized values.
-UNAVAILABLE = fetch failed, shown as gap.
+## Verify on-chain
+
+Contract addresses live in `deployed_addresses.json` / `deployed_addresses.mainnet.json`; daily attestations (balances, fees, coverage) are published under `attestations/`. The website (pyd.fi) serves the same feed verbatim.
+
+## Report a finding
+
+Open an issue with the `audit` label (preferred — public, timestamped) or email `proyield@pyd.fi` for sensitive disclosures. We acknowledge within 72h and publish fix commits referencing the finding. Disclosure window: 90 days (shorter by agreement once fixed).
+
+## Rewards
+
+Recognition first, bounty second: every acknowledged finding is published in `AUDIT-LOG.md` with its fix. Monetary bounties (USDC — **never** other assets, never via unsolicited "solution" PRs) begin once the vault is revenue-positive, with vesting.
+
+**We never solicit payments to any wallet.** Any comment attaching a payout address to a "fix" is a scam — it is removed, the author is blocked, and the submission is not reviewed.
+
+## License
+
+MIT — see `LICENSE`. This repository intentionally contains only the audit surface; internal operations, research, and tooling live elsewhere.
