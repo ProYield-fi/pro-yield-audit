@@ -20,8 +20,9 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
     mapping(address => uint256) public shares;
     string public name_;
 
-    uint256 public constant MAX_WITHDRAWAL_FEE = 500;
-    uint256 public constant MAX_PERFORMANCE_FEE = 10000;
+    // MAX_WITHDRAWAL_FEE / MAX_PERFORMANCE_FEE lived here as unused public
+    // getters; removed for the HyperEVM 3,000,000-gas deploy budget (the
+    // vault owns fee policy — its own constants).
 
     event Harvest(uint256 profit);
     event Deposit(address indexed user, uint256 amount);
@@ -42,6 +43,10 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
         return name_;
     }
 
+    /// @dev The vault OVERRIDES this (its deposit is the user-facing one).
+    /// Kept on the base so ProYieldVault's `override` stays valid; strategy
+    /// instances never receive deposits through it (the vault allocate()
+    /// path is a plain safeTransfer).
     function deposit(uint256 amount) external virtual nonReentrant {
         require(amount > 0, "BaseStrategy: zero amount");
         shares[msg.sender] += amount;

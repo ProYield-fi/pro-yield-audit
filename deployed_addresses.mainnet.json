@@ -21,9 +21,19 @@
  },
  "stage": "S2-team",
  "_notes": [
-  "Minimal set \u2014 vault + FeeDistributor only; strategies/PYD suite deliberately absent (VAULT_UNLOCK_PLAN \u00a77).",
-  "Deployed 2026-09-25 carrying the round-2 audit fixes (profit-first DN bridge split; vault loss accounting) \u2014 supersedes the 2026-09-24 r0 set (vault 0xadaE15e2\u2026, FD 0xAa6794\u2026), archived in deployed_addresses.mainnet.r0-09024.json; r0 held 0 TVL.",
+  "Minimal set — vault + FeeDistributor only; strategies/PYD suite deliberately absent (VAULT_UNLOCK_PLAN §7).",
+  "Deployed 2026-09-25 carrying the round-2 audit fixes (profit-first DN bridge split; vault loss accounting) — supersedes the 2026-09-24 r0 set (vault 0xadaE15e2…, FD 0xAa6794…), archived in deployed_addresses.mainnet.r0-09024.json; r0 held 0 TVL.",
   "Ownership (vault + FeeDistributor) transferred to the treasury Safe 2026-09-25 (2-of-3; user's phone is the backup owner).",
-  "team E2E: deposit \u2192 shares \u2192 withdraw via scripts/customer_deposit.js / customer_withdraw.js patterns."
- ]
+  "team E2E: deposit → shares → withdraw via scripts/customer_deposit.js / customer_withdraw.js patterns."
+ ],
+ "dn_core_strategy": "0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4",
+ "dn_core_strategy_meta": {
+  "deployed_utc": "2026-09-25T21:54:01.064Z",
+  "perp_asset": 159,
+  "spot_pair": 107,
+  "spot_asset": 10107,
+  "max_action_usd6": "25000000",
+  "keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB"
+ }
 }

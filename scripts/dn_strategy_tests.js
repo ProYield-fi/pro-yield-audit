@@ -151,8 +151,8 @@ async function main() {
 
   // ── 3b. Spot hedge leg (HIGH-2): config derivation + reads + accounting ──
   await (await positionAt.set(0n, 0n, 0n, 10, false)).wait();
-  await (await strategy.setSpotConfig(107)).wait();
-  report("setSpotConfig derives asset 10107 / token 150 / pxScale 1e8",
+  await (await strategy.setSpotConfig(107, 150n, 10n ** 8n)).wait();
+  report("setSpotConfig stores asset 10107 / token 150 / pxScale 1e8",
     (await strategy.spotAsset()) === 10107n &&
     (await strategy.spotTokenIndex()) === 150n &&
     (await strategy.spotPxScale()) === 10n ** 8n);
@@ -261,7 +261,7 @@ async function main() {
   await expectRevert(k.openShort.staticCall(1, px, sz, 3), "WrongAsset", "asset whitelist");
   await expectRevert(k.openShort.staticCall(10107, px, sz, 3), "WrongAsset", "perp orders reject spot asset");
   await (await positionAt.set(-5_000_000n, 0n, 0n, 10, false)).wait();
-  await expectRevert(strategy.setSpotConfig.staticCall(107), "NotFlat", "setSpotConfig guard (open position)");
+  await expectRevert(strategy.setSpotConfig.staticCall(107, 150n, 10n ** 8n), "NotFlat", "setSpotConfig guard (open position)");
   await (await positionAt.set(0n, 0n, 0n, 10, false)).wait();
   await (await positionAt.set(-5_000_000n, 0n, 0n, 10, false)).wait();
   await expectRevert(strategy.setPerpAsset.staticCall(1), "NotFlat", "setPerpAsset guard (open position)");

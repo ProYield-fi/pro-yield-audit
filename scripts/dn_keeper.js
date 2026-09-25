@@ -148,6 +148,18 @@ async function loadSleeveWeight() {
 }
 
 /// @returns sleeve target in USD (float) given vault assets + DN weight.
+/** Round a CoreWriter wire px (10^8 × human) to HL's 5-significant-figure
+ *  grid. IOC limits only need to be *acceptable* worst-price bounds, so the
+ *  ±1e-4 rounding is irrelevant to fills and keeps every order inside HL's
+ *  px tick rules (the earlier live MISMATCH was a 10^4 scale bug — raw px
+ *  fed straight into a 10^8-wire field). */
+function roundPxWire(wire) {
+  if (wire <= 0n) return wire;
+  const human = Number(wire) / 1e8;
+  if (!Number.isFinite(human) || human <= 0) return wire;
+  return BigInt(Math.round(Number(human.toPrecision(5)) * 1e8));
+}
+
 function computeTargetNotionalUsd(vaultTotalAssetsUsd, dnWeight) {
   let sleeve = vaultTotalAssetsUsd * dnWeight;
   if (CONFIG.maxSleeveUsd > 0) sleeve = Math.min(sleeve, CONFIG.maxSleeveUsd);
@@ -182,18 +194,49 @@ async function main() {
   const exists = await strategy.coreAccountExists();
   const [equity6, principal6, szi, realized, swept, syncedAt] = await strategy.coreState();
   const harvestable = await strategy.harvestableProfit();
-  console.log(`state: exists=${exists} equity6=${equity6} principal6=${principal6} szi=${szi} szDecimals=${szDec}`);
+  // coreEquity6 is cached storage — only syncCore() refreshes it (it also
+  // refreshes the vault's totalAssets view). Execute: stamp it on-chain
+  // (cheap, permissionless). Dry: read the precompile live so displayed
+  // numbers and decisions still match reality without sending a tx.
+  let equityLive6 = equity6;
+  if (!CONFIG.dryRun) {
+    try {
+      const stx = await strategy.syncCore();
+      await stx.wait();
+      equityLive6 = (await strategy.coreState())[0];
+      console.log(`synced Core equity: $${(Number(equityLive6) / 1e6).toFixed(2)}`);
+    } catch (e) {
+      console.warn("syncCore skipped:", String(e.message || e).slice(0, 140));
+    }
+  } else {
+    try {
+      equityLive6 = (await strategy.marginSummary()).accountValue;
+    } catch (_) {
+      /* keep cached value */
+    }
+  }
+  // Position too: cached lastPositionSzi is pre-action in execute mode (the
+  // sync above) and stale in dry mode — read the precompile live for decisions.
+  let sziLive = szi;
+  try {
+    sziLive = (await strategy.position()).szi;
+  } catch (_) {
+    /* keep cached value */
+  }
+  console.log(`state: exists=${exists} equity6=${equityLive6} principal6=${principal6} szi=${sziLive} szDecimals=${szDec}`);
   console.log(`profit: realized=${realized} swept=${swept} harvestable=${harvestable} syncedAt=${syncedAt}`);
 
   // Loss visibility (round-2 H1): equity below principal = the venue lost
   // money. No on-chain write-down happens by itself — alert so the OWNER
   // reconciles with vault.reportLoss(<loss, underlying units>), keeping
   // depositor claims tied to real backing instead of phantom value.
-  if (exists && equity6 < principal6) {
-    const loss6 = principal6 - equity6;
+  // $0.10 dust floor: normal trading fees ($0.005/fill at beta sizes) dip
+  // equity below principal on every open — those are not reportLoss events.
+  if (exists && equityLive6 < principal6 && principal6 - equityLive6 > 100_000n) {
+    const loss6 = principal6 - equityLive6;
     await sendAlert(
       "⚠️ DN equity below principal",
-      `Core equity $${(Number(equity6) / 1e6).toFixed(2)} < principal $${(Number(principal6) / 1e6).toFixed(2)} — loss $${(Number(loss6) / 1e6).toFixed(2)}. OWNER ACTION: vault.reportLoss(<loss in underlying units>) so claims stop being phantom (round-2 H1).`
+      `Core equity $${(Number(equityLive6) / 1e6).toFixed(2)} < principal $${(Number(principal6) / 1e6).toFixed(2)} — loss $${(Number(loss6) / 1e6).toFixed(2)}. OWNER ACTION: vault.reportLoss(<loss in underlying units>) so claims stop being phantom (round-2 H1).`
     );
   }
 
@@ -228,21 +271,31 @@ async function main() {
   }
 
   // Current notional (USD) from the on-chain position + oracle px.
+  // Scales, live-verified against HyperCore docs (2026-09-25):
+  //   oraclePx raw = human × 10^(6 − szDecimals) → 91.6555 reads as 916555.
+  //   CoreWriter limit-order wire wants 10^8 × human → pxWire = raw × 10^(2+szDec).
   const px = BigInt(await strategy.oraclePx());
-  // szi is 1e8-scaled human units (0.05 BTC → 5_000_000); px is 1e8-scaled
-  // USD. Notional USD = (|szi|/1e8) × (px/1e8) — BOTH normalized.
-  const currentNotionalUsd = (Math.abs(Number(szi)) / 1e8) * (Number(px) / 1e8);
+  const pxWire = px * 10n ** BigInt(2 + szDec);
+  const pxHuman = Number(pxWire) / 1e8;
+  // szi raw is in LOTS (human × 10^szDecimals — live-verified: a -0.11 HYPE
+  // position reads as szi=-11 with szDecimals=2; do not reuse without
+  // re-verifying on a second asset).
+  const sziHuman = Number(sziLive) / 10 ** szDec;
+  const currentNotionalUsd = Math.abs(sziHuman) * pxHuman;
   const driftPct = targetNotionalUsd > 0 ? ((currentNotionalUsd - targetNotionalUsd) / targetNotionalUsd) * 100 : 0;
-  console.log(`position: szi=${szi} px=${Number(px) / 1e8} current notional ${currentNotionalUsd.toFixed(2)} USD (drift ${driftPct.toFixed(2)}% vs target)`);
+  console.log(`position: szi=${sziLive} (${sziHuman} HYPE) px=${pxHuman} current notional ${currentNotionalUsd.toFixed(2)} USD (drift ${driftPct.toFixed(2)}% vs target)`);
 
   // ── 4. Decide ──
-  const coreProfit6 = equity6 > principal6 ? equity6 - principal6 : 0n;
+  const coreProfit6 = equityLive6 > principal6 ? equityLive6 - principal6 : 0n;
   let action = "HOLD";
   if (!exists) action = "BRIDGE_FIRST";
   else if (coreProfit6 > 0n && harvestable === 0n) action = "BRIDGE_PROFIT";
-  else if (targetNotionalUsd >= 10 && szi === 0n && apr >= CONFIG.fundingAprThreshold) action = "OPEN";
-  else if (szi !== 0n && apr < CONFIG.unwindAprThreshold) action = "UNWIND";
-  else if (szi !== 0n && Math.abs(driftPct) > CONFIG.rebalanceBandPct) action = "REBALANCE";
+  else if (targetNotionalUsd >= 10 && sziLive === 0n && apr >= CONFIG.fundingAprThreshold) action = "OPEN";
+  else if (sziLive !== 0n && apr < CONFIG.unwindAprThreshold) action = "UNWIND";
+  else if (sziLive !== 0n && targetNotionalUsd >= 10 && Math.abs(driftPct) > CONFIG.rebalanceBandPct) action = "REBALANCE";
+  // (bare-truth guard: with a sub-$10 policy target a "rebalance" would reduce
+  // the position below HL's order minimum — that's not a trade the venue
+  // accepts, so hold instead.)
   console.log(`decision: ${action} (dryRun=${CONFIG.dryRun})`);
 
   if (CONFIG.dryRun || action === "HOLD" || action === "BRIDGE_FIRST") {
@@ -257,6 +310,12 @@ async function main() {
     // amount realizes as profit and leaves the principal (hedge margin)
     // untouched on Core; a full drain still returns principal + profit.
     const amount6 = coreProfit6;
+    // sendAsset draws the Core SPOT balance; realized money sits on the PERP
+    // side → class-transfer down first (action 7, next block), then bridge.
+    console.log(`class-transfer perp→spot: ${amount6} (6dp)`);
+    const mtx = await strategy.moveUsdcToSpot(amount6);
+    await mtx.wait();
+    await new Promise((r) => setTimeout(r, 8000));
     console.log(`bridging profit back: ${amount6} (6dp)`);
     const tx = await strategy.bridgeBackToEvm(amount6);
     await tx.wait();
@@ -284,8 +343,8 @@ async function main() {
   if (action === "UNWIND") {
     // Negative funding: the short PAYS. Close the full position (reduceOnly),
     // verify, alert. Capital returns to spot → bridge-back handles the rest.
-    const sz = szi < 0n ? -szi : szi; // buy back the exact position size
-    const limitPx = (px * (10000n - CONFIG.slippageBps)) / 10000n; // buy: lower
+    const sz = (sziLive < 0n ? -sziLive : sziLive) * 10n ** BigInt(8 - szDec); // lots → 1e8 wire: buy back the exact size
+    const limitPx = roundPxWire((pxWire * (10000n + CONFIG.slippageBps)) / 10000n); // BUY → cross above
     console.log(`unwinding short: sz=${sz} @ IOC ${limitPx} (funding ${apr.toFixed(2)}% < ${CONFIG.unwindAprThreshold}%)`);
     const tx = await strategy.closeShort(asset, limitPx, sz, CONFIG.tifIoc);
     await tx.wait();
@@ -299,6 +358,20 @@ async function main() {
         `funding ${apr.toFixed(2)}%/yr — short NOT closed (szi=${after.szi}); spot hedge left in place (still balanced). Verify on-chain.`
       );
       process.exit(3);
+    }
+    // Move ALL remaining Core USDC perp→spot so a later bridge-out (or the
+    // vault recall unwind) can draw it — sendAsset is spot-source only.
+    try {
+      const msum2 = await strategy.marginSummary();
+      const avLeft6 = msum2.accountValue > 0n ? BigInt(msum2.accountValue) : 0n;
+      if (avLeft6 >= 1_000_000n) {
+        console.log(`class-transfer perp→spot (remaining $${(Number(avLeft6) / 1e6).toFixed(2)})`);
+        const mtx2 = await strategy.moveUsdcToSpot(avLeft6);
+        await mtx2.wait();
+        await new Promise((r) => setTimeout(r, 8000));
+      }
+    } catch (e) {
+      console.warn("perp→spot class-transfer skipped:", e.message?.slice(0, 120));
     }
     // ── Spot leg: return the hedge (HIGH-2). Selling needs a ≥$10 REQUEST;
     // sub-$10 hedge sizes can't be expressed as spot orders → spot-send
@@ -314,7 +387,7 @@ async function main() {
           const szDecS = 10 - Math.round(Math.log10(Number(pxScale)));
           const step = 10n ** BigInt(8 - szDecS);
           const szS = (hs / step) * step;
-          const sellPx = (pxRaw * (10000n - CONFIG.slippageBps)) / 10000n;
+          const sellPx = roundPxWire((pxRaw * 100n * (10000n - CONFIG.slippageBps)) / 10000n); // spot raw@1e6 → wire×100; SELL crosses below
           console.log(`selling spot hedge: ${Number(szS) / 1e8} HYPE @ IOC ${sellPx}`);
           const stx = await strategy.sellSpot(sellPx, szS, CONFIG.tifIoc);
           await stx.wait();
@@ -346,17 +419,17 @@ async function main() {
     // means over-sized from price moves, i.e. BUY back the excess).
     if (action === "REBALANCE" && currentNotionalUsd > targetNotionalUsd) {
       const reduceUsd = currentNotionalUsd - targetNotionalUsd;
-      const szFloat = reduceUsd / (Number(px) / 1e8);
+      const szFloat = reduceUsd / pxHuman;
       const factor = 10 ** szDec;
       const sz = BigInt(Math.floor(szFloat * factor)) * 10n ** 8n / BigInt(factor);
-      const limitPx = (px * (10000n - CONFIG.slippageBps)) / 10000n; // buy: lower
+      const limitPx = roundPxWire((pxWire * (10000n + CONFIG.slippageBps)) / 10000n); // BUY → cross above
       console.log(`reducing short by ${reduceUsd.toFixed(2)} USD: sz=${sz} @ IOC ${limitPx}`);
       const tx = await strategy.closeShort(asset, limitPx, sz, CONFIG.tifIoc);
       await tx.wait();
       await new Promise((r) => setTimeout(r, 8000));
       const after = await strategy.position();
       console.log(`verified: szi=${after.szi}`);
-      if ((Math.abs(Number(after.szi)) / 1e8) * (Number(px) / 1e8) < targetNotionalUsd * 0.9) {
+      if ((Math.abs(Number(after.szi)) / 10 ** szDec) * pxHuman < targetNotionalUsd * 0.9) {
         console.error("MISMATCH: position smaller than expected — investigate (drop?)");
         process.exit(3);
       }
@@ -365,7 +438,7 @@ async function main() {
     // OPEN path (also the under-sized rebalance): short the full target.
     // Margin check: strategy must hold enough USDC on Core (bridged earlier).
     const needMargin6 = BigInt(Math.floor(targetNotionalUsd * 1e6)) * CONFIG.marginUtilBps / 10000n;
-    if (equity6 < needMargin6) {
+    if (equityLive6 < needMargin6) {
       // Bridge more USDC in first (from idle EVM balance), THEN size the hedge
       // in a LATER block (CoreWriter sequencing rule).
       const idle = await strategy.underlying().then((u) => u).catch(() => null);
@@ -385,11 +458,28 @@ async function main() {
       await btx.wait();
       await new Promise((r) => setTimeout(r, 8000)); // action lands NEXT L1 block
       console.log("bridge verified (earlier-block rule honored)");
+      // Bridge credits Core SPOT; orders need PERP collateral. Class-transfer
+      // now (action 7) and wait one action cycle — skipping this made live
+      // opens reject for zero margin (spot USDC is not perp collateral).
+      const moved6 = bridgeable / scale;
+      console.log(`class-transfer spot→perp: ${moved6} (6dp)`);
+      const mtx = await strategy.moveUsdcToPerp(moved6);
+      await mtx.wait();
+      await new Promise((r) => setTimeout(r, 8000));
+      const msum = await strategy.marginSummary();
+      if (msum.accountValue < needMargin6) {
+        await sendAlert(
+          "🟠 DN margin still short after bridge + class-transfer",
+          `perp equity $${(Number(msum.accountValue) / 1e6).toFixed(2)} < need $${(Number(needMargin6) / 1e6).toFixed(2)} — fund more or resize; NOT opening (would reject).`
+        );
+        process.exit(4);
+      }
+      console.log(`perp equity after class-transfer: $${(Number(msum.accountValue) / 1e6).toFixed(2)} (need $${(Number(needMargin6) / 1e6).toFixed(2)})`);
     }
-    const szFloat = targetNotionalUsd / (Number(px) / 1e8);
+    const szFloat = targetNotionalUsd / pxHuman;
     const factor = 10 ** szDec;
     const sz = BigInt(Math.floor(szFloat * factor)) * 10n ** 8n / BigInt(factor);
-    const limitPx = (px * (10000n + CONFIG.slippageBps)) / 10000n; // sell: higher
+    const limitPx = roundPxWire((pxWire * (10000n - CONFIG.slippageBps)) / 10000n); // SELL → cross below
     console.log(`opening short: sz=${sz} @ IOC ${limitPx}`);
     const tx = await strategy.openShort(asset, limitPx, sz, CONFIG.tifIoc);
     await tx.wait();
@@ -408,7 +498,7 @@ async function main() {
       console.warn("⚠️ spot leg DISABLED (spotPairIndex unset) — single-leg position; NOT delta-neutral");
       await sendAlert("🟠 DN running WITHOUT spot leg", "spotPairIndex unset — single-leg short (HIGH-2 posture). No delta-neutral claims until the spot hedge is live.");
     } else {
-      const shortSz1e8 = after.szi < 0n ? -after.szi : after.szi;
+      const shortSz1e8 = (after.szi < 0n ? -after.szi : after.szi) * 10n ** BigInt(8 - szDec); // lots → 1e8
       const hedgeSz1e8 = await strategy.spotHedgeSz();
       const pxRaw = await strategy.spotPx();
       const pxScale = await strategy.spotPxScale();
@@ -422,7 +512,7 @@ async function main() {
           const szDecS = 10 - Math.round(Math.log10(pxDiv)); // pxScale = 10^(10-szDec)
           const step = 10n ** BigInt(8 - szDecS);
           const szS = (gap1e8 / step) * step;
-          const buyPx = (pxRaw * (10000n + CONFIG.slippageBps)) / 10000n;
+          const buyPx = roundPxWire((pxRaw * 100n * (10000n + CONFIG.slippageBps)) / 10000n); // spot raw@1e6 → wire×100; BUY crosses above
           console.log(`buying spot hedge gap: ${Number(szS) / 1e8} HYPE @ IOC ${buyPx}`);
           const stx = await strategy.openSpotBuy(buyPx, szS, CONFIG.tifIoc);
           await stx.wait();
@@ -432,11 +522,15 @@ async function main() {
           if (hsAfter < shortSz1e8) {
             await sendAlert("🟠 DN hedge still short after buy", `hedge ${hsAfter} < short ${shortSz1e8} (1e8 units) — check spot fills.`);
           }
-        } else {
+        } else if (gapUsd > 1.0) {
           await sendAlert(
             "🟠 DN hedge gap — spot leg under-funded",
             `short ${Number(shortSz1e8) / 1e8} vs spot ${Number(hedgeSz1e8) / 1e8} HYPE (gap $${gapUsd.toFixed(2)} — below HL's $10 spot order min). Fund the strategy's Core spot (transfer HYPE in) before claiming delta-neutral.`
           );
+        } else {
+          // Sub-step gaps are order-granularity noise: spot sizes round to
+          // 0.01 HYPE ≈ $1 at current px — you cannot trade closer than one step.
+          console.log(`hedge gap $${gapUsd.toFixed(2)} ≤ one order step ($1) — within granularity ✓`);
         }
       } else {
         console.log(`hedge covers the short (${Number(hedgeSz1e8) / 1e8} >= ${Number(shortSz1e8) / 1e8} HYPE) — delta-neutral ✓`);

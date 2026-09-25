@@ -61,7 +61,8 @@ async function main() {
 
   await (await existsAt.setExists(true)).wait();
   await (await perpInfoAt.set("BTC", 1, 5, 40, false)).wait();
-  await (await oracleAt.setPx(6_000_000_000_000n)).wait(); // $60k BTC
+  // Perp px raw = human × 10^(6−szDecimals) (live-verified) → $60k BTC = 600_000.
+  await (await oracleAt.setPx(600_000n)).wait(); // $60k BTC
 
   const usdc = await (await E.getContractFactory("MockUSDC")).deploy();
   await usdc.waitForDeployment();

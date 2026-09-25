@@ -144,15 +144,9 @@ async function main() {
      4294967295, 4294967295, 0, 500_000_000n])]);
   report("bridgeBackToEvm bytes (action 13 sendAsset)", (await coreWriterAt.lastAction()).toLowerCase() === want.toLowerCase());
 
-  tx = await adapter.stakeHype(10_000_000_000n); // 100 HYPE × 1e8
-  await tx.wait();
-  want = E.concat(["0x01000004", coder.encode(["uint64"], [10_000_000_000n])]);
-  report("stakeHype bytes (action 4)", (await coreWriterAt.lastAction()).toLowerCase() === want.toLowerCase());
-
-  tx = await adapter.delegateHype(user1.address, 10_000_000_000n, false);
-  await tx.wait();
-  want = E.concat(["0x01000003", coder.encode(["address", "uint64", "bool"], [user1.address, 10_000_000_000n, false])]);
-  report("delegateHype bytes (action 3)", (await coreWriterAt.lastAction()).toLowerCase() === want.toLowerCase());
+  // Staking actions (4/3/5) removed from the deployment surface for the
+  // HyperEVM 3,000,000-gas deploy budget — covered by the raw-action capture
+  // suite instead (dn_realread_capture); re-added in an audit revision.
 
   // ── Bridge in ──
   const depBefore = await walletAt.depositCount(); // persistent anvil: storage survives runs
@@ -196,8 +190,8 @@ async function main() {
   await (await marginAt.set(123_456n, 100n, 200n, 50n)).wait();
   const m = await adapter.marginSummary();
   report("margin summary read (0x80f)", m.accountValue === 123_456n && m.marginUsed === 100n);
-  await (await withdrawableAt.setAmount(42_000_000n)).wait();
-  report("withdrawable read (0x803)", (await adapter.withdrawable()) === 42_000_000n);
+  // withdrawable() (0x803) removed with the size-cut set — the raw-decode
+  // capture suite still pins the precompile bytes (dn_realread_replay).
 
   console.log(`\n══════ ${pass} passed, ${fail} failed ══════`);
   process.exit(fail ? 1 : 0);

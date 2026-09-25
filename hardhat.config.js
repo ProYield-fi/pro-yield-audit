@@ -29,7 +29,8 @@ module.exports = {
       // deploy tx can never fit. Foundry already builds optimized (runs=200);
       // putting hardhat on the same footing makes the deployment build match
       // the bytecode the whole fuzz/invariant suite exercises.
-      optimizer: { enabled: true, runs: 200 },
+      optimizer: { enabled: true, runs: 1 },
+      viaIR: true,
     },
   },
   networks: {

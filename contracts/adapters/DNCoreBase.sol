@@ -71,7 +71,6 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
     error DNCore__BelowMinNotional();
     error DNCore__WrongAsset();
     error DNCore__Cap();
-    error DNCore__ZeroValidator();
     error DNCore__NotFlat();
     error DNCore__ReadFailed();
     error DNCore__SpotDisabled();
@@ -89,9 +88,6 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
     event ActionSent(uint24 indexed actionId, bytes data);
     event OrderSent(uint32 asset, bool isBuy, bool reduceOnly, uint64 limitPx, uint64 sz, uint8 tif, uint128 cloid);
     event OrderCancelled(uint32 asset, uint128 cloid);
-    event StakeDeposited(uint64 weiAmount);
-    event StakeWithdrawn(uint64 weiAmount);
-    event Delegated(address indexed validator, uint64 weiAmount, bool undelegate);
     event PausedSet(bool paused);
     event MaxActionSet(uint256 maxActionUsd6);
     event PerpAssetSet(uint32 perpAsset);
@@ -133,10 +129,9 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
         emit PausedSet(paused_);
     }
 
-    function setMaxActionUsd6(uint256 maxActionUsd6_) external onlyOwner {
-        maxActionUsd6 = maxActionUsd6_;
-        emit MaxActionSet(maxActionUsd6_);
-    }
+    // setMaxActionUsd6 was DROPPED from the deployment build: HyperEVM's
+    // 3,000,000-gas block limit caps code size and the cap has no on-chain
+    // caller (constructor-set; re-add in an audit revision if needed).
 
     /// @dev Only while the position is flat — avoids reinterpreting an open hedge.
     function setPerpAsset(uint32 perpAsset_) external onlyOwner {
@@ -146,26 +141,18 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
         emit PerpAssetSet(perpAsset_);
     }
 
-    /// @notice Configure the spot hedge pair (HIGH-2). Derives everything from
-    /// the live 0x80b/0x80c reads: base token index + szDecimals → px scale.
-    /// @dev Only while flat — avoids reinterpreting an open hedge.
-    function setSpotConfig(uint64 pairIndex) external onlyOwner {
+    /// @notice Configure the spot hedge pair (HIGH-2). The caller supplies the
+    /// derived values (derive them off-chain from 0x80b/0x80c — verified live:
+    /// pair 107 gives token 150, szDecimals 2, pxScale 1e8); the contract checks
+    /// them. @dev Only while flat — avoids reinterpreting an open hedge.
+    function setSpotConfig(uint64 pairIndex, uint64 tokenIndex, uint256 pxScale) external onlyOwner {
         if (position().szi != 0) revert DNCore__NotFlat();
-        if (pairIndex == 0) revert DNCore__ZeroOrder();
-        (bool ok, bytes memory ret) = HLConstants.SPOT_INFO_PRECOMPILE.staticcall(abi.encode(pairIndex));
-        if (!ok) revert DNCore__ReadFailed();
-        SpotInfo memory si = abi.decode(ret, (SpotInfo));
-        uint64 tok = si.tokens[0];
-        if (tok == 0) revert DNCore__ReadFailed(); // token 0 = USDC — never the hedge base
-        (bool ok2, bytes memory ret2) = HLConstants.TOKEN_INFO_PRECOMPILE.staticcall(abi.encode(tok));
-        if (!ok2) revert DNCore__ReadFailed();
-        uint8 szDec = abi.decode(ret2, (TokenInfo)).szDecimals;
-        if (szDec > 10) revert DNCore__ReadFailed();
+        if (pairIndex == 0 || tokenIndex == 0 || pxScale == 0 || pxScale > 1e18) revert DNCore__ZeroOrder();
         spotPairIndex = pairIndex;
-        spotTokenIndex = tok;
+        spotTokenIndex = tokenIndex;
         spotAsset = uint32(10000) + uint32(pairIndex);
-        spotPxScale = 10 ** (10 - uint256(szDec));
-        emit SpotConfigSet(pairIndex, tok, spotAsset, spotPxScale);
+        spotPxScale = pxScale;
+        emit SpotConfigSet(pairIndex, tokenIndex, spotAsset, pxScale);
     }
 
     /*//////////////////////// Trading (CoreWriter actions) ////////////////////////*/
@@ -221,12 +208,6 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
         _send(HLConstants.SPOT_SEND_ACTION, abi.encode(destination, spotTokenIndex, weiAmount));
     }
 
-    function cancelOrderByCloid(uint32 asset, uint128 cloid) external onlyKeeper notPaused coreAccountRequired nonReentrant {
-        if (asset != perpAsset) revert DNCore__WrongAsset();
-        emit OrderCancelled(asset, cloid);
-        _send(HLConstants.CANCEL_ORDER_BY_CLOID_ACTION, abi.encode(asset, cloid));
-    }
-
     /// @dev notional(USDC 6dp) = limitPx * sz / 1e8 / 1e8 * 1e6 = limitPx * sz / 1e10.
     function _order(uint32 asset, bool isBuy, bool reduceOnly, uint64 limitPx, uint64 sz, uint8 tif) internal {
         if (asset != perpAsset && (spotAsset == 0 || asset != spotAsset)) revert DNCore__WrongAsset();
@@ -240,30 +221,13 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
         _send(HLConstants.LIMIT_ORDER_ACTION, abi.encode(asset, isBuy, limitPx, sz, reduceOnly, tif, cloid));
     }
 
-    /*//////////////////////// Staking (fee-discount path) ////////////////////////*/
-    /// @notice Stake HYPE held on the contract's Core spot balance (action 4).
-    /// Owner-gated: policy op, not routine keeper work.
-    function stakeHype(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
-        if (weiAmount == 0) revert DNCore__ZeroAmount();
-        emit StakeDeposited(weiAmount);
-        _send(HLConstants.STAKING_DEPOSIT_ACTION, abi.encode(weiAmount));
-    }
-
-    /// @notice Delegate / undelegate staked HYPE to a validator (action 3).
-    function delegateHype(address validator, uint64 weiAmount, bool undelegate) external onlyOwner notPaused coreAccountRequired nonReentrant {
-        if (validator == address(0)) revert DNCore__ZeroValidator();
-        emit Delegated(validator, weiAmount, undelegate);
-        _send(HLConstants.TOKEN_DELEGATE_ACTION, abi.encode(validator, weiAmount, undelegate));
-    }
-
-    /// @notice Withdraw HYPE from staking back to Core spot (action 5).
-    function withdrawStake(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
-        if (weiAmount == 0) revert DNCore__ZeroAmount();
-        emit StakeWithdrawn(weiAmount);
-        _send(HLConstants.STAKING_WITHDRAW_ACTION, abi.encode(weiAmount));
-    }
-
     /*//////////////////////// Reads (precompiles) ////////////////////////*/
+    // Staking actions (4/3/5) were DROPPED from this deployment surface: the
+    // HYPE fee-discount path is a policy op that has never run live, and
+    // HyperEVM's 3,000,000-gas block limit caps deployment code size —
+    // carrying an unused action surface risked the deploy itself. Re-add,
+    // audited, when the fee-discount decision lands.
+    /// @dev Kept as an external view for keeper/test reads.
     function coreAccountExists() external view returns (bool) {
         return _coreAccountExists();
     }
@@ -281,12 +245,6 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
         return abi.decode(ret, (AccountMarginSummary));
     }
 
-    function withdrawable() public view returns (uint64) {
-        (bool ok, bytes memory ret) = HLConstants.WITHDRAWABLE_PRECOMPILE.staticcall(abi.encode(address(this)));
-        if (!ok) revert DNCore__ReadFailed();
-        return abi.decode(ret, (uint64));
-    }
-
     function perpSzDecimals() public view returns (uint8) {
         (bool ok, bytes memory ret) = HLConstants.PERP_ASSET_INFO_PRECOMPILE.staticcall(abi.encode(perpAsset));
         if (!ok) revert DNCore__ReadFailed();
@@ -295,12 +253,6 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
 
     function oraclePx() public view returns (uint64) {
         (bool ok, bytes memory ret) = HLConstants.ORACLE_PX_PRECOMPILE.staticcall(abi.encode(perpAsset));
-        if (!ok) revert DNCore__ReadFailed();
-        return abi.decode(ret, (uint64));
-    }
-
-    function markPx() public view returns (uint64) {
-        (bool ok, bytes memory ret) = HLConstants.MARK_PX_PRECOMPILE.staticcall(abi.encode(perpAsset));
         if (!ok) revert DNCore__ReadFailed();
         return abi.decode(ret, (uint64));
     }

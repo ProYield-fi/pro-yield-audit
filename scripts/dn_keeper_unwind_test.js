@@ -62,7 +62,9 @@ async function main() {
 
   await (await existsAt.setExists(true)).wait();
   await (await perpInfoAt.set("BTC", 1, 5, 40, false)).wait();
-  await (await oracleAt.setPx(6_000_000_000_000n)).wait(); // $60k
+  // Real precompile conventions (verified live): perp px raw = human × 10^(6−szDecimals)
+  // → BTC $60k (szDec 5) = 600_000; szi raw = human × 10^szDecimals → -0.05 = -5_000.
+  await (await oracleAt.setPx(600_000n)).wait(); // $60k
 
   const usdc = await (await E.getContractFactory("MockUSDC")).deploy();
   await usdc.waitForDeployment();
@@ -83,9 +85,9 @@ async function main() {
   await (await strategy.setKeeper(keeper.address)).wait();
 
   // State: position OPEN (short 0.05 BTC = -$3,000 notional), margin synced.
-  // MockUSDC 18-dec: equity = principal 100k USD = 100e21; sz in 1e8-scaled human
-  // BTC: -0.05 BTC → szi = -5_000_000n (0.05 × 1e8).
-  const SZI = -5_000_000n;
+  // MockUSDC 18-dec: equity = principal 100k USD = 100e21.
+  // BTC: -0.05 BTC → szi = -5_000n (0.05 × 10^5, lots convention).
+  const SZI = -5_000n;
   await (await usdc.mint(user1.address, U(1_000_000))).wait();
   await (await usdc.connect(user1).approve(vAddr, U(1_000_000))).wait();
   await (await vault.connect(user1).deposit(U(1_000_000))).wait();

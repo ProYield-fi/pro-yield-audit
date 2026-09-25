@@ -35,13 +35,13 @@ contract DNCoreStrategy is BaseStrategy, DNCoreBase {
     /// (1 for real USDC; 1e12 for an 18-decimals test token).
     uint256 public immutable coreScale;
     uint256 public bufferBps = 1500; // liquidity buffer (bps of assets, <= 5000)
-    uint256 public constant MAX_BUFFER_BPS = 5000;
+    uint256 internal constant MAX_BUFFER_BPS = 5000; // getter unused; internal for deploy budget
 
     /*//////////////////////// Core accounting (6dp, Core-native) ////////////////////////*/
     int256 public coreEquity6;      // Core account value (margin summary), last sync
     uint256 public corePrincipal6;  // net USDC sent to Core (principal only)
     int64 public lastPositionSzi;   // last synced perp position size
-    uint256 public lastSync;
+    uint256 internal lastSync; // getter unused; internal for deploy budget
 
     /*//////////////////////// Profit (underlying units) ////////////////////////*/
     uint256 public profitRealized;  // profit bridged back to EVM
