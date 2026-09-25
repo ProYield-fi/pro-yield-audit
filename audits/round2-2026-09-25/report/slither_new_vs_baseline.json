@@ -1,0 +1,353 @@
+[
+  {
+    "check": "unchecked-transfer",
+    "contract": "MockCoreDepositWallet",
+    "file": "contracts/mocks/MockCoreWriter.sol",
+    "impact": "High",
+    "confidence": "Medium",
+    "lines": "33-40",
+    "desc_first": "MockCoreDepositWallet.deposit(uint256,uint32) (contracts/mocks/MockCoreWriter.sol#33-40) ignores return value by IERC20(token).transferFrom(msg.sender,address(this),amount) (contracts/mocks/MockCoreWr"
+  },
+  {
+    "check": "unchecked-transfer",
+    "contract": "MockSwapper",
+    "file": "contracts/mocks/MockSwapper.sol",
+    "impact": "High",
+    "confidence": "Medium",
+    "lines": "18-26",
+    "desc_first": "MockSwapper.swap(address,address,uint256,uint256) (contracts/mocks/MockSwapper.sol#18-26) ignores return value by tokenIn.transferFrom(msg.sender,address(this),amountIn) (contracts/mocks/MockSwapper.s"
+  },
+  {
+    "check": "unchecked-transfer",
+    "contract": "MockSwapper",
+    "file": "contracts/mocks/MockSwapper.sol",
+    "impact": "High",
+    "confidence": "Medium",
+    "lines": "18-26",
+    "desc_first": "MockSwapper.swap(address,address,uint256,uint256) (contracts/mocks/MockSwapper.sol#18-26) ignores return value by pydOut.transfer(msg.sender,out) (contracts/mocks/MockSwapper.sol#24)"
+  },
+  {
+    "check": "incorrect-equality",
+    "contract": "PYDFeeDiscount",
+    "file": "contracts/PYDFeeDiscount.sol",
+    "impact": "Medium",
+    "confidence": "High",
+    "lines": "207-219",
+    "desc_first": "PYDFeeDiscount.claimRebate() (contracts/PYDFeeDiscount.sol#207-219) uses a dangerous strict equality:"
+  },
+  {
+    "check": "incorrect-equality",
+    "contract": "PYDFunder",
+    "file": "contracts/PYDFunder.sol",
+    "impact": "Medium",
+    "confidence": "High",
+    "lines": "101-132",
+    "desc_first": "PYDFunder.topUp(uint256,uint256) (contracts/PYDFunder.sol#101-132) uses a dangerous strict equality:"
+  },
+  {
+    "check": "incorrect-equality",
+    "contract": "DNCoreStrategy",
+    "file": "contracts/DNCoreStrategy.sol",
+    "impact": "Medium",
+    "confidence": "High",
+    "lines": "155-172",
+    "desc_first": "DNCoreStrategy._doHarvest() (contracts/DNCoreStrategy.sol#155-172) uses a dangerous strict equality:"
+  },
+  {
+    "check": "unused-return",
+    "contract": "MockEvilStrategy",
+    "file": "contracts/mocks/MockEvilStrategy.sol",
+    "impact": "Medium",
+    "confidence": "Medium",
+    "lines": "28-43",
+    "desc_first": "MockEvilStrategy._doHarvest() (contracts/mocks/MockEvilStrategy.sol#28-43) ignores return value by underlying.approve(attackerVault,bal) (contracts/mocks/MockEvilStrategy.sol#35)"
+  },
+  {
+    "check": "missing-zero-check",
+    "contract": "setToken",
+    "file": "contracts/mocks/MockCoreWriter.sol",
+    "impact": "Low",
+    "confidence": "Medium",
+    "lines": "29-29",
+    "desc_first": "MockCoreDepositWallet.setToken(address).token_ (contracts/mocks/MockCoreWriter.sol#29) lacks a zero-check on :"
+  },
+  {
+    "check": "missing-zero-check",
+    "contract": "setAttackTarget",
+    "file": "contracts/mocks/MockEvilStrategy.sol",
+    "impact": "Low",
+    "confidence": "Medium",
+    "lines": "18-18",
+    "desc_first": "MockEvilStrategy.setAttackTarget(address,bool,bool).vault_ (contracts/mocks/MockEvilStrategy.sol#18) lacks a zero-check on :"
+  },
+  {
+    "check": "calls-loop",
+    "contract": "PYDFeeDiscount",
+    "file": "contracts/PYDFeeDiscount.sol",
+    "impact": "Low",
+    "confidence": "Medium",
+    "lines": "235-239",
+    "desc_first": "PYDFeeDiscount._vaultSharesOf(address) (contracts/PYDFeeDiscount.sol#235-239) has external calls inside a loop: (ok,ret) = vault.staticcall(abi.encodeWithSignature(shares(address),user)) (contracts/PY"
+  },
+  {
+    "check": "pragma",
+    "contract": "?",
+    "file": "contracts/BaseStrategy.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "2-2",
+    "desc_first": "5 different versions of Solidity are used:"
+  },
+  {
+    "check": "solc-version",
+    "contract": "?",
+    "file": "node_modules/@openzeppelin/contracts/interfaces/IERC165.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "4-4",
+    "desc_first": "Version constraint >=0.4.16 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)"
+  },
+  {
+    "check": "solc-version",
+    "contract": "?",
+    "file": "node_modules/@openzeppelin/contracts/interfaces/IERC1363.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "4-4",
+    "desc_first": "Version constraint >=0.6.2 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)"
+  },
+  {
+    "check": "solc-version",
+    "contract": "?",
+    "file": "node_modules/@openzeppelin/contracts/interfaces/draft-IERC6093.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "4-4",
+    "desc_first": "Version constraint >=0.8.4 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)"
+  },
+  {
+    "check": "solc-version",
+    "contract": "?",
+    "file": "node_modules/@openzeppelin/contracts/access/Ownable.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "4-4",
+    "desc_first": "Version constraint ^0.8.20 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)"
+  },
+  {
+    "check": "low-level-calls",
+    "contract": "DNCoreBase",
+    "file": "contracts/adapters/DNCoreBase.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "229-233",
+    "desc_first": "Low level call in DNCoreBase.oraclePx() (contracts/adapters/DNCoreBase.sol#229-233):"
+  },
+  {
+    "check": "low-level-calls",
+    "contract": "DNCoreBase",
+    "file": "contracts/adapters/DNCoreBase.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "235-239",
+    "desc_first": "Low level call in DNCoreBase.markPx() (contracts/adapters/DNCoreBase.sol#235-239):"
+  },
+  {
+    "check": "low-level-calls",
+    "contract": "DNCoreBase",
+    "file": "contracts/adapters/DNCoreBase.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "204-208",
+    "desc_first": "Low level call in DNCoreBase.position() (contracts/adapters/DNCoreBase.sol#204-208):"
+  },
+  {
+    "check": "low-level-calls",
+    "contract": "DNCoreBase",
+    "file": "contracts/adapters/DNCoreBase.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "211-215",
+    "desc_first": "Low level call in DNCoreBase.marginSummary() (contracts/adapters/DNCoreBase.sol#211-215):"
+  },
+  {
+    "check": "low-level-calls",
+    "contract": "PYDFeeDiscount",
+    "file": "contracts/PYDFeeDiscount.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "235-239",
+    "desc_first": "Low level call in PYDFeeDiscount._vaultSharesOf(address) (contracts/PYDFeeDiscount.sol#235-239):"
+  },
+  {
+    "check": "low-level-calls",
+    "contract": "PYDFeeDiscount",
+    "file": "contracts/PYDFeeDiscount.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "229-233",
+    "desc_first": "Low level call in PYDFeeDiscount._vaultTotalShares() (contracts/PYDFeeDiscount.sol#229-233):"
+  },
+  {
+    "check": "low-level-calls",
+    "contract": "DNCoreBase",
+    "file": "contracts/adapters/DNCoreBase.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "223-227",
+    "desc_first": "Low level call in DNCoreBase.perpSzDecimals() (contracts/adapters/DNCoreBase.sol#223-227):"
+  },
+  {
+    "check": "low-level-calls",
+    "contract": "DNCoreBase",
+    "file": "contracts/adapters/DNCoreBase.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "242-246",
+    "desc_first": "Low level call in DNCoreBase._coreAccountExists() (contracts/adapters/DNCoreBase.sol#242-246):"
+  },
+  {
+    "check": "low-level-calls",
+    "contract": "DNCoreBase",
+    "file": "contracts/adapters/DNCoreBase.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "217-221",
+    "desc_first": "Low level call in DNCoreBase.withdrawable() (contracts/adapters/DNCoreBase.sol#217-221):"
+  },
+  {
+    "check": "missing-inheritance",
+    "contract": "?",
+    "file": "contracts/mocks/MockSwapper.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "9-27",
+    "desc_first": "MockSwapper (contracts/mocks/MockSwapper.sol#9-27) should inherit from ISwapper (contracts/PYDFunder.sol#150-152)"
+  },
+  {
+    "check": "missing-inheritance",
+    "contract": "?",
+    "file": "contracts/MorphoStrategy.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "17-60",
+    "desc_first": "MorphoStrategy (contracts/MorphoStrategy.sol#17-60) should inherit from IStrategy (contracts/IStrategy.sol#4-10)"
+  },
+  {
+    "check": "missing-inheritance",
+    "contract": "?",
+    "file": "contracts/ProYieldVault.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "8-273",
+    "desc_first": "ProYieldVault (contracts/ProYieldVault.sol#8-273) should inherit from IStrategy (contracts/IStrategy.sol#4-10)"
+  },
+  {
+    "check": "missing-inheritance",
+    "contract": "?",
+    "file": "contracts/mocks/MockCoreWriter.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "10-18",
+    "desc_first": "MockCoreWriter (contracts/mocks/MockCoreWriter.sol#10-18) should inherit from ICoreWriter (contracts/adapters/HLInterfaces.sol#7-9)"
+  },
+  {
+    "check": "naming-convention",
+    "contract": "setCaps",
+    "file": "contracts/ProYieldVault.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "98-98",
+    "desc_first": "Parameter ProYieldVault.setCaps(uint256,uint256)._tvlCap (contracts/ProYieldVault.sol#98) is not in mixedCase"
+  },
+  {
+    "check": "naming-convention",
+    "contract": "fallback",
+    "file": "contracts/mocks/MockPrecompiles.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "107-107",
+    "desc_first": "Parameter MockPerpInfo.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#107) is not in mixedCase"
+  },
+  {
+    "check": "naming-convention",
+    "contract": "fallback",
+    "file": "contracts/mocks/MockPrecompiles.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "74-74",
+    "desc_first": "Parameter MockWithdrawable.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#74) is not in mixedCase"
+  },
+  {
+    "check": "naming-convention",
+    "contract": "fallback",
+    "file": "contracts/mocks/MockPrecompiles.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "120-120",
+    "desc_first": "Parameter MockOraclePx.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#120) is not in mixedCase"
+  },
+  {
+    "check": "naming-convention",
+    "contract": "fallback",
+    "file": "contracts/mocks/MockPrecompiles.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "21-21",
+    "desc_first": "Parameter MockCoreUserExists.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#21) is not in mixedCase"
+  },
+  {
+    "check": "naming-convention",
+    "contract": "fallback",
+    "file": "contracts/mocks/MockPrecompiles.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "61-61",
+    "desc_first": "Parameter MockMarginSummary.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#61) is not in mixedCase"
+  },
+  {
+    "check": "naming-convention",
+    "contract": "fallback",
+    "file": "contracts/mocks/MockPrecompiles.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "42-42",
+    "desc_first": "Parameter MockPosition2.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#42) is not in mixedCase"
+  },
+  {
+    "check": "naming-convention",
+    "contract": "setCaps",
+    "file": "contracts/ProYieldVault.sol",
+    "impact": "Informational",
+    "confidence": "High",
+    "lines": "98-98",
+    "desc_first": "Parameter ProYieldVault.setCaps(uint256,uint256)._perUserCap (contracts/ProYieldVault.sol#98) is not in mixedCase"
+  },
+  {
+    "check": "cache-array-length",
+    "contract": "allocate",
+    "file": "contracts/ProYieldVault.sol",
+    "impact": "Optimization",
+    "confidence": "High",
+    "lines": "151-151",
+    "desc_first": "Loop condition i < strategyList.length (contracts/ProYieldVault.sol#151) should use cached array length instead of referencing `length` member of the storage array."
+  },
+  {
+    "check": "cache-array-length",
+    "contract": "_recallShortfall",
+    "file": "contracts/ProYieldVault.sol",
+    "impact": "Optimization",
+    "confidence": "High",
+    "lines": "176-176",
+    "desc_first": "Loop condition i < strategyList.length (contracts/ProYieldVault.sol#176) should use cached array length instead of referencing `length` member of the storage array."
+  },
+  {
+    "check": "constable-states",
+    "contract": "PYDFunder",
+    "file": "contracts/PYDFunder.sol",
+    "impact": "Optimization",
+    "confidence": "High",
+    "lines": "40-40",
+    "desc_first": "PYDFunder.minConvertUsd6 (contracts/PYDFunder.sol#40) should be constant"
+  }
+]

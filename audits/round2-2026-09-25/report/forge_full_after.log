@@ -1,0 +1,143 @@
+No files changed, compilation skipped
+
+Ran 7 tests for test/forge/Vault.caps.t.sol:VaultCapsTest
+[PASS] test_defaults_uncapped_and_unpaused() (gas: 22656)
+[PASS] test_events_emitted() (gas: 127953)
+[PASS] test_pause_blocks_deposits_not_withdrawals() (gas: 623161)
+[PASS] test_per_user_cap_boundary() (gas: 553620)
+[PASS] test_per_user_cap_counts_earned_value() (gas: 785379)
+[PASS] test_setters_owner_only() (gas: 59372)
+[PASS] test_tvl_cap_boundary_and_reopen() (gas: 511067)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 5.57ms (4.33ms CPU time)
+
+Ran 2 tests for test/audit/Round2.dn_accounting.t.sol:Round2DNTest
+[PASS] test_PartB_fullAmountBridge_realizesProfit_sweepWorks() (gas: 506071)
+[PASS] test_PartB_keeperProfitOnlyBridge_realizesZeroProfit() (gas: 408889)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 6.95ms (648.50µs CPU time)
+
+Ran 9 tests for test/forge/PYD.coverage.t.sol:PYDCoverageTest
+[PASS] test_accrual_accumulates_across_touches() (gas: 519495)
+[PASS] test_contract_callers() (gas: 1745918)
+[PASS] test_discount_constructor_zero_guards() (gas: 10406)
+[PASS] test_name_counts_budget() (gas: 306082)
+[PASS] test_rollover_math_exact() (gas: 286432)
+[PASS] test_settiers_boundaries() (gas: 122315)
+[PASS] test_snapshot_noop_paths() (gas: 887300)
+[PASS] test_withdraw_path() (gas: 356179)
+[PASS] test_withdraw_then_claim_keeps_accrual() (gas: 474450)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 10.69ms (3.94ms CPU time)
+
+Ran 8 tests for test/audit/Round2.repros.t.sol:Round2ReprosTest
+[PASS] test_H1_strategyLoss_phantomTotalAssets_withdrawReverts() (gas: 1972044)
+[PASS] test_H3_creditYield_doubleCountsPreExistingIdle() (gas: 626987)
+[PASS] test_H3b_repeatedCreditYield_sameIdle_inflates() (gas: 238863)
+[PASS] test_L1_route_silentlyClamps_routedExceedsReceived() (gas: 528745)
+[PASS] test_M1_integration_recallDrainsStrategy_toZero_inclDonation() (gas: 1885234)
+[PASS] test_M1_unit_recall_capsAtBalance_notDeployedDebt() (gas: 1360195)
+[PASS] test_M2a_donationToVault_notCountedAtHarvest() (gas: 323886)
+[PASS] test_M2b_donationToStrategy_sweptAsProfit_withFDFee() (gas: 1742451)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 12.24ms (6.44ms CPU time)
+
+Ran 11 tests for test/forge/Vault.coverage.t.sol:VaultCoverageTest
+[PASS] test_allocate_no_zero_value_transfers() (gas: 2796488)
+[PASS] test_contract_callers_use_msg_sender_not_tx_origin() (gas: 615195)
+[PASS] test_harvestStrategy_success_and_messages() (gas: 447853)
+[PASS] test_harvest_skips_paused_strategy() (gas: 1653225)
+[PASS] test_harvest_stamps_lastHarvest() (gas: 271340)
+[PASS] test_harvest_takes_no_zero_value_fee_transfer() (gas: 272538)
+[PASS] test_name() (gas: 9464)
+[PASS] test_recall_never_over_pulls_past_the_shortfall() (gas: 3174192)
+[PASS] test_recall_pulls_exactly_the_shortfall() (gas: 549631)
+[PASS] test_zero_performance_fee_path() (gas: 580255)
+[PASS] test_zero_supply_conversions() (gas: 15376)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 16.78ms (5.28ms CPU time)
+
+Ran 2 tests for test/forge/Vault.differential.t.sol:VaultDifferentialTest
+[PASS] testFuzz_differential_short(uint96) (runs: 64, μ: 11895171, ~: 11942840)
+[PASS] test_differential_long_horizon() (gas: 239751246)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 492.53ms (680.01ms CPU time)
+
+Ran 10 tests for test/forge/Vault.invariants.t.sol:VaultInvariantsTest
+[PASS]
+VaultInvariantsTest invariants:
+[PASS] invariant_credited_leq_routed
+[PASS] invariant_fd_bookkeeping
+[PASS] invariant_no_zero_valued_depositor
+[PASS] invariant_price_never_below_one
+[PASS] invariant_solvency
+[PASS] invariant_user_shares_sum_to_total
+ VaultInvariantsTest invariants (runs: 64, calls: 12800, reverts: 700)
+
+╭--------------+----------------+-------+---------+----------╮
+| Contract     | Selector       | Calls | Reverts | Discards |
++============================================================+
+| VaultHandler | allocate       | 1267  | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | creditYield    | 1267  | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | deposit        | 1248  | 349     | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | donate         | 1254  | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | fundStrategy   | 1279  | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | harvest        | 1320  | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | routeOut       | 1304  | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | toggleStrategy | 1258  | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | warp           | 1308  | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | withdraw       | 1295  | 351     | 0        |
+╰--------------+----------------+-------+---------+----------╯
+
+[PASS] test_broken_strategy_does_not_brick_harvest() (gas: 587141)
+[PASS] test_credit_yield_requires_backing() (gas: 251298)
+[PASS] test_donation_attack_neutralized() (gas: 640741)
+[PASS] test_dust_deposit_reverts_below_price() (gas: 490452)
+[PASS] test_emergency_withdraw_dilutes_share_price() (gas: 313956)
+[PASS] test_first_depositor_one_to_one_then_price_appreciation() (gas: 713323)
+[PASS] test_harvest_fee_split() (gas: 575926)
+[PASS] test_paused_strategy_locks_its_funds_for_withdrawals() (gas: 709420)
+[PASS] test_withdraw_recalls_from_strategies() (gas: 485386)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 3.37s (3.37s CPU time)
+
+Ran 11 tests for test/forge/PYD.invariants.t.sol:PYDInvariantsTest
+[PASS]
+PYDInvariantsTest invariants:
+[PASS] invariant_accrual_bounded_by_pool
+[PASS] invariant_claims_bounded_by_pool
+[PASS] invariant_principal_intact
+[PASS] invariant_stake_sum_to_total
+ PYDInvariantsTest invariants (runs: 64, calls: 12800, reverts: 0)
+
+╭--------------+-------------+-------+---------+----------╮
+| Contract     | Selector    | Calls | Reverts | Discards |
++=========================================================+
+| StakeHandler | claim       | 2158  | 0       | 0        |
+|--------------+-------------+-------+---------+----------|
+| StakeHandler | exit        | 2131  | 0       | 0        |
+|--------------+-------------+-------+---------+----------|
+| StakeHandler | fundRewards | 2114  | 0       | 0        |
+|--------------+-------------+-------+---------+----------|
+| StakeHandler | stake       | 2148  | 0       | 0        |
+|--------------+-------------+-------+---------+----------|
+| StakeHandler | unstake     | 2154  | 0       | 0        |
+|--------------+-------------+-------+---------+----------|
+| StakeHandler | warp        | 2095  | 0       | 0        |
+╰--------------+-------------+-------+---------+----------╯
+
+[PASS] test_claims_never_exceed_funded_pool() (gas: 412306)
+[PASS] test_discount_exit_keeps_accrued_rebate_claimable() (gas: 1085504)
+[PASS] test_discount_set_tiers_validation() (gas: 382947)
+[PASS] test_discount_snapshot_math_and_budget_cap() (gas: 1160472)
+[PASS] test_discount_tier_boundaries() (gas: 957930)
+[PASS] test_discount_zero_share_and_below_tier_stakers_accrue_nothing() (gas: 1045549)
+[PASS] test_exit_returns_principal_and_rewards() (gas: 417870)
+[PASS] test_mid_period_topup_preserves_accrual() (gas: 434153)
+[PASS] test_no_accrual_after_period_finish() (gas: 317482)
+[PASS] test_rollover_without_interaction_no_double_accrual() (gas: 488497)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 3.38s (3.38s CPU time)
+
+Ran 8 test suites in 3.38s (7.29s CPU time): 60 tests passed, 0 failed, 0 skipped (60 total tests)

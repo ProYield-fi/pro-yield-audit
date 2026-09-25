@@ -1,0 +1,41 @@
+{
+  "totals": {
+    "round2": 75,
+    "by_group": {
+      "production-core": 38,
+      "mocks": 14,
+      "libs": 16,
+      "adapters": 7
+    }
+  },
+  "by_group": {
+    "production-core": {
+      "reentrancy-balance": 1,
+      "incorrect-equality": 8,
+      "reentrancy-no-eth": 3,
+      "calls-loop": 4,
+      "reentrancy-benign": 4,
+      "timestamp": 7,
+      "pragma": 1,
+      "low-level-calls": 3,
+      "missing-inheritance": 2,
+      "naming-convention": 2,
+      "cache-array-length": 2,
+      "constable-states": 1
+    },
+    "mocks": {
+      "unchecked-transfer": 3,
+      "unused-return": 1,
+      "missing-zero-check": 2,
+      "missing-inheritance": 2,
+      "naming-convention": 6
+    },
+    "libs": {
+      "assembly": 12,
+      "solc-version": 4
+    },
+    "adapters": {
+      "low-level-calls": 7
+    }
+  }
+}

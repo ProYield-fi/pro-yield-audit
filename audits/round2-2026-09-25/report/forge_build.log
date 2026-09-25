@@ -1,0 +1,751 @@
+Compiling 63 files with Solc 0.8.28
+Solc 0.8.28 finished in 6.01s
+Compiler run successful with warnings:
+Warning (2072): Unused local variable.
+   --> contracts/PYDFunder.sol:120:9:
+    |
+120 |         uint256 got = swapper.swap(address(usdc), address(staking.pyd()), cap, 0);
+    |         ^^^^^^^^^^^
+
+Warning (5667): Unused function parameter. Remove or comment out the variable name to silence this warning.
+  --> contracts/mocks/MockSwapper.sol:18:19:
+   |
+18 |     function swap(address tIn, address, uint256 amountIn, uint256) external returns (uint256) {
+   |                   ^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to pure
+  --> contracts/DeltaNeutralStrategy.sol:46:5:
+   |
+46 |     function name() external view override returns (string memory) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+  --> contracts/MorphoStrategy.sol:28:5:
+   |
+28 |     function name() external view override returns (string memory) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+  --> contracts/PendleStrategy.sol:21:5:
+   |
+21 |     function name() external view override returns (string memory) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+  --> contracts/ProYieldVault.sol:46:5:
+   |
+46 |     function name() external view override returns (string memory) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+  --> contracts/SkyStrategy.sol:22:5:
+   |
+22 |     function name() external view override returns (string memory) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+  --> contracts/SkyStrategy.sol:32:5:
+   |
+32 |     function _doHarvest() internal override returns (uint256) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+  --> contracts/mocks/MockEvilStrategy.sol:24:5:
+   |
+24 |     function name() external view override returns (string memory) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+  --> test/forge/Vault.invariants.t.sol:33:5:
+   |
+33 |     function name() external view override returns (string memory) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+warning[missing-events-access-control]: `delta` is changed without an event but is used for access control
+   ╭▸ contracts/DeltaNeutralStrategy.sol:71:9
+   │
+71 │         delta += size;
+   │         ━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-events-access-control]: `stakeAmount` is changed without an event but is used for access control
+   ╭▸ contracts/PYDStaking.sol:95:9
+   │
+95 │         stakeAmount[msg.sender] -= amount;
+   │         ━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[require-revert-in-loop]: `require` or `revert` inside a loop
+    ╭▸ contracts/PYDFeeDiscount.sol:103:50
+    │
+103 │             if (newTiers[i][0] <= prevThreshold) revert PYDFee__BadTier(); // must ascend
+    │                                                  ━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/require-revert-in-loop
+
+warning[require-revert-in-loop]: `require` or `revert` inside a loop
+    ╭▸ contracts/PYDFeeDiscount.sol:104:48
+    │
+104 │             if (newTiers[i][1] > MAX_TIER_BPS) revert PYDFee__BadTier();
+    │                                                ━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/require-revert-in-loop
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+   ╭▸ contracts/mocks/MockEvilStrategy.sol:18:30
+   │
+18 │     function setAttackTarget(address vault_, bool doDeposit, bool doWithdraw) external onlyOwner {
+   │                              ━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/adapters/DNCoreAdapter.sol:53:80
+   │
+53 │     function bridgeUsdcToCore(uint256 evmAmount) external onlyKeeper notPaused nonReentrant {
+   │                                                                                ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[missing-events-access-control]: `delta` is changed without an event but is used for access control
+   ╭▸ contracts/DeltaNeutralStrategy.sol:81:9
+   │
+81 │         delta -= size;
+   │         ━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[unused-return]: return value of an external call is not used
+   ╭▸ contracts/mocks/MockEvilStrategy.sol:35:17
+   │
+35 │                 underlying.approve(attackerVault, bal);
+   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/unused-return
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/PendleStrategy.sol:30:59
+   │
+30 │     function setMarket(address market) external onlyOwner nonReentrant {
+   │                                                           ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/adapters/DNCoreBase.sol:136:91
+    │
+136 │     function moveUsdcToPerp(uint64 ntl) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+    │                                                                                           ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/PYDStaking.sol:46:79
+   │
+46 │     function fundRewards(uint256 amount, uint256 duration) external onlyOwner nonReentrant {
+   │                                                                               ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/adapters/DNCoreAdapter.sol:62:98
+   │
+62 │     function bridgeBackToEvm(uint64 weiAmount) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+   │                                                                                                  ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+   ╭▸ contracts/PYDStaking.sol:64:13
+   │
+64 │         if (block.timestamp >= periodFinish) {
+   │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/DeltaNeutralStrategy.sol:50:66
+   │
+50 │     function setShortPosition(address short_) external onlyOwner nonReentrant {
+   │                                                                  ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+   ╭▸ contracts/PendleStrategy.sol:36:13
+   │
+36 │         if (block.timestamp > maturity && pendleMarket != address(0)) {
+   │             ━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/adapters/DNCoreBase.sol:141:91
+    │
+141 │     function moveUsdcToSpot(uint64 ntl) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+    │                                                                                           ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[missing-events-arithmetic]: `_totalAssets` is changed without an event but is used in arithmetic
+    ╭▸ contracts/ProYieldVault.sol:140:9
+    │
+140 │         _totalAssets -= balance;
+    │         ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-events-arithmetic
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/DeltaNeutralStrategy.sol:56:60
+   │
+56 │     function setOracle(address oracle_) external onlyOwner nonReentrant {
+   │                                                            ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/DeltaNeutralStrategy.sol:61:67
+   │
+61 │     function setFundingSource(address source_) external onlyOwner nonReentrant {
+   │                                                                   ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+   ╭▸ contracts/DeltaNeutralStrategy.sol:61:31
+   │
+61 │     function setFundingSource(address source_) external onlyOwner nonReentrant {
+   │                               ━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/adapters/DNCoreBase.sol:148:126
+    │
+148 │ …int8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+    │                                                              ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[reentrancy-no-eth]: external call can be reentered before `delta` is updated
+    ╭▸ contracts/DeltaNeutralStrategy.sol:120:23
+    │
+120 │           (bool ok, ) = fundingSource.call(
+    │ ┏━━━━━━━━━━━━━━━━━━━━━━━┛
+121 │ ┃             abi.encodeWithSignature("payFunding(address,uint256)", address(this), amount)
+122 │ ┃         );
+    │ ┗━━━━━━━━━┛
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-no-eth
+
+warning[missing-events-access-control]: `shares` is changed without an event but is used for access control
+    ╭▸ contracts/ProYieldVault.sol:206:9
+    │
+206 │         shares[msg.sender] -= sh;
+    │         ━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/DeltaNeutralStrategy.sol:67:60
+   │
+67 │     function openPosition(uint256 size) external onlyOwner nonReentrant {
+   │                                                            ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+   ╭▸ contracts/DeltaNeutralStrategy.sol:73:9
+   │
+73 │         emit PositionOpened(msg.sender, size);
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/adapters/DNCoreBase.sol:153:127
+    │
+153 │ …int8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+    │                                                              ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/PYDStaking.sol:142:34
+    │
+142 │         uint256 lastApplicable = block.timestamp < periodFinish ? block.timestamp : periodFinish;
+    │                                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/PYDStaking.sol:143:13
+    │
+143 │         if (lastApplicable <= lastUpdateTime) return rewardPerTokenStored;
+    │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/DeltaNeutralStrategy.sol:76:49
+   │
+76 │     function closePosition() external onlyOwner nonReentrant {
+   │                                                 ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/adapters/DNCoreBase.sol:157:112
+    │
+157 │     function cancelOrderByCloid(uint32 asset, uint128 cloid) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+    │                                                                                                                ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/PYDStaking.sol:149:13
+    │
+149 │         if (block.timestamp >= periodFinish && periodFinish > 0) {
+    │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+   ╭▸ contracts/DeltaNeutralStrategy.sol:84:9
+   │
+84 │         emit PositionClosed(msg.sender, size);
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/DeltaNeutralStrategy.sol:93:49
+   │
+93 │     function updateFunding() external onlyOwner nonReentrant {
+   │                                                 ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[calls-loop]: external call inside a loop
+    ╭▸ contracts/PYDFeeDiscount.sol:236:39
+    │
+236 │         (bool ok, bytes memory ret) = vault.staticcall(abi.encodeWithSignature("shares(address)", user));
+    │                                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/calls-loop
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/DeltaNeutralStrategy.sol:114:33
+    │
+114 │         if (fundingRate == 0 || elapsed == 0) return;
+    │                                 ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/DeltaNeutralStrategy.sol:117:13
+    │
+117 │         if (amount == 0) return;
+    │             ━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/ProYieldVault.sol:134:53
+    │
+134 │     function emergencyWithdraw() external onlyOwner nonReentrant {
+    │                                                     ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/DeltaNeutralStrategy.sol:125:9
+    │
+125 │         emit FundingAccrued(amount);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/ProYieldVault.sol:143:44
+    │
+143 │     function allocate() external onlyOwner nonReentrant {
+    │                                            ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[missing-zero-check]: address parameter is used in a state write or value transfer without a zero-address check
+   ╭▸ contracts/mocks/MockCoreWriter.sol:29:23
+   │
+29 │     function setToken(address token_) external {
+   │                       ━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-zero-check
+
+warning[erc20-unchecked-transfer]: ERC20 `transfer` or `transferFrom` call does not check the return value
+   ╭▸ contracts/mocks/MockCoreWriter.sol:38:13
+   │
+38 │             IERC20(token).transferFrom(msg.sender, address(this), amount);
+   │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/erc20-unchecked-transfer
+
+warning[erc20-unchecked-transfer]: ERC20 `transfer` or `transferFrom` call does not check the return value
+   ╭▸ contracts/mocks/MockSwapper.sol:22:9
+   │
+22 │         tokenIn.transferFrom(msg.sender, address(this), amountIn);
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/erc20-unchecked-transfer
+
+warning[erc20-unchecked-transfer]: ERC20 `transfer` or `transferFrom` call does not check the return value
+   ╭▸ contracts/mocks/MockSwapper.sol:24:9
+   │
+24 │         pydOut.transfer(msg.sender, out);
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/erc20-unchecked-transfer
+
+warning[block-timestamp]: usage of `block.timestamp` in a comparison may be manipulated by validators
+    ╭▸ contracts/PYDStaking.sol:169:16
+    │
+169 │         return block.timestamp < periodFinish ? block.timestamp : periodFinish;
+    │                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/block-timestamp
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/adapters/DNCoreBase.sol:179:91
+    │
+179 │     function stakeHype(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
+    │                                                                                           ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/adapters/DNCoreBase.sol:186:130
+    │
+186 │ …ndelegate) external onlyOwner notPaused coreAccountRequired nonReentrant {
+    │                                                              ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/adapters/DNCoreBase.sol:193:95
+    │
+193 │     function withdrawStake(uint64 weiAmount) external onlyOwner notPaused coreAccountRequired nonReentrant {
+    │                                                                                               ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[calls-loop]: external call inside a loop
+    ╭▸ contracts/ProYieldVault.sol:186:17
+    │
+186 │                 BaseStrategy(strategy).recall(perStrategy);
+    │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/calls-loop
+
+warning[calls-loop]: external call inside a loop
+    ╭▸ contracts/ProYieldVault.sol:187:31
+    │
+187 │                 uint256 got = underlying.balanceOf(address(this)) - idle;
+    │                               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/calls-loop
+
+warning[missing-events-access-control]: `balanceOf` is changed without an event but is used for access control
+   ╭▸ contracts/PYDToken.sol:21:9
+   │
+21 │         balanceOf[msg.sender] -= value;
+   │         ━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-events-access-control]: `balanceOf` is changed without an event but is used for access control
+   ╭▸ contracts/PYDToken.sol:34:9
+   │
+34 │         balanceOf[from] -= value;
+   │         ━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[missing-events-access-control]: `allowance` is changed without an event but is used for access control
+   ╭▸ contracts/PYDToken.sol:36:9
+   │
+36 │         allowance[from][msg.sender] -= value;
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/MorphoStrategy.sol:32:60
+   │
+32 │     function setMorpho(address morpho_) external onlyOwner nonReentrant {
+   │                                                            ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/PYDFunder.sol:131:9
+    │
+131 │         emit StreamFunded(pydOut, duration);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/MorphoStrategy.sol:38:56
+   │
+38 │     function supply(uint256 amount) external onlyOwner nonReentrant {
+   │                                                        ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/FeeDistributor.sol:50:67
+   │
+50 │     function route(address to, uint256 amount) external onlyOwner nonReentrant {
+   │                                                                   ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/ProYieldVault.sol:211:9
+    │
+211 │         emit Withdraw(msg.sender, amount);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/DNCoreStrategy.sol:90:80
+   │
+90 │     function bridgeUsdcToCore(uint256 evmAmount) external onlyKeeper notPaused nonReentrant {
+   │                                                                                ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[missing-events-access-control]: `vault` is changed without an event but is used for access control
+   ╭▸ contracts/BaseStrategy.sol:78:9
+   │
+78 │         vault = vault_;
+   │         ━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/missing-events-access-control
+
+warning[unsafe-typecast]: typecast can truncate values
+   ╭▸ contracts/DNCoreStrategy.sol:94:24
+   │
+94 │         uint64 core6 = uint64(evmAmount / coreScale);
+   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[calls-loop]: external call inside a loop
+    ╭▸ contracts/ProYieldVault.sol:226:21
+    │
+226 │                 try BaseStrategy(s).harvest() {
+    │                     ━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/calls-loop
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/ProYieldVault.sol:228:21
+    │
+228 │                     emit StrategyHarvestFailed(s);
+    │                     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[reentrancy-events]: event emitted after an external call; reentrancy can reorder or fabricate logs that off-chain consumers rely on
+    ╭▸ contracts/ProYieldVault.sol:243:9
+    │
+243 │         emit Harvest(totalProfit);
+    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/reentrancy-events
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/DNCoreStrategy.sol:104:96
+    │
+104 │     function bridgeBackToEvm(uint64 amount6) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+    │                                                                                                ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[unsafe-typecast]: typecast can truncate values
+    ╭▸ contracts/DNCoreStrategy.sol:108:58
+    │
+108 │         uint64 principalRed = amount6 > corePrincipal6 ? uint64(corePrincipal6) : amount6;
+    │                                                          ━━━━━━━━━━━━━━━━━━━━━━
+    │
+    ├ note: consider disabling this lint if you're certain the cast is safe
+    │       
+    │       // casting to 'uint64' is safe because [explain why]
+    │       // forge-lint: disable-next-line(unsafe-typecast)
+    │       
+    │       
+    ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/ProYieldVault.sol:260:61
+    │
+260 │     function creditYield(uint256 amount) external onlyOwner nonReentrant {
+    │                                                             ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/BaseStrategy.sol:70:60
+   │
+70 │     function setKeeper(address keeper_) external onlyOwner nonReentrant {
+   │                                                            ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[unsafe-typecast]: typecast can truncate values
+    ╭▸ contracts/DNCoreStrategy.sol:143:41
+    │
+143 │         uint256 eqU = coreEquity6 > 0 ? uint256(coreEquity6) * coreScale : 0;
+    │                                         ━━━━━━━━━━━━━━━━━━━━
+    │
+    ├ note: consider disabling this lint if you're certain the cast is safe
+    │       
+    │       // casting to 'uint256' is safe because [explain why]
+    │       // forge-lint: disable-next-line(unsafe-typecast)
+    │       
+    │       
+    ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+    ╭▸ contracts/ProYieldVault.sol:267:67
+    │
+267 │     function harvestStrategy(address strategy) external onlyOwner nonReentrant {
+    │                                                                   ━━━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/BaseStrategy.sol:76:58
+   │
+76 │     function setVault(address vault_) external onlyOwner nonReentrant {
+   │                                                          ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[non-reentrant-not-first]: `nonReentrant` is not the first modifier
+   ╭▸ contracts/BaseStrategy.sol:91:56
+   │
+91 │     function setActive(bool active) external onlyOwner nonReentrant {
+   │                                                        ━━━━━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/non-reentrant-not-first
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+   ╭▸ test/forge/PYD.coverage.t.sol:76:17
+   │
+76 │         vm.warp(block.timestamp + 4 days);
+   │         ────────━━━━━━━━━━━━━━━────────── `vm.warp` changes this environment here
+   │
+   ├ help: capture it with `vm.getBlockTimestamp()` instead
+   ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+   ╭▸ test/forge/PYD.coverage.t.sol:92:17
+   │
+92 │         vm.warp(block.timestamp + 3 days);
+   │         ────────━━━━━━━━━━━━━━━────────── `vm.warp` changes this environment here
+   │
+   ├ help: capture it with `vm.getBlockTimestamp()` instead
+   ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+    ╭▸ test/forge/PYD.coverage.t.sol:145:45
+    │
+145 │         assertEq(discount.lastSnapshotAt(), block.timestamp, "empty-vault snapshot timestamp recorded");
+    │                                             ━━━━━━━━━━━━━━━
+    ‡
+156 │         vm.warp(block.timestamp + 1 hours);
+    │         ────────────────────────────────── `vm.warp` changes this environment here
+    │
+    ├ help: capture it with `vm.getBlockTimestamp()` instead
+    ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+    ╭▸ test/forge/PYD.coverage.t.sol:156:17
+    │
+156 │         vm.warp(block.timestamp + 1 hours);
+    │         ────────━━━━━━━━━━━━━━━─────────── `vm.warp` changes this environment here
+    │
+    ├ help: capture it with `vm.getBlockTimestamp()` instead
+    ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+    ╭▸ test/forge/PYD.invariants.t.sol:155:17
+    │
+155 │         vm.warp(block.timestamp + 7 days); // exactly at periodFinish
+    │         ────────━━━━━━━━━━━━━━━────────── `vm.warp` changes this environment here
+    │
+    ├ help: capture it with `vm.getBlockTimestamp()` instead
+    ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+    ╭▸ test/forge/PYD.invariants.t.sol:175:17
+    │
+175 │         vm.warp(block.timestamp + 7 days);
+    │         ────────━━━━━━━━━━━━━━━────────── `vm.warp` changes this environment here
+    │
+    ├ help: capture it with `vm.getBlockTimestamp()` instead
+    ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[environment-read-across-mutation]: `block.timestamp` may be reused across `vm.warp`
+    ╭▸ test/forge/PYD.invariants.t.sol:198:17
+    │
+198 │         vm.warp(block.timestamp + 5 days);
+    │         ────────━━━━━━━━━━━━━━━────────── `vm.warp` changes this environment here
+    │
+    ├ help: capture it with `vm.getBlockTimestamp()` instead
+    ╰ help: https://getfoundry.sh/forge/linting/environment-read-across-mutation
+
+warning[inconsistent-type-names]: contract mixes shorthand and explicit integer type names; use `uint256` and `int256` consistently
+    ╭▸ contracts/ProYieldVault.sol:151:18
+    │
+151 │             for (uint i = 0; i < strategyList.length; i++) {
+    │                  ━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/inconsistent-type-names
+
+warning[inconsistent-type-names]: contract mixes shorthand and explicit integer type names; use `uint256` and `int256` consistently
+    ╭▸ contracts/ProYieldVault.sol:158:18
+    │
+158 │             for (uint i = 0; i < strategyList.length; i++) {
+    │                  ━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/inconsistent-type-names
+
+warning[inconsistent-type-names]: contract mixes shorthand and explicit integer type names; use `uint256` and `int256` consistently
+    ╭▸ contracts/ProYieldVault.sol:176:14
+    │
+176 │         for (uint i = 0; i < strategyList.length; i++) {
+    │              ━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/inconsistent-type-names
+
+warning[inconsistent-type-names]: contract mixes shorthand and explicit integer type names; use `uint256` and `int256` consistently
+    ╭▸ contracts/ProYieldVault.sol:183:14
+    │
+183 │         for (uint i = 0; i < strategyList.length && missing > 0; i++) {
+    │              ━━━━━━━━━━
+    │
+    ╰ help: https://getfoundry.sh/forge/linting/inconsistent-type-names
+
+BUILD_EXIT=0

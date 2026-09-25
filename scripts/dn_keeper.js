@@ -8,9 +8,11 @@
 //   1. Read strategy state (coreState: equity/principal/szi/realized/swept).
 //   2. Read live funding from the HL API.
 //   3. SIZE the sleeve: targetNotionalUsd = vault.totalAssets() × DN weight
-//      (from the scout's blend snapshot) × deployPct. Never exceeds the USDC
-//      the strategy actually holds on Core (margin cap = deployable × maxLev
-//      is NOT used — we stay 1:1 notional vs margin for true delta-neutral).
+//      (from the scout's blend snapshot) × deployPct. Capped by the USDC the
+//      strategy actually holds on Core. Margin policy = marginUtilBps (3300 =
+//      ~33% of notional, effective ≈3× max) — deliberately NOT 1:1; the head-
+//      room covers fees/spread. (Round-2: the old "1:1 notional vs margin"
+//      comment contradicted the 3300bps policy — aligned.)
 //   4. Decide: BRIDGE_FIRST → OPEN → REBALANCE → BRIDGE_PROFIT → HOLD.
 //   5. Execute staged calls (bridge must land in an EARLIER block than actions).
 //   6. VERIFY every CoreWriter action after the on-chain delay (they drop
@@ -173,6 +175,18 @@ async function main() {
   console.log(`state: exists=${exists} equity6=${equity6} principal6=${principal6} szi=${szi} szDecimals=${szDec}`);
   console.log(`profit: realized=${realized} swept=${swept} harvestable=${harvestable} syncedAt=${syncedAt}`);
 
+  // Loss visibility (round-2 H1): equity below principal = the venue lost
+  // money. No on-chain write-down happens by itself — alert so the OWNER
+  // reconciles with vault.reportLoss(<loss, underlying units>), keeping
+  // depositor claims tied to real backing instead of phantom value.
+  if (exists && equity6 < principal6) {
+    const loss6 = principal6 - equity6;
+    await sendAlert(
+      "⚠️ DN equity below principal",
+      `Core equity $${(Number(equity6) / 1e6).toFixed(2)} < principal $${(Number(principal6) / 1e6).toFixed(2)} — loss $${(Number(loss6) / 1e6).toFixed(2)}. OWNER ACTION: vault.reportLoss(<loss in underlying units>) so claims stop being phantom (round-2 H1).`
+    );
+  }
+
   // ── 2. Funding ──
   const apr = await fetchFundingApr(asset);
   console.log(`funding: ${apr.toFixed(2)}% annualized (HlPerp, ${asset === 0 ? "BTC" : "ETH"})`);
@@ -228,8 +242,9 @@ async function main() {
   // ── 5. Act (staged; each step verified before the next) ──
   if (action === "BRIDGE_PROFIT") {
     // Return the profit portion Core→EVM (needs HYPE on Core for transfer gas).
-    // NOTE: if the hedge margin must stay sized, unwind extra margin first —
-    // amount below only takes the excess above principal. TODO(policy).
+    // Contract split is PROFIT-FIRST (round-2 HIGH-1 fix): a profit-sized
+    // amount realizes as profit and leaves the principal (hedge margin)
+    // untouched on Core; a full drain still returns principal + profit.
     const amount6 = coreProfit6;
     console.log(`bridging profit back: ${amount6} (6dp)`);
     const tx = await strategy.bridgeBackToEvm(amount6);
@@ -240,10 +255,18 @@ async function main() {
     console.log(`verified: equity6=${eq2} principal6=${pr2} realized=${realized2}`);
     if (vaultAddr !== hre.ethers.ZeroAddress) {
       const vault = await hre.ethers.getContractAt("ProYieldVault", vaultAddr, signer);
+      const sweptBefore = await strategy.profitSwept();
       const htx = await vault.harvest();
       await htx.wait();
-      console.log("vault.harvest() done — realized profit swept above buffer");
-      await sendAlert("💰 DN profit harvested", `realized profit swept to the vault above the buffer. Check the transparency page for the updated share price.`);
+      const sweptAfter = await strategy.profitSwept();
+      if (sweptAfter > sweptBefore) {
+        console.log(`vault.harvest() done — swept ${sweptAfter - sweptBefore} to the vault`);
+        await sendAlert("💰 DN profit harvested", `realized profit swept to the vault above the buffer. Check the transparency page for the updated share price.`);
+      } else {
+        // Realized but still under the liquidity buffer — not swept yet.
+        // Alerting "harvested" here was round-2 HIGH-1's misleading alert.
+        console.log("vault.harvest() done — profit sits inside the liquidity buffer, nothing swept this round");
+      }
     }
   }
 

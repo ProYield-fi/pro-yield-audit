@@ -98,15 +98,24 @@ contract DNCoreStrategy is BaseStrategy, DNCoreBase {
     }
 
     /// @notice Return USDC Core->EVM (sendAsset to the USDC system address).
-    /// Requires HYPE on Core for transfer gas. Splits the amount into principal
-    /// vs profit at the FRESHLY-SYNCED equity: profit = amount above remaining
-    /// principal. Only realized profit can ever be harvested.
+    /// Requires HYPE on Core for transfer gas. Splits the amount at the
+    /// FRESHLY-SYNCED equity: while equity > principal, an outflow draws from
+    /// the PROFIT portion FIRST (principal stays invested, keeping the hedge
+    /// margin sized), so a profit-sized skim realizes profit instead of
+    /// silently consuming principal basis (round-2 HIGH-1).
+    ///   profitAvail = max(0, equity - principal)
+    ///   profitRed   = min(amount, profitAvail);  principalRed = amount - profitRed
+    /// Full-amount drains are unchanged (profitAvail is realized, the rest is
+    /// principal); in a loss (equity < principal) every unit is principal.
     function bridgeBackToEvm(uint64 amount6) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         if (amount6 == 0) revert DNCore__ZeroAmount();
         _syncCore();
         if (int256(uint256(amount6)) > coreEquity6) revert DNCore__ExceedsEquity();
-        uint64 principalRed = amount6 > corePrincipal6 ? uint64(corePrincipal6) : amount6;
-        uint64 profitRed = amount6 - principalRed;
+        uint64 profitAvail = coreEquity6 > int256(corePrincipal6)
+            ? uint64(uint256(coreEquity6 - int256(corePrincipal6)))
+            : 0;
+        uint64 profitRed = amount6 < profitAvail ? amount6 : profitAvail;
+        uint64 principalRed = amount6 - profitRed;
         corePrincipal6 -= principalRed;
         coreEquity6 -= int256(uint256(amount6));
         if (profitRed > 0) {

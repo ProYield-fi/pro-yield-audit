@@ -1,0 +1,339 @@
+'forge clean' running (wd: /home/user/.hermes/cache/scratch/audit-round2-20260925-100000)
+'forge config --json' running
+'forge build --build-info --skip ./test/** ./script/** --force' running (wd: /home/user/.hermes/cache/scratch/audit-round2-20260925-100000)
+
+Detector: reentrancy-balance
+Reentrancy in PYDFunder.topUp(uint256,uint256) (contracts/PYDFunder.sol#101-132):
+	External call allowing reentrancy:
+	- got = swapper.swap(address(usdc),address(staking.pyd()),cap,0) (contracts/PYDFunder.sol#120)
+	Balance read before the call:
+	- pydBefore = IERC20(staking.pyd()).balanceOf(address(this)) (contracts/PYDFunder.sol#115)
+	Possible stale balance used after the call in a condition:
+	- pydOut == 0 (contracts/PYDFunder.sol#122)
+		- stale variable `pydOut`
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities
+
+Detector: unchecked-transfer
+MockCoreDepositWallet.deposit(uint256,uint32) (contracts/mocks/MockCoreWriter.sol#33-40) ignores return value by IERC20(token).transferFrom(msg.sender,address(this),amount) (contracts/mocks/MockCoreWriter.sol#38)
+MockSwapper.swap(address,address,uint256,uint256) (contracts/mocks/MockSwapper.sol#18-26) ignores return value by tokenIn.transferFrom(msg.sender,address(this),amountIn) (contracts/mocks/MockSwapper.sol#22)
+MockSwapper.swap(address,address,uint256,uint256) (contracts/mocks/MockSwapper.sol#18-26) ignores return value by pydOut.transfer(msg.sender,out) (contracts/mocks/MockSwapper.sol#24)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unchecked-transfer
+
+Detector: incorrect-equality
+DNCoreStrategy._doHarvest() (contracts/DNCoreStrategy.sol#155-172) uses a dangerous strict equality:
+	- sweep == 0 (contracts/DNCoreStrategy.sol#167)
+BaseStrategy.recall(uint256) (contracts/BaseStrategy.sol#83-89) uses a dangerous strict equality:
+	- amount == 0 (contracts/BaseStrategy.sol#87)
+DeltaNeutralStrategy._settleAccrued() (contracts/DeltaNeutralStrategy.sol#109-126) uses a dangerous strict equality:
+	- amount == 0 (contracts/DeltaNeutralStrategy.sol#117)
+PYDFeeDiscount.claimRebate() (contracts/PYDFeeDiscount.sol#207-219) uses a dangerous strict equality:
+	- amount == 0 (contracts/PYDFeeDiscount.sol#215)
+PYDFunder.topUp(uint256,uint256) (contracts/PYDFunder.sol#101-132) uses a dangerous strict equality:
+	- pydOut == 0 (contracts/PYDFunder.sol#122)
+ProYieldVault._toAssets(uint256) (contracts/ProYieldVault.sol#78-81) uses a dangerous strict equality:
+	- _totalShares == 0 (contracts/ProYieldVault.sol#79)
+ProYieldVault._toShares(uint256) (contracts/ProYieldVault.sol#73-76) uses a dangerous strict equality:
+	- _totalShares == 0 (contracts/ProYieldVault.sol#74)
+ProYieldVault.emergencyWithdraw() (contracts/ProYieldVault.sol#134-141) uses a dangerous strict equality:
+	- balance == 0 (contracts/ProYieldVault.sol#136)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-strict-equalities
+
+Detector: reentrancy-no-eth
+Reentrancy in DeltaNeutralStrategy._doHarvest() (contracts/DeltaNeutralStrategy.sol#131-160):
+	External calls:
+	- _settleAccrued() (contracts/DeltaNeutralStrategy.sol#138)
+		- (ok,None) = fundingSource.call(abi.encodeWithSignature(payFunding(address,uint256),address(this),amount)) (contracts/DeltaNeutralStrategy.sol#120-122)
+	State variables written after the call(s):
+	- accruedFunding -= swept (contracts/DeltaNeutralStrategy.sol#146)
+	DeltaNeutralStrategy.accruedFunding (contracts/DeltaNeutralStrategy.sol#17) can be used in cross function reentrancies:
+	- DeltaNeutralStrategy.accruedFunding (contracts/DeltaNeutralStrategy.sol#17)
+Reentrancy in DeltaNeutralStrategy.closePosition() (contracts/DeltaNeutralStrategy.sol#76-85):
+	External calls:
+	- _settleAccrued() (contracts/DeltaNeutralStrategy.sol#79)
+		- (ok,None) = fundingSource.call(abi.encodeWithSignature(payFunding(address,uint256),address(this),amount)) (contracts/DeltaNeutralStrategy.sol#120-122)
+	State variables written after the call(s):
+	- delta -= size (contracts/DeltaNeutralStrategy.sol#81)
+	DeltaNeutralStrategy.delta (contracts/DeltaNeutralStrategy.sol#13) can be used in cross function reentrancies:
+	- DeltaNeutralStrategy.delta (contracts/DeltaNeutralStrategy.sol#13)
+	- positions[msg.sender] = 0 (contracts/DeltaNeutralStrategy.sol#82)
+	DeltaNeutralStrategy.positions (contracts/DeltaNeutralStrategy.sol#19) can be used in cross function reentrancies:
+	- DeltaNeutralStrategy.positions (contracts/DeltaNeutralStrategy.sol#19)
+Reentrancy in DeltaNeutralStrategy.openPosition(uint256) (contracts/DeltaNeutralStrategy.sol#67-74):
+	External calls:
+	- _settleAccrued() (contracts/DeltaNeutralStrategy.sol#69)
+		- (ok,None) = fundingSource.call(abi.encodeWithSignature(payFunding(address,uint256),address(this),amount)) (contracts/DeltaNeutralStrategy.sol#120-122)
+	State variables written after the call(s):
+	- delta += size (contracts/DeltaNeutralStrategy.sol#71)
+	DeltaNeutralStrategy.delta (contracts/DeltaNeutralStrategy.sol#13) can be used in cross function reentrancies:
+	- DeltaNeutralStrategy.delta (contracts/DeltaNeutralStrategy.sol#13)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
+
+Detector: unused-return
+MockEvilStrategy._doHarvest() (contracts/mocks/MockEvilStrategy.sol#28-43) ignores return value by underlying.approve(attackerVault,bal) (contracts/mocks/MockEvilStrategy.sol#35)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
+
+Detector: missing-zero-check
+MockCoreDepositWallet.setToken(address).token_ (contracts/mocks/MockCoreWriter.sol#29) lacks a zero-check on :
+		- token = token_ (contracts/mocks/MockCoreWriter.sol#30)
+MockEvilStrategy.setAttackTarget(address,bool,bool).vault_ (contracts/mocks/MockEvilStrategy.sol#18) lacks a zero-check on :
+		- attackerVault = vault_ (contracts/mocks/MockEvilStrategy.sol#19)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-zero-address-validation
+
+Detector: calls-loop
+PYDFeeDiscount._vaultSharesOf(address) (contracts/PYDFeeDiscount.sol#235-239) has external calls inside a loop: (ok,ret) = vault.staticcall(abi.encodeWithSignature(shares(address),user)) (contracts/PYDFeeDiscount.sol#236)
+	Calls stack containing the loop:
+		PYDFeeDiscount.snapshotHarvest()
+ProYieldVault._recallShortfall(uint256) (contracts/ProYieldVault.sol#171-192) has external calls inside a loop: BaseStrategy(strategy).recall(perStrategy) (contracts/ProYieldVault.sol#186)
+	Calls stack containing the loop:
+		ProYieldVault.withdraw(uint256)
+ProYieldVault._recallShortfall(uint256) (contracts/ProYieldVault.sol#171-192) has external calls inside a loop: got = underlying.balanceOf(address(this)) - idle (contracts/ProYieldVault.sol#187)
+	Calls stack containing the loop:
+		ProYieldVault.withdraw(uint256)
+ProYieldVault.harvest() (contracts/ProYieldVault.sol#214-244) has external calls inside a loop: BaseStrategy(s).harvest() (contracts/ProYieldVault.sol#226-229)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation/#calls-inside-a-loop
+
+Detector: reentrancy-benign
+Reentrancy in DeltaNeutralStrategy._settleAccrued() (contracts/DeltaNeutralStrategy.sol#109-126):
+	External calls:
+	- (ok,None) = fundingSource.call(abi.encodeWithSignature(payFunding(address,uint256),address(this),amount)) (contracts/DeltaNeutralStrategy.sol#120-122)
+	State variables written after the call(s):
+	- accruedFunding += amount (contracts/DeltaNeutralStrategy.sol#124)
+Reentrancy in DeltaNeutralStrategy.closePosition() (contracts/DeltaNeutralStrategy.sol#76-85):
+	External calls:
+	- _settleAccrued() (contracts/DeltaNeutralStrategy.sol#79)
+		- (ok,None) = fundingSource.call(abi.encodeWithSignature(payFunding(address,uint256),address(this),amount)) (contracts/DeltaNeutralStrategy.sol#120-122)
+	State variables written after the call(s):
+	- totalPrincipal -= size (contracts/DeltaNeutralStrategy.sol#83)
+Reentrancy in ProYieldVault.harvest() (contracts/ProYieldVault.sol#214-244):
+	External calls:
+	- BaseStrategy(s).harvest() (contracts/ProYieldVault.sol#226-229)
+	State variables written after the call(s):
+	- _totalAssets += totalProfit - _feeOn(totalProfit) (contracts/ProYieldVault.sol#240)
+	- lastHarvest = block.timestamp (contracts/ProYieldVault.sol#242)
+Reentrancy in DeltaNeutralStrategy.openPosition(uint256) (contracts/DeltaNeutralStrategy.sol#67-74):
+	External calls:
+	- _settleAccrued() (contracts/DeltaNeutralStrategy.sol#69)
+		- (ok,None) = fundingSource.call(abi.encodeWithSignature(payFunding(address,uint256),address(this),amount)) (contracts/DeltaNeutralStrategy.sol#120-122)
+	State variables written after the call(s):
+	- positions[msg.sender] += size (contracts/DeltaNeutralStrategy.sol#70)
+	- totalPrincipal += size (contracts/DeltaNeutralStrategy.sol#72)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
+
+Detector: timestamp
+DeltaNeutralStrategy._settleAccrued() (contracts/DeltaNeutralStrategy.sol#109-126) uses timestamp for comparisons
+	Dangerous comparisons:
+	- fundingRate == 0 || elapsed == 0 (contracts/DeltaNeutralStrategy.sol#114)
+	- amount == 0 (contracts/DeltaNeutralStrategy.sol#117)
+	- require(bool,string)(ok,DeltaNeutral: funding source failed) (contracts/DeltaNeutralStrategy.sol#123)
+DeltaNeutralStrategy._doHarvest() (contracts/DeltaNeutralStrategy.sol#131-160) uses timestamp for comparisons
+	Dangerous comparisons:
+	- msg.sender == vault && accruedFunding > 0 (contracts/DeltaNeutralStrategy.sol#141)
+	- swept > bal (contracts/DeltaNeutralStrategy.sol#144)
+	- swept > 0 (contracts/DeltaNeutralStrategy.sol#145)
+PYDStaking.fundRewards(uint256,uint256) (contracts/PYDStaking.sol#46-77) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= periodFinish (contracts/PYDStaking.sol#64)
+PYDStaking._rewardPerToken() (contracts/PYDStaking.sol#140-146) uses timestamp for comparisons
+	Dangerous comparisons:
+	- lastApplicable <= lastUpdateTime (contracts/PYDStaking.sol#143)
+	- block.timestamp < periodFinish (contracts/PYDStaking.sol#142)
+PYDStaking._updatePeriod() (contracts/PYDStaking.sol#148-159) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= periodFinish && periodFinish > 0 (contracts/PYDStaking.sol#149)
+PYDStaking.lastT() (contracts/PYDStaking.sol#168-170) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < periodFinish (contracts/PYDStaking.sol#169)
+PendleStrategy.harvest() (contracts/PendleStrategy.sol#35-39) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > maturity && pendleMarket != address(0) (contracts/PendleStrategy.sol#36)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+
+Detector: assembly
+SafeERC20._safeTransfer(IERC20,address,uint256,bool) (node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#176-200) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#179-199)
+SafeERC20._safeTransferFrom(IERC20,address,address,uint256,bool) (node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#212-244) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#221-243)
+SafeERC20._safeApprove(IERC20,address,uint256,bool) (node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#255-279) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#258-278)
+StorageSlot.getAddressSlot(bytes32) (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#66-70) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#67-69)
+StorageSlot.getBooleanSlot(bytes32) (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#75-79) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#76-78)
+StorageSlot.getBytes32Slot(bytes32) (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#84-88) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#85-87)
+StorageSlot.getUint256Slot(bytes32) (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#93-97) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#94-96)
+StorageSlot.getInt256Slot(bytes32) (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#102-106) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#103-105)
+StorageSlot.getStringSlot(bytes32) (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#111-115) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#112-114)
+StorageSlot.getStringSlot(string) (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#120-124) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#121-123)
+StorageSlot.getBytesSlot(bytes32) (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#129-133) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#130-132)
+StorageSlot.getBytesSlot(bytes) (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#138-142) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#139-141)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#assembly-usage
+
+Detector: pragma
+5 different versions of Solidity are used:
+	- Version constraint ^0.8.28 is used by:
+		-^0.8.28 (contracts/BaseStrategy.sol#2)
+		-^0.8.28 (contracts/DNCoreStrategy.sol#2)
+		-^0.8.28 (contracts/DeltaNeutralStrategy.sol#2)
+		-^0.8.28 (contracts/FeeDistributor.sol#2)
+		-^0.8.28 (contracts/IStrategy.sol#2)
+		-^0.8.28 (contracts/MorphoStrategy.sol#2)
+		-^0.8.28 (contracts/PYDFeeDiscount.sol#2)
+		-^0.8.28 (contracts/PYDFunder.sol#2)
+		-^0.8.28 (contracts/PYDStaking.sol#2)
+		-^0.8.28 (contracts/PYDToken.sol#2)
+		-^0.8.28 (contracts/PendleStrategy.sol#2)
+		-^0.8.28 (contracts/ProYieldVault.sol#2)
+		-^0.8.28 (contracts/SkyStrategy.sol#2)
+		-^0.8.28 (contracts/adapters/DNCoreAdapter.sol#2)
+		-^0.8.28 (contracts/adapters/DNCoreBase.sol#2)
+		-^0.8.28 (contracts/adapters/HLConstants.sol#2)
+		-^0.8.28 (contracts/adapters/HLInterfaces.sol#2)
+		-^0.8.28 (contracts/mocks/DecodeVerifier.sol#2)
+		-^0.8.28 (contracts/mocks/MockCoreWriter.sol#2)
+		-^0.8.28 (contracts/mocks/MockEvilStrategy.sol#2)
+		-^0.8.28 (contracts/mocks/MockFundingOracle.sol#2)
+		-^0.8.28 (contracts/mocks/MockFundingSource.sol#2)
+		-^0.8.28 (contracts/mocks/MockPrecompiles.sol#2)
+		-^0.8.28 (contracts/mocks/MockSwapper.sol#2)
+		-^0.8.28 (contracts/mocks/MockUSDC.sol#2)
+	- Version constraint ^0.8.20 is used by:
+		-^0.8.20 (node_modules/@openzeppelin/contracts/access/Ownable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Context.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#5)
+	- Version constraint >=0.6.2 is used by:
+		->=0.6.2 (node_modules/@openzeppelin/contracts/interfaces/IERC1363.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol#4)
+	- Version constraint >=0.4.16 is used by:
+		->=0.4.16 (node_modules/@openzeppelin/contracts/interfaces/IERC165.sol#4)
+		->=0.4.16 (node_modules/@openzeppelin/contracts/interfaces/IERC20.sol#4)
+		->=0.4.16 (node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol#4)
+		->=0.4.16 (node_modules/@openzeppelin/contracts/utils/introspection/IERC165.sol#4)
+	- Version constraint >=0.8.4 is used by:
+		->=0.8.4 (node_modules/@openzeppelin/contracts/interfaces/draft-IERC6093.sol#4)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#different-pragma-directives-are-used
+
+Detector: solc-version
+Version constraint ^0.8.20 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- VerbatimInvalidDeduplication
+	- FullInlinerNonExpressionSplitArgumentEvaluationOrder
+	- MissingSideEffectsOnSelectorAccess.
+It is used by:
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/access/Ownable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Context.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#5)
+Version constraint >=0.6.2 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- MissingSideEffectsOnSelectorAccess
+	- AbiReencodingHeadOverflowWithStaticArrayCleanup
+	- DirtyBytesArrayToStorage
+	- NestedCalldataArrayAbiReencodingSizeValidation
+	- ABIDecodeTwoDimensionalArrayMemory
+	- KeccakCaching
+	- EmptyByteArrayCopy
+	- DynamicArrayCleanup
+	- MissingEscapingInFormatting
+	- ArraySliceDynamicallyEncodedBaseType
+	- ImplicitConstructorCallvalueCheck
+	- TupleAssignmentMultiStackSlotComponents
+	- MemoryArrayCreationOverflow.
+It is used by:
+	- >=0.6.2 (node_modules/@openzeppelin/contracts/interfaces/IERC1363.sol#4)
+	- >=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol#4)
+Version constraint >=0.4.16 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- DirtyBytesArrayToStorage
+	- ABIDecodeTwoDimensionalArrayMemory
+	- KeccakCaching
+	- EmptyByteArrayCopy
+	- DynamicArrayCleanup
+	- ImplicitConstructorCallvalueCheck
+	- TupleAssignmentMultiStackSlotComponents
+	- MemoryArrayCreationOverflow
+	- privateCanBeOverridden
+	- SignedArrayStorageCopy
+	- ABIEncoderV2StorageArrayWithMultiSlotElement
+	- DynamicConstructorArgumentsClippedABIV2
+	- UninitializedFunctionPointerInConstructor_0.4.x
+	- IncorrectEventSignatureInLibraries_0.4.x
+	- ExpExponentCleanup
+	- NestedArrayFunctionCallDecoder
+	- ZeroFunctionSelector.
+It is used by:
+	- >=0.4.16 (node_modules/@openzeppelin/contracts/interfaces/IERC165.sol#4)
+	- >=0.4.16 (node_modules/@openzeppelin/contracts/interfaces/IERC20.sol#4)
+	- >=0.4.16 (node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol#4)
+	- >=0.4.16 (node_modules/@openzeppelin/contracts/utils/introspection/IERC165.sol#4)
+Version constraint >=0.8.4 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- FullInlinerNonExpressionSplitArgumentEvaluationOrder
+	- MissingSideEffectsOnSelectorAccess
+	- AbiReencodingHeadOverflowWithStaticArrayCleanup
+	- DirtyBytesArrayToStorage
+	- DataLocationChangeInInternalOverride
+	- NestedCalldataArrayAbiReencodingSizeValidation
+	- SignedImmutables.
+It is used by:
+	- >=0.8.4 (node_modules/@openzeppelin/contracts/interfaces/draft-IERC6093.sol#4)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-versions-of-solidity
+
+Detector: low-level-calls
+Low level call in DeltaNeutralStrategy._doHarvest() (contracts/DeltaNeutralStrategy.sol#131-160):
+	- (success,None) = address(shortPosition).call{value: ethBal}() (contracts/DeltaNeutralStrategy.sol#156)
+Low level call in PYDFeeDiscount._vaultTotalShares() (contracts/PYDFeeDiscount.sol#229-233):
+	- (ok,ret) = vault.staticcall(abi.encodeWithSignature(totalShares())) (contracts/PYDFeeDiscount.sol#230)
+Low level call in PYDFeeDiscount._vaultSharesOf(address) (contracts/PYDFeeDiscount.sol#235-239):
+	- (ok,ret) = vault.staticcall(abi.encodeWithSignature(shares(address),user)) (contracts/PYDFeeDiscount.sol#236)
+Low level call in DNCoreBase.position() (contracts/adapters/DNCoreBase.sol#204-208):
+	- (ok,ret) = HLConstants.POSITION2_PRECOMPILE.staticcall(abi.encode(address(this),perpAsset)) (contracts/adapters/DNCoreBase.sol#205)
+Low level call in DNCoreBase.marginSummary() (contracts/adapters/DNCoreBase.sol#211-215):
+	- (ok,ret) = HLConstants.ACCOUNT_MARGIN_SUMMARY_PRECOMPILE.staticcall(abi.encode(uint32(0),address(this))) (contracts/adapters/DNCoreBase.sol#212)
+Low level call in DNCoreBase.withdrawable() (contracts/adapters/DNCoreBase.sol#217-221):
+	- (ok,ret) = HLConstants.WITHDRAWABLE_PRECOMPILE.staticcall(abi.encode(address(this))) (contracts/adapters/DNCoreBase.sol#218)
+Low level call in DNCoreBase.perpSzDecimals() (contracts/adapters/DNCoreBase.sol#223-227):
+	- (ok,ret) = HLConstants.PERP_ASSET_INFO_PRECOMPILE.staticcall(abi.encode(perpAsset)) (contracts/adapters/DNCoreBase.sol#224)
+Low level call in DNCoreBase.oraclePx() (contracts/adapters/DNCoreBase.sol#229-233):
+	- (ok,ret) = HLConstants.ORACLE_PX_PRECOMPILE.staticcall(abi.encode(perpAsset)) (contracts/adapters/DNCoreBase.sol#230)
+Low level call in DNCoreBase.markPx() (contracts/adapters/DNCoreBase.sol#235-239):
+	- (ok,ret) = HLConstants.MARK_PX_PRECOMPILE.staticcall(abi.encode(perpAsset)) (contracts/adapters/DNCoreBase.sol#236)
+Low level call in DNCoreBase._coreAccountExists() (contracts/adapters/DNCoreBase.sol#242-246):
+	- (ok,ret) = HLConstants.CORE_USER_EXISTS_PRECOMPILE.staticcall(abi.encode(address(this))) (contracts/adapters/DNCoreBase.sol#243)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls
+
+Detector: missing-inheritance
+MorphoStrategy (contracts/MorphoStrategy.sol#17-60) should inherit from IStrategy (contracts/IStrategy.sol#4-10)
+ProYieldVault (contracts/ProYieldVault.sol#8-273) should inherit from IStrategy (contracts/IStrategy.sol#4-10)
+MockCoreWriter (contracts/mocks/MockCoreWriter.sol#10-18) should inherit from ICoreWriter (contracts/adapters/HLInterfaces.sol#7-9)
+MockSwapper (contracts/mocks/MockSwapper.sol#9-27) should inherit from ISwapper (contracts/PYDFunder.sol#150-152)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-inheritance
+
+Detector: naming-convention
+Parameter ProYieldVault.setCaps(uint256,uint256)._tvlCap (contracts/ProYieldVault.sol#98) is not in mixedCase
+Parameter ProYieldVault.setCaps(uint256,uint256)._perUserCap (contracts/ProYieldVault.sol#98) is not in mixedCase
+Parameter MockCoreUserExists.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#21) is not in mixedCase
+Parameter MockPosition2.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#42) is not in mixedCase
+Parameter MockMarginSummary.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#61) is not in mixedCase
+Parameter MockWithdrawable.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#74) is not in mixedCase
+Parameter MockPerpInfo.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#107) is not in mixedCase
+Parameter MockOraclePx.fallback(bytes)._data (contracts/mocks/MockPrecompiles.sol#120) is not in mixedCase
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions
+
+Detector: cache-array-length
+Loop condition i < strategyList.length (contracts/ProYieldVault.sol#151) should use cached array length instead of referencing `length` member of the storage array.
+ Loop condition i < strategyList.length (contracts/ProYieldVault.sol#176) should use cached array length instead of referencing `length` member of the storage array.
+ Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#cache-array-length
+
+Detector: constable-states
+PYDFunder.minConvertUsd6 (contracts/PYDFunder.sol#40) should be constant 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#state-variables-that-could-be-declared-constant
+. analyzed (49 contracts with 101 detectors), 75 result(s) found
+SLITHER_EXIT=255

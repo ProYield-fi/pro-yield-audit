@@ -140,6 +140,21 @@ contract ProYieldVault is BaseStrategy {
         _totalAssets -= balance;
     }
 
+    event LossReported(uint256 amount);
+
+    /// @notice Write booked liabilities down to match REAL backing after a
+    /// strategy/venue loss (round-2 H1). Owner-only (beta owner = treasury
+    /// Safe): the loss is measured from live venue reads off-chain, then
+    /// reported here so the remaining depositors socialise it pro-rata
+    /// (share price falls for everyone) instead of the books carrying phantom
+    /// value while withdrawals revert. Without this call a loss is invisible;
+    /// with it, claims always reconcile to what actually backs them.
+    function reportLoss(uint256 amount) external onlyOwner {
+        require(amount <= _totalAssets, "ProYieldVault: exceeds assets");
+        _totalAssets -= amount;
+        emit LossReported(amount);
+    }
+
     function allocate() external onlyOwner nonReentrant {
         uint256 balance = underlying.balanceOf(address(this));
         // Keep a liquid reserve so withdrawals never depend on strategy recall.
@@ -209,6 +224,31 @@ contract ProYieldVault is BaseStrategy {
         _recallShortfall(amount);
         underlying.safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, amount);
+    }
+
+    /// @notice Partial-redemption escape hatch (round-2 H1): withdraw as much
+    /// as idle + recallable balance can ACTUALLY pay right now. Never reverts
+    /// for illiquidity alone; shares burn only for what is paid, so the rest
+    /// of the claim stays on the books. Under a reported loss the price is
+    /// already written down and this pays the fair amount; under an
+    /// unreported loss it still lets users exit with the real backing that
+    /// exists instead of being fully trapped by phantom value.
+    function withdrawUpTo(uint256 amount) external nonReentrant returns (uint256 paid) {
+        require(amount > 0, "ProYieldVault: zero amount");
+        uint256 want = _toAssets(shares[msg.sender]);
+        if (amount < want) want = amount;
+        require(want > 0, "ProYieldVault: zero shares");
+        _recallShortfall(want);
+        uint256 bal = underlying.balanceOf(address(this));
+        paid = bal < want ? bal : want;
+        require(paid > 0, "ProYieldVault: no liquidity");
+        uint256 sh = _toShares(paid);
+        if (sh > shares[msg.sender]) sh = shares[msg.sender];
+        shares[msg.sender] -= sh;
+        _totalShares -= sh;
+        _totalAssets -= paid;
+        underlying.safeTransfer(msg.sender, paid);
+        emit Withdraw(msg.sender, paid);
     }
 
     function harvest() external override nonReentrant {

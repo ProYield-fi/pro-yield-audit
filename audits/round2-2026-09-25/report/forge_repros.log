@@ -1,0 +1,26 @@
+No files changed, compilation skipped
+
+Ran 2 tests for test/audit/Round2.dn_accounting.t.sol:Round2DNTest
+[PASS] test_PartB_fullAmountBridge_realizesProfit_sweepWorks() (gas: 506071)
+[PASS] test_PartB_keeperProfitOnlyBridge_realizesZeroProfit() (gas: 408889)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.93ms (492.39µs CPU time)
+
+Ran 8 tests for test/audit/Round2.repros.t.sol:Round2ReprosTest
+[PASS] test_H1_strategyLoss_phantomTotalAssets_withdrawReverts() (gas: 1972044)
+[PASS] test_H3_creditYield_doubleCountsPreExistingIdle() (gas: 626987)
+Logs:
+  H3: bob maxWithdraw (phantom payout, wei): 1999999999999999999500
+
+[PASS] test_H3b_repeatedCreditYield_sameIdle_inflates() (gas: 238863)
+[PASS] test_L1_route_silentlyClamps_routedExceedsReceived() (gas: 528745)
+[PASS] test_M1_integration_recallDrainsStrategy_toZero_inclDonation() (gas: 1885234)
+Logs:
+  M1: strategy remaining balance after 1 withdrawal (wei): 0
+  M1: vault totalAssets after (phantom, wei): 8500000000000000000000
+
+[PASS] test_M1_unit_recall_capsAtBalance_notDeployedDebt() (gas: 1360195)
+[PASS] test_M2a_donationToVault_notCountedAtHarvest() (gas: 323886)
+[PASS] test_M2b_donationToStrategy_sweptAsProfit_withFDFee() (gas: 1742451)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 2.45ms (4.05ms CPU time)
+
+Ran 2 test suites in 5.87ms (4.37ms CPU time): 10 tests passed, 0 failed, 0 skipped (10 total tests)
