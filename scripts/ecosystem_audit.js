@@ -45,6 +45,16 @@ async function main() {
   console.log("── 1. artifact inventory + vault identity across generations ──");
   const manifest = readJson(path.join(REPO, "deployed_addresses.json")) || {};
   const canonical = manifest.pro_yield_vault ? String(manifest.pro_yield_vault).toLowerCase() : null;
+  // Post-mainnet-flip, live artifacts describe DIFFERENT networks by design:
+  // the repo + scout artifacts track the testnet ops loop; the web feed is the
+  // live MAINNET vault. Cross-check each artifact against ITS network's
+  // manifest (deployed_addresses.mainnet.json for mainnet-labelled feeds).
+  const mainnetManifest = readJson(path.join(REPO, "deployed_addresses.mainnet.json")) || {};
+  const canonicalByNet = {
+    testnet: canonical,
+    mainnet: mainnetManifest.pro_yield_vault ? String(mainnetManifest.pro_yield_vault).toLowerCase() : null,
+  };
+  const netOf = (j) => (/mainnet/i.test(String(j.network || j.source || "")) ? "mainnet" : "testnet");
   const artifacts = [
     ["repo/deployed_addresses.json", path.join(REPO, "deployed_addresses.json"), true],
     // NOTE: repo/data/vault_state.json was a producer-less fossil from the
@@ -61,18 +71,22 @@ async function main() {
     if (j == null) { check(`artifact present: ${name}`, "FAIL", `missing/unparsable: ${p}`); continue; }
     const v = j.pro_yield_vault || j.vault || j.vault_address || j.vaults?.[0]?.address || j.vaults?.[0]?.vault_address;
     if (!v) { check(`vault identity in ${name}`, "WARN", "no vault address field"); continue; }
-    vaults[name] = String(v).toLowerCase();
+    vaults[name] = { net: netOf(j), addr: String(v).toLowerCase() };
     check(`vault identity in ${name}`, "PASS", short(v));
   }
-  const distinct = [...new Set(Object.values(vaults))];
-  const divergent = Object.entries(vaults).filter(([, v]) => v !== canonical);
+  const distinct = [...new Set(Object.values(vaults).map((v) => v.addr))];
+  const divergent = Object.entries(vaults).filter(([, v]) => {
+    const canon = canonicalByNet[v.net];
+    return canon != null && v.addr !== canon;
+  });
+  const nets = [...new Set(Object.values(vaults).map((v) => v.net))];
   check("vault address is single-valued across live artifacts",
     Object.keys(vaults).length < 2 ? "SKIP" : divergent.length === 0 ? "PASS" : "FAIL",
     Object.keys(vaults).length < 2
       ? `only ${Object.keys(vaults).length} artifact(s) on this host — nothing to cross-check`
       : divergent.length === 0
-        ? `all artifacts agree on ${short(canonical)}`
-        : `canonical(manifest)=${short(canonical)}; divergent: ${divergent.map(([n, v]) => `${n}=${short(v)}`).join(", ")}`);
+        ? `each artifact matches its network manifest (${nets.map((n) => `${n}: ${short(canonicalByNet[n] || "no manifest")}`).join(", ")})`
+        : `divergent vs network manifest: ${divergent.map(([n, v]) => `${n}(${v.net})=${short(v.addr)} vs manifest ${short(canonicalByNet[v.net])}`).join(", ")}`);
 
   console.log("\n── 2. staleness / heartbeat of every operating loop ──");
   const loops = [
@@ -311,6 +325,7 @@ async function main() {
   // 8e) chain map for every vault generation found: which chain has its code?
   const probes = [
     ["declared", d?.ok ? DECLARED_RPC : null],
+    ["mainnet", mainnetManifest.chain?.rpc || null],
     ["sandbox", local.ok ? LOCAL_RPC : null],
   ].filter(([, u]) => u);
   if (probes.length && (distinct.length || canonical)) {
