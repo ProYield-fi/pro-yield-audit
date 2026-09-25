@@ -182,7 +182,10 @@ async function main() {
 
   // ── Manifest ───────────────────────────────────────────────────────────────
   const manifest = {
-    chain: "hyperevm-mainnet",
+    // chain as an OBJECT — the vault-status writer + ecosystem audit read
+    // chain.id / chain.name for identity labels (a bare string publishes
+    // "chain undefined" and mis-classifies the feed as testnet).
+    chain: { id: 999, name: "hyperevm-mainnet", rpc: "https://rpc.hyperliquid.xyz/evm" },
     chain_id: 999,
     deployed_utc: new Date().toISOString(),
     deployer: deployer.address,
