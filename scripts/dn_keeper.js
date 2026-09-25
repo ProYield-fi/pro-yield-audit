@@ -34,7 +34,7 @@ const fs = require("fs");
 const CONFIG = {
   strategy: process.env.DN_STRATEGY || process.env.DN_ADAPTER || null,
   hlInfoUrl: "https://api.hyperliquid.xyz/info",
-  fundingAprThreshold: 5.0, // annualized % below which opening a hedge is not justified
+  fundingAprThreshold: parseFloat(process.env.DN_OPEN_APR || "5.0"), // annualized % below which opening a hedge is not justified (env override for E2E runs)
   unwindAprThreshold: parseFloat(process.env.DN_UNWIND_APR || "-2.0"), // short PAYS when funding > 0; below this → close
   rebalanceBandPct: 5,      // |positionDrift| > band → rebalance
   slippageBps: 20n,         // IOC limit vs oracle (0.20%)
@@ -42,8 +42,9 @@ const CONFIG = {
   // ── Sizing policy ──
   scoutSnapshot: process.env.SCOUT_SNAPSHOT || "/home/user/yield_scout/data/snapshot.json",
   deployPct: parseFloat(process.env.DN_DEPLOY_PCT || "0.90"), // fraction of sleeve bridged to Core
-  marginUtilBps: 3300n,  // perp margin needed per 1e4 notional (BTC maxLev 40 → 1/40 = 250bps; pad to 3300 for fees/spread)
+  marginUtilBps: BigInt(process.env.DN_MARGIN_UTIL_BPS || "3300"), // perp margin needed per 1e4 notional (BTC maxLev 40 → 1/40 = 250bps; pad to 3300 for fees/spread). Env override for small-size demo runs (e.g. 1700).
   maxSleeveUsd: parseFloat(process.env.DN_MAX_SLEEVE_USD || "0"), // 0 = no override cap
+  targetOverrideUsd: parseFloat(process.env.DN_TARGET_USD || "0"), // 0 = use vault×weight sizing; >0 pins the hedge notional (demo/E2E runs)
   dryRun: !(process.argv.includes("--execute") || process.env.DN_EXECUTE === "1"),
 };
 
@@ -117,7 +118,8 @@ async function fetchFundingApr(assetIndex) {
   const predicted = await hlInfo({ type: "predictedFundings" });
   // shape: [[coin, [[venue, {fundingRate, nextFundingTime}], ...]], ...]
   // HlPerp venue = the validator perp book we hedge on. fundingRate is HOURLY.
-  const coin = assetIndex === 0 ? "BTC" : "ETH";
+  const coin = assetIndex === 0 ? "BTC" : assetIndex === 1 ? "ETH" : assetIndex === 159 ? "HYPE" : null;
+  if (!coin) throw new Error(`unknown perp asset index ${assetIndex} — add its coin name before trusting funding math`);
   const row = predicted.find((r) => r[0] === coin);
   if (!row) throw new Error(`no predicted funding for ${coin}`);
   const venue = row[1].find((v) => v[0] === "HlPerp") || row[1][0];
@@ -149,14 +151,22 @@ async function loadSleeveWeight() {
 function computeTargetNotionalUsd(vaultTotalAssetsUsd, dnWeight) {
   let sleeve = vaultTotalAssetsUsd * dnWeight;
   if (CONFIG.maxSleeveUsd > 0) sleeve = Math.min(sleeve, CONFIG.maxSleeveUsd);
+  if (CONFIG.targetOverrideUsd > 0) sleeve = CONFIG.targetOverrideUsd; // demo/E2E pin
   return sleeve; // hedge NOTIONAL = sleeve USD (1:1 delta-neutral)
 }
 
 async function main() {
-  // Chain guard FIRST — never act off HyperEVM testnet (998), even in dry-run.
+  // Chain guard FIRST. HyperEVM testnet (998) runs freely; MAINNET (999) is
+  // real-money and requires the explicit DN_ALLOW_MAINNET=1 opt-in — the live
+  // beta keeper runs there, so the guard allows it, but never silently.
   const __net = await hre.ethers.provider.getNetwork();
-  if (Number(__net.chainId) !== 998) {
-    console.error(`REFUSING: chain ${__net.chainId} is not HyperEVM testnet (998) — never mainnet.`);
+  const __chain = Number(__net.chainId);
+  if (__chain !== 998 && __chain !== 999) {
+    console.error(`REFUSING: chain ${__chain} is not HyperEVM (998/999).`);
+    process.exit(3);
+  }
+  if (__chain === 999 && process.env.DN_ALLOW_MAINNET !== "1") {
+    console.error("REFUSING: mainnet (999) needs explicit DN_ALLOW_MAINNET=1.");
     process.exit(3);
   }
   const [signer] = await hre.ethers.getSigners();
@@ -189,7 +199,8 @@ async function main() {
 
   // ── 2. Funding ──
   const apr = await fetchFundingApr(asset);
-  console.log(`funding: ${apr.toFixed(2)}% annualized (HlPerp, ${asset === 0 ? "BTC" : "ETH"})`);
+  const coinName = asset === 0 ? "BTC" : asset === 1 ? "ETH" : asset === 159 ? "HYPE" : `asset${asset}`;
+  console.log(`funding: ${apr.toFixed(2)}% annualized (HlPerp, ${coinName})`);
 
   // ── 3. Size the sleeve (allocation policy hookup) ──
   // Vault totalAssets (6dp USDC units) → USD; × DN weight → sleeve notional.
@@ -282,11 +293,50 @@ async function main() {
     const after = await strategy.position();
     const flat = after.szi === 0n;
     console.log(`verified: szi=${after.szi} (flat=${flat})`);
-    await sendAlert(
-      flat ? "🟢 DN unwind complete" : "🔴 DN unwind MISMATCH",
-      `funding ${apr.toFixed(2)}%/yr — short ${flat ? "closed" : "NOT closed (szi=" + after.szi + ")"}; verify on-chain.`
-    );
-    if (!flat) process.exit(3);
+    if (!flat) {
+      await sendAlert(
+        "🔴 DN unwind MISMATCH",
+        `funding ${apr.toFixed(2)}%/yr — short NOT closed (szi=${after.szi}); spot hedge left in place (still balanced). Verify on-chain.`
+      );
+      process.exit(3);
+    }
+    // ── Spot leg: return the hedge (HIGH-2). Selling needs a ≥$10 REQUEST;
+    // sub-$10 hedge sizes can't be expressed as spot orders → spot-send
+    // (action 6) instead — that path exists precisely for this.
+    let hedgeNote = "no spot leg configured";
+    if ((await strategy.spotPairIndex()) !== 0n) {
+      const hs = await strategy.spotHedgeSz();
+      if (hs > 0n) {
+        const pxRaw = await strategy.spotPx();
+        const pxScale = await strategy.spotPxScale();
+        const valUsd = Number(pxRaw) > 0 ? (Number(hs) * Number(pxRaw) / Number(pxScale)) / 1e6 : 0;
+        if (valUsd >= 10.5) {
+          const szDecS = 10 - Math.round(Math.log10(Number(pxScale)));
+          const step = 10n ** BigInt(8 - szDecS);
+          const szS = (hs / step) * step;
+          const sellPx = (pxRaw * (10000n - CONFIG.slippageBps)) / 10000n;
+          console.log(`selling spot hedge: ${Number(szS) / 1e8} HYPE @ IOC ${sellPx}`);
+          const stx = await strategy.sellSpot(sellPx, szS, CONFIG.tifIoc);
+          await stx.wait();
+        } else {
+          const dest = process.env.DN_HEDGE_RETURN_ADDR || (await strategy.owner());
+          console.log(`spot hedge ~$${valUsd.toFixed(2)} < $10.5 order min — spot-sending ${hs} (1e8 units) HYPE to ${dest}`);
+          const stx = await strategy.hedgeTransferOut(dest, hs);
+          await stx.wait();
+        }
+        await new Promise((r) => setTimeout(r, 8000));
+        const hsAfter = await strategy.spotHedgeSz();
+        hedgeNote = `hedge ${hs} → ${hsAfter} (1e8 units)`;
+        console.log(`verified hedge after unwind: ${hsAfter}`);
+        if (hsAfter >= hs) {
+          await sendAlert("🔴 DN hedge NOT returned", `spot hedge unchanged (${hsAfter}) after unwind — investigate (action drop?).`);
+          process.exit(3);
+        }
+      } else {
+        hedgeNote = "no spot hedge held";
+      }
+    }
+    await sendAlert("🟢 DN unwind complete", `funding ${apr.toFixed(2)}%/yr — short closed; ${hedgeNote}; verify on-chain.`);
     return;
   }
 
@@ -351,6 +401,47 @@ async function main() {
       process.exit(3);
     }
     console.log(`verified: szi=${after.szi}`);
+    // ── Spot leg (HIGH-2): the short alone is a one-way bet. Verify the spot
+    // hedge covers it; buy the gap when Core spot USDC covers a ≥$10.07
+    // request, otherwise ALERT — never leave a silent naked short.
+    if ((await strategy.spotPairIndex()) === 0n) {
+      console.warn("⚠️ spot leg DISABLED (spotPairIndex unset) — single-leg position; NOT delta-neutral");
+      await sendAlert("🟠 DN running WITHOUT spot leg", "spotPairIndex unset — single-leg short (HIGH-2 posture). No delta-neutral claims until the spot hedge is live.");
+    } else {
+      const shortSz1e8 = after.szi < 0n ? -after.szi : after.szi;
+      const hedgeSz1e8 = await strategy.spotHedgeSz();
+      const pxRaw = await strategy.spotPx();
+      const pxScale = await strategy.spotPxScale();
+      const pxDiv = Number(pxScale) > 0 ? Number(pxScale) : 1;
+      const hedgeUsd = (Number(hedgeSz1e8) * Number(pxRaw) / pxDiv) / 1e6;
+      console.log(`spot hedge: ${Number(hedgeSz1e8) / 1e8} HYPE (~$${hedgeUsd.toFixed(2)}) vs short ${Number(shortSz1e8) / 1e8} HYPE`);
+      if (hedgeSz1e8 < shortSz1e8) {
+        const gap1e8 = shortSz1e8 - hedgeSz1e8;
+        const gapUsd = (Number(gap1e8) * Number(pxRaw) / pxDiv) / 1e6;
+        if (gapUsd >= 10.07) {
+          const szDecS = 10 - Math.round(Math.log10(pxDiv)); // pxScale = 10^(10-szDec)
+          const step = 10n ** BigInt(8 - szDecS);
+          const szS = (gap1e8 / step) * step;
+          const buyPx = (pxRaw * (10000n + CONFIG.slippageBps)) / 10000n;
+          console.log(`buying spot hedge gap: ${Number(szS) / 1e8} HYPE @ IOC ${buyPx}`);
+          const stx = await strategy.openSpotBuy(buyPx, szS, CONFIG.tifIoc);
+          await stx.wait();
+          await new Promise((r) => setTimeout(r, 8000));
+          const hsAfter = await strategy.spotHedgeSz();
+          console.log(`verified hedge: ${Number(hsAfter) / 1e8} HYPE`);
+          if (hsAfter < shortSz1e8) {
+            await sendAlert("🟠 DN hedge still short after buy", `hedge ${hsAfter} < short ${shortSz1e8} (1e8 units) — check spot fills.`);
+          }
+        } else {
+          await sendAlert(
+            "🟠 DN hedge gap — spot leg under-funded",
+            `short ${Number(shortSz1e8) / 1e8} vs spot ${Number(hedgeSz1e8) / 1e8} HYPE (gap $${gapUsd.toFixed(2)} — below HL's $10 spot order min). Fund the strategy's Core spot (transfer HYPE in) before claiming delta-neutral.`
+          );
+        }
+      } else {
+        console.log(`hedge covers the short (${Number(hedgeSz1e8) / 1e8} >= ${Number(shortSz1e8) / 1e8} HYPE) — delta-neutral ✓`);
+      }
+    }
   }
 
   // UNWIND_REVIEW flow: same pattern — act, wait, verify, alert.

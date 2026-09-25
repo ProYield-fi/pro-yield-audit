@@ -14,6 +14,10 @@ library HLConstants {
     address internal constant PERP_ASSET_INFO_PRECOMPILE = 0x000000000000000000000000000000000000080a;
     address internal constant ACCOUNT_MARGIN_SUMMARY_PRECOMPILE = 0x000000000000000000000000000000000000080F;
     address internal constant CORE_USER_EXISTS_PRECOMPILE = 0x0000000000000000000000000000000000000810;
+    address internal constant SPOT_BALANCE_PRECOMPILE = 0x0000000000000000000000000000000000000801;
+    address internal constant SPOT_PX_PRECOMPILE = 0x0000000000000000000000000000000000000808;
+    address internal constant SPOT_INFO_PRECOMPILE = 0x000000000000000000000000000000000000080b;
+    address internal constant TOKEN_INFO_PRECOMPILE = 0x000000000000000000000000000000000000080C;
 
     /*//////////////////////// Bridge / system ////////////////////////*/
     address internal constant HYPE_SYSTEM_ADDRESS = 0x2222222222222222222222222222222222222222;
@@ -31,6 +35,7 @@ library HLConstants {
     uint24 internal constant TOKEN_DELEGATE_ACTION = 3;
     uint24 internal constant STAKING_DEPOSIT_ACTION = 4;
     uint24 internal constant STAKING_WITHDRAW_ACTION = 5;
+    uint24 internal constant SPOT_SEND_ACTION = 6;
     uint24 internal constant USD_CLASS_TRANSFER_ACTION = 7;
     uint24 internal constant CANCEL_ORDER_BY_CLOID_ACTION = 11;
     uint24 internal constant SEND_ASSET_ACTION = 13;

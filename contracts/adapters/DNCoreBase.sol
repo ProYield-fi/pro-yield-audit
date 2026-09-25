@@ -48,6 +48,16 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
     uint256 public maxActionUsd6;
     bool public paused;
 
+    /// @notice Spot hedge config (HIGH-2 fix). `spotPairIndex` = HyperCore spot
+    /// pair index (e.g. 107 = HYPE/USDC); `spotTokenIndex` = derived base-token
+    /// index; `spotAsset` = spot ORDER asset (10000 + pairIndex); `spotPxScale`
+    /// = 10^(10 - szDecimals) so spotValue6 = spotSz(1e8) * spotPxRaw / scale
+    /// yields USDC 6dp. 0 = spot leg disabled — never claim delta-neutral then.
+    uint64 public spotPairIndex;
+    uint64 public spotTokenIndex;
+    uint32 public spotAsset;
+    uint256 public spotPxScale;
+
     /// @notice HL minimum order notional is $10.
     uint256 public constant MIN_ORDER_USD6 = 10e6;
 
@@ -64,12 +74,16 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
     error DNCore__ZeroValidator();
     error DNCore__NotFlat();
     error DNCore__ReadFailed();
+    error DNCore__SpotDisabled();
 
     /*//////////////////////// Read structs (mirror hyper-evm-lib) ////////////////////////*/
     struct Position { int64 szi; uint64 entryNtl; int64 isolatedRawUsd; uint32 leverage; bool isIsolated; }
     struct AccountMarginSummary { int64 accountValue; uint64 marginUsed; uint64 ntlPos; int64 rawUsd; }
     struct PerpAssetInfo { string coin; uint32 marginTableId; uint8 szDecimals; uint8 maxLeverage; bool onlyIsolated; }
     struct CoreUserExists { bool exists; }
+    struct SpotBalance { uint64 total; uint64 hold; uint64 entryNtl; }
+    struct SpotInfo { string name; uint64[2] tokens; }
+    struct TokenInfo { string name; uint64[] spots; uint64 deployerTradingFeeShare; address deployer; address evmContract; uint8 szDecimals; uint8 weiDecimals; int8 evmExtraWeiDecimals; }
 
     /*//////////////////////// Events (shared execution surface) ////////////////////////*/
     event ActionSent(uint24 indexed actionId, bytes data);
@@ -81,6 +95,8 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
     event PausedSet(bool paused);
     event MaxActionSet(uint256 maxActionUsd6);
     event PerpAssetSet(uint32 perpAsset);
+    event SpotConfigSet(uint64 pairIndex, uint64 tokenIndex, uint32 asset, uint256 pxScale);
+    event HedgeTransferOut(address indexed destination, uint64 weiAmount);
 
     /// @dev Children pass perpAsset + maxActionUsd6; Ownable's constructor args
     /// are supplied by the child's inheritance path (see DIAMOND NOTE above).
@@ -130,6 +146,28 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
         emit PerpAssetSet(perpAsset_);
     }
 
+    /// @notice Configure the spot hedge pair (HIGH-2). Derives everything from
+    /// the live 0x80b/0x80c reads: base token index + szDecimals → px scale.
+    /// @dev Only while flat — avoids reinterpreting an open hedge.
+    function setSpotConfig(uint64 pairIndex) external onlyOwner {
+        if (position().szi != 0) revert DNCore__NotFlat();
+        if (pairIndex == 0) revert DNCore__ZeroOrder();
+        (bool ok, bytes memory ret) = HLConstants.SPOT_INFO_PRECOMPILE.staticcall(abi.encode(pairIndex));
+        if (!ok) revert DNCore__ReadFailed();
+        SpotInfo memory si = abi.decode(ret, (SpotInfo));
+        uint64 tok = si.tokens[0];
+        if (tok == 0) revert DNCore__ReadFailed(); // token 0 = USDC — never the hedge base
+        (bool ok2, bytes memory ret2) = HLConstants.TOKEN_INFO_PRECOMPILE.staticcall(abi.encode(tok));
+        if (!ok2) revert DNCore__ReadFailed();
+        uint8 szDec = abi.decode(ret2, (TokenInfo)).szDecimals;
+        if (szDec > 10) revert DNCore__ReadFailed();
+        spotPairIndex = pairIndex;
+        spotTokenIndex = tok;
+        spotAsset = uint32(10000) + uint32(pairIndex);
+        spotPxScale = 10 ** (10 - uint256(szDec));
+        emit SpotConfigSet(pairIndex, tok, spotAsset, spotPxScale);
+    }
+
     /*//////////////////////// Trading (CoreWriter actions) ////////////////////////*/
     /// @notice Move USDC spot→perp (or back) on Core. `ntl` is USDC perp units
     /// (6 decimals; 1 USDC = 1e6).
@@ -146,12 +184,41 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
     /// @notice Open the short hedge (sell perp). limitPx/sz are 10^8 × human
     /// value; sz must respect the asset's szDecimals (keeper reads 0x80a).
     function openShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+        if (asset != perpAsset) revert DNCore__WrongAsset();
         _order(asset, false, false, limitPx, sz, tif);
     }
 
     /// @notice Unwind — buy back the short (reduceOnly).
     function closeShort(uint32 asset, uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+        if (asset != perpAsset) revert DNCore__WrongAsset();
         _order(asset, true, true, limitPx, sz, tif);
+    }
+
+    /// @notice Buy the spot hedge — the LONG leg that cancels the short's
+    /// price exposure (HIGH-2 fix). `limitPx`/`sz` are 10^8 × human value;
+    /// sz must respect the pair's szDecimals (keeper derives from pxScale).
+    /// HL spot orders enforce a $10 minimum on the REQUESTED notional.
+    function openSpotBuy(uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+        if (spotAsset == 0) revert DNCore__SpotDisabled();
+        _order(spotAsset, true, false, limitPx, sz, tif);
+    }
+
+    /// @notice Sell the spot hedge (unwind path). Spot orders take no
+    /// reduceOnly flag. Requests under $10 are rejected by HL — use
+    /// hedgeTransferOut for sub-$10 hedge sizes.
+    function sellSpot(uint64 limitPx, uint64 sz, uint8 tif) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+        if (spotAsset == 0) revert DNCore__SpotDisabled();
+        _order(spotAsset, false, false, limitPx, sz, tif);
+    }
+
+    /// @notice Spot-send the hedge straight from the contract's Core spot
+    /// balance (action 6) — the unwind path for hedge sizes below HL's $10
+    /// order minimum (orders can't express them; a send can).
+    function hedgeTransferOut(address destination, uint64 weiAmount) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+        if (spotAsset == 0) revert DNCore__SpotDisabled();
+        if (destination == address(0) || weiAmount == 0) revert DNCore__ZeroAmount();
+        emit HedgeTransferOut(destination, weiAmount);
+        _send(HLConstants.SPOT_SEND_ACTION, abi.encode(destination, spotTokenIndex, weiAmount));
     }
 
     function cancelOrderByCloid(uint32 asset, uint128 cloid) external onlyKeeper notPaused coreAccountRequired nonReentrant {
@@ -162,7 +229,7 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
 
     /// @dev notional(USDC 6dp) = limitPx * sz / 1e8 / 1e8 * 1e6 = limitPx * sz / 1e10.
     function _order(uint32 asset, bool isBuy, bool reduceOnly, uint64 limitPx, uint64 sz, uint8 tif) internal {
-        if (asset != perpAsset) revert DNCore__WrongAsset();
+        if (asset != perpAsset && (spotAsset == 0 || asset != spotAsset)) revert DNCore__WrongAsset();
         if (limitPx == 0 || sz == 0) revert DNCore__ZeroOrder();
         if (tif != HLConstants.TIF_ALO && tif != HLConstants.TIF_GTC && tif != HLConstants.TIF_IOC) revert DNCore__BadTif();
         uint256 notional6 = (uint256(limitPx) * uint256(sz)) / 1e10;
@@ -239,6 +306,36 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
     }
 
     /*//////////////////////// Internals ////////////////////////*/
+    /// @notice Spot hedge size (1e8 units — Core spot wei for HYPE). Safe: 0
+    /// when the spot leg is unconfigured or the read fails.
+    function spotHedgeSz() public view returns (uint64) {
+        if (spotTokenIndex == 0) return 0;
+        (bool ok, bytes memory ret) = HLConstants.SPOT_BALANCE_PRECOMPILE.staticcall(
+            abi.encode(address(this), spotTokenIndex)
+        );
+        if (!ok) return 0;
+        return abi.decode(ret, (SpotBalance)).total;
+    }
+
+    /// @notice Live spot price for the hedge pair (raw; human px =
+    /// raw / 10^(8 - szDecimals)). Safe: 0 on failure.
+    function spotPx() public view returns (uint64) {
+        if (spotPairIndex == 0) return 0;
+        (bool ok, bytes memory ret) = HLConstants.SPOT_PX_PRECOMPILE.staticcall(abi.encode(spotPairIndex));
+        if (!ok) return 0;
+        return abi.decode(ret, (uint64));
+    }
+
+    /// @notice Spot hedge value in USDC 6dp. Safe: 0 on any read failure —
+    /// totalAssets math must never revert on a precompile hiccup.
+    function spotValue6() public view returns (uint64) {
+        uint64 sz = spotHedgeSz();
+        if (sz == 0) return 0;
+        uint64 px = spotPx();
+        if (px == 0 || spotPxScale == 0) return 0;
+        return uint64((uint256(sz) * uint256(px)) / spotPxScale);
+    }
+
     function _coreAccountExists() internal view returns (bool) {
         (bool ok, bytes memory ret) = HLConstants.CORE_USER_EXISTS_PRECOMPILE.staticcall(abi.encode(address(this)));
         if (!ok) revert DNCore__ReadFailed();

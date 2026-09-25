@@ -122,3 +122,85 @@ contract MockOraclePx {
         return abi.encode(px);
     }
 }
+
+
+contract MockSpotBalance {
+    uint64 public total;
+    uint64 public hold;
+    uint64 public entryNtl;
+
+    function set(uint64 t, uint64 h, uint64 e) external {
+        total = t;
+        hold = h;
+        entryNtl = e;
+    }
+
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 64, "bad calldata shape (spotBalance: address,uint64)");
+        return abi.encode(total, hold, entryNtl);
+    }
+}
+
+contract MockSpotPx {
+    uint64 public px;
+
+    function setPx(uint64 p) external {
+        px = p;
+    }
+
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 32, "bad calldata shape (spotPx: uint64)");
+        return abi.encode(px);
+    }
+}
+
+contract MockSpotInfo {
+    struct SpotInfo {
+        string name;
+        uint64[2] tokens;
+    }
+
+    string public name;
+    uint64[2] public toks;
+
+    function set(string calldata n, uint64 t0, uint64 t1) external {
+        name = n;
+        toks[0] = t0;
+        toks[1] = t1;
+    }
+
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 32, "bad calldata shape (spotInfo: uint64)");
+        return abi.encode(SpotInfo(name, toks));
+    }
+}
+
+contract MockTokenInfo {
+    struct TokenInfo {
+        string name;
+        uint64[] spots;
+        uint64 deployerTradingFeeShare;
+        address deployer;
+        address evmContract;
+        uint8 szDecimals;
+        uint8 weiDecimals;
+        int8 evmExtraWeiDecimals;
+    }
+
+    string public name;
+    uint8 public szDecimals;
+    uint8 public weiDecimals;
+
+    function set(string calldata n, uint8 sz_, uint8 wd_) external {
+        name = n;
+        szDecimals = sz_;
+        weiDecimals = wd_;
+    }
+
+    fallback(bytes calldata _data) external returns (bytes memory) {
+        require(_data.length == 32, "bad calldata shape (tokenInfo: uint64)");
+        uint64[] memory sp = new uint64[](1);
+        sp[0] = 107;
+        return abi.encode(TokenInfo(name, sp, 0, address(0), address(0), szDecimals, weiDecimals, int8(0)));
+    }
+}

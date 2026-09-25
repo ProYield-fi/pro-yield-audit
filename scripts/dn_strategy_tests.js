@@ -48,6 +48,10 @@ const P_813 = "0x0000000000000000000000000000000000000813";
 const P_80F = "0x000000000000000000000000000000000000080f";
 const P_80A = "0x000000000000000000000000000000000000080a";
 const P_807 = "0x0000000000000000000000000000000000000807";
+const P_801 = "0x0000000000000000000000000000000000000801";
+const P_808 = "0x0000000000000000000000000000000000000808";
+const P_80B = "0x000000000000000000000000000000000000080b";
+const P_80C = "0x000000000000000000000000000000000000080c";
 const TESTNET_DEPOSIT_WALLET = "0x0B80659a4076E9E93C7DbE0f10675A16a3e5C206";
 
 async function mockAt(name, fixedAddr) {
@@ -88,10 +92,18 @@ async function main() {
   const marginAt = await mockAt("MockMarginSummary", P_80F);
   const perpInfoAt = await mockAt("MockPerpInfo", P_80A);
   const oracleAt = await mockAt("MockOraclePx", P_807);
+  const spotBalAt = await mockAt("MockSpotBalance", P_801);
+  const spotPxAt = await mockAt("MockSpotPx", P_808);
+  const spotInfoAt = await mockAt("MockSpotInfo", P_80B);
+  const tokenInfoAt = await mockAt("MockTokenInfo", P_80C);
   const walletAt = await mockAt("MockCoreDepositWallet", TESTNET_DEPOSIT_WALLET);
   await (await existsAt.setExists(true)).wait();
   await (await perpInfoAt.set("BTC", 1, 5, 40, false)).wait();
   await (await oracleAt.setPx(6_000_000_000_000n)).wait();
+  await (await spotInfoAt.set("@107", 150n, 0n)).wait();
+  await (await tokenInfoAt.set("HYPE", 2, 8)).wait();
+  await (await spotPxAt.setPx(91_727_000n)).wait();
+  await (await spotBalAt.set(0n, 0n, 0n)).wait();
 
   const usdc = await (await E.getContractFactory("MockUSDC")).deploy();
   await usdc.waitForDeployment();
@@ -136,6 +148,23 @@ async function main() {
   await (await k.syncCore()).wait();
   report("syncCore: equity 505e6 recorded", (await strategy.coreEquity6()) === 505_000_000n);
   report("totalAssets = 505 (Core) + 400 (idle) = 905", (await strategy.totalAssets()) === U(905));
+
+  // ── 3b. Spot hedge leg (HIGH-2): config derivation + reads + accounting ──
+  await (await positionAt.set(0n, 0n, 0n, 10, false)).wait();
+  await (await strategy.setSpotConfig(107)).wait();
+  report("setSpotConfig derives asset 10107 / token 150 / pxScale 1e8",
+    (await strategy.spotAsset()) === 10107n &&
+    (await strategy.spotTokenIndex()) === 150n &&
+    (await strategy.spotPxScale()) === 10n ** 8n);
+  await (await spotBalAt.set(9_862_989n, 0n, 0n)).wait(); // 0.09862989 HYPE @1e8
+  report("spotHedgeSz reads 0.09862989 HYPE (1e8 units)", (await strategy.spotHedgeSz()) === 9_862_989n);
+  report("spotPx reads 91727000 raw", (await strategy.spotPx()) === 91_727_000n);
+  report("spotValue6 = $9.047023 (6dp)", (await strategy.spotValue6()) === 9_047_023n);
+  report("totalAssets counts the spot hedge: 905 + 9.047023",
+    (await strategy.totalAssets()) === U(905) + 9_047_023n * 10n ** 12n);
+  // Spot readings are failure-safe: an unset pair contributes 0, not a revert.
+  await (await spotBalAt.set(0n, 0n, 0n)).wait();
+  report("totalAssets back to 905 with no hedge", (await strategy.totalAssets()) === U(905));
 
   // ── 4. Bridge back: principal vs profit split at fresh equity ──
   await (await k.bridgeBackToEvm(505_000_000n)).wait();
@@ -200,6 +229,26 @@ async function main() {
     [0, false, px, sz, false, 3, 0n])]);
   report("openShort bytes (action 1)", (await coreWriterAt.lastAction()).toLowerCase() === want3.toLowerCase());
 
+  // Spot hedge orders + transfer-out (action 1 with asset 10107; action 6)
+  const spotPx8 = 9_150_000_000n, spotSz8 = 11_000_000n; // 91.50 @ 0.11 HYPE
+  await (await k.openSpotBuy(spotPx8, spotSz8, 3)).wait();
+  let want4 = E.concat(["0x01000001", coder.encode(
+    ["uint32", "bool", "uint64", "uint64", "bool", "uint8", "uint128"],
+    [10107, true, spotPx8, spotSz8, false, 3, 0n])]);
+  report("openSpotBuy bytes (action 1, asset 10107, isBuy)",
+    (await coreWriterAt.lastAction()).toLowerCase() === want4.toLowerCase());
+  await (await k.sellSpot(spotPx8, spotSz8, 3)).wait();
+  let want5 = E.concat(["0x01000001", coder.encode(
+    ["uint32", "bool", "uint64", "uint64", "bool", "uint8", "uint128"],
+    [10107, false, spotPx8, spotSz8, false, 3, 0n])]);
+  report("sellSpot bytes (action 1, asset 10107, sell)",
+    (await coreWriterAt.lastAction()).toLowerCase() === want5.toLowerCase());
+  await (await k.hedgeTransferOut(user1.address, 50_000_000n)).wait();
+  let want6 = E.concat(["0x01000006", coder.encode(
+    ["address", "uint64", "uint64"], [user1.address, 150n, 50_000_000n])]);
+  report("hedgeTransferOut bytes (action 6, token 150)",
+    (await coreWriterAt.lastAction()).toLowerCase() === want6.toLowerCase());
+
   // ── 10. Gates ──
   await expectRevert(strategy.connect(user2).moveUsdcToPerp.staticCall(1_000_000n), "NotKeeper", "keeper gate");
   await (await strategy.setPaused(true)).wait();
@@ -210,6 +259,10 @@ async function main() {
   await (await existsAt.setExists(true)).wait();
   await expectRevert(k.openShort.staticCall(0, px, 10_000n * 10n ** 8n, 3), "Cap", "notional cap");
   await expectRevert(k.openShort.staticCall(1, px, sz, 3), "WrongAsset", "asset whitelist");
+  await expectRevert(k.openShort.staticCall(10107, px, sz, 3), "WrongAsset", "perp orders reject spot asset");
+  await (await positionAt.set(-5_000_000n, 0n, 0n, 10, false)).wait();
+  await expectRevert(strategy.setSpotConfig.staticCall(107), "NotFlat", "setSpotConfig guard (open position)");
+  await (await positionAt.set(0n, 0n, 0n, 10, false)).wait();
   await (await positionAt.set(-5_000_000n, 0n, 0n, 10, false)).wait();
   await expectRevert(strategy.setPerpAsset.staticCall(1), "NotFlat", "setPerpAsset guard (open position)");
   await (await positionAt.set(0n, 0n, 0n, 10, false)).wait();

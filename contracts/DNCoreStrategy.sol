@@ -147,10 +147,15 @@ contract DNCoreStrategy is BaseStrategy, DNCoreBase {
         return (coreEquity6, corePrincipal6, lastPositionSzi, profitRealized, profitSwept, lastSync);
     }
 
-    /// @notice Strategy assets in underlying units (synced Core equity + idle).
+    /// @notice Strategy assets in underlying units: synced Core equity (perp
+    /// margin side) + the SPOT HEDGE at the live spot mark (HIGH-2 — the long
+    /// leg is a real asset and must count) + idle EVM balance. Every spot read
+    /// is failure-safe (spotValue6() → 0), so withdraw math can never revert
+    /// on a precompile hiccup.
     function totalAssets() public view override(BaseStrategy) returns (uint256) {
         uint256 eqU = coreEquity6 > 0 ? uint256(coreEquity6) * coreScale : 0;
-        return eqU + underlying.balanceOf(address(this));
+        uint256 spotU = uint256(spotValue6()) * coreScale;
+        return eqU + spotU + underlying.balanceOf(address(this));
     }
 
     /// @notice Realized profit still waiting to be swept (underlying units).
