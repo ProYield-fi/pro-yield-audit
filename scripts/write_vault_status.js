@@ -32,10 +32,14 @@ async function readTotalShares(addr) {
   throw new Error("vault exposes neither totalShares() nor totalSupply()");
 }
 
-async function readScales(vaultAddr) {
+async function readScales(vaultAddr, hints = []) {
   // [assetDecimals, shareDecimals]; both default to 18 (repo generation).
   let assetDec = 18;
   let shareDec = 18;
+  const tryDecimals = async (addr) => {
+    const ac = new hre.ethers.Contract(addr, ["function decimals() view returns (uint8)"], hre.ethers.provider);
+    return Number(await ac.decimals());
+  };
   try {
     const vc = new hre.ethers.Contract(vaultAddr, [
       "function asset() view returns (address)",
@@ -44,9 +48,16 @@ async function readScales(vaultAddr) {
     try { shareDec = Number(await vc.decimals()); } catch { /* repo gen */ }
     try {
       const assetAddr = await vc.asset();
-      const ac = new hre.ethers.Contract(assetAddr, ["function decimals() view returns (uint8)"], hre.ethers.provider);
-      assetDec = Number(await ac.decimals());
-    } catch { /* no asset() — repo gen: 18dp mock accounting */ }
+      assetDec = await tryDecimals(assetAddr);
+    } catch {
+      // Lean vaults expose no asset()/decimals() (user-facing fns only — the
+      // mainnet ProYieldVault is one). Fall back to the manifest's vault_asset,
+      // then the known HyperEVM USDC, so 6dp balances are never shown as 18dp.
+      for (const h of [...hints, "0xb88339CB7199b77E23DB6E890353E22632Ba630f"]) {
+        if (!h) continue;
+        try { assetDec = await tryDecimals(h); break; } catch { /* next hint */ }
+      }
+    }
   } catch { /* not an ERC-4626-style vault */ }
   return [assetDec, shareDec];
 }
@@ -76,7 +87,7 @@ async function main() {
   const vault = await hre.ethers.getContractAt("ProYieldVault", deployed.pro_yield_vault);
   const totalAssets = await vault.totalAssets();
   const totalShares = await readTotalShares(deployed.pro_yield_vault);
-  const [assetDec, shareDec] = await readScales(deployed.pro_yield_vault);
+  const [assetDec, shareDec] = await readScales(deployed.pro_yield_vault, [deployed.vault_asset]);
   // Shares below one whole unit at their declared scale are a unit mismatch,
   // not a fact (the testnet vault declares 18 but counts in the asset's 6).
   const shownShareDec = totalShares > 0n && totalShares < 10n ** BigInt(shareDec) ? assetDec : shareDec;
