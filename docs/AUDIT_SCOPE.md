@@ -17,7 +17,9 @@ Primary (holds or routes user funds):
 | `contracts/adapters/DNCoreAdapter.sol` | 77 | Standalone DN execution wrapper (same surface, no vault) |
 | `contracts/FeeDistributor.sol` | 60 | Fee routing (60/20/20 recycle policy) |
 | `contracts/PYDStaking.sol` | 161 | PYD reward streaming (Synthetix-style) |
-| `contracts/PYDToken.sol` | 39 | Fixed-supply PYD, transfer caps |
+| `contracts/PYDToken.sol` | 26 | Fixed-supply OZ ERC20 (standard events); no mint path |
+| `contracts/PYDFeeDiscount.sol` | 250 | Tiered fee rebates accrued from real fee deltas (staker-facing) |
+| `contracts/PYDFunder.sol` | 152 | Capped USDC→PYD conversion → PYDStaking streams (dormant until a swapper is set) |
 
 Legacy/secondary (deployed but pending migration review):
 `DeltaNeutralStrategy.sol`, `SkyStrategy.sol`, `MorphoStrategy.sol`,
