@@ -1,39 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract PYDToken is Ownable {
-    string public constant name = "ProYield";
-    string public constant symbol = "PYD";
-    uint8 public constant decimals = 18;
-    uint256 public immutable totalSupply;
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
-    
-    constructor(uint256 _initialSupply) Ownable(msg.sender) {
-        totalSupply = _initialSupply * 10**18;
-        balanceOf[msg.sender] = totalSupply;
-    }
-
-    function transfer(address to, uint256 value) external returns (bool) {
-        require(balanceOf[msg.sender] >= value, "Insufficient balance");
-        balanceOf[msg.sender] -= value;
-        balanceOf[to] += value;
-        return true;
-    }
-
-    function approve(address spender, uint256 value) external returns (bool) {
-        allowance[msg.sender][spender] = value;
-        return true;
-    }
-
-    function transferFrom(address from, address to, uint256 value) external returns (bool) {
-        require(balanceOf[from] >= value, "Insufficient balance");
-        require(allowance[from][msg.sender] >= value, "Allowance exceeded");
-        balanceOf[from] -= value;
-        balanceOf[to] += value;
-        allowance[from][msg.sender] -= value;
-        return true;
+/// @notice ProYield token (PYD) — fixed supply, minted once at deploy to the
+/// deployer, then distributed per the published allocation.
+///
+/// Standard OpenZeppelin ERC20: Transfer/Approval events and the full surface
+/// so wallets, explorers, DEXes and HyperCore/HIP-1 tooling work with no
+/// special-casing. Unlike the earlier minimal token (no events, custom
+/// internals) this is the contract every integration expects.
+///
+/// No mint function — supply is immutable and verifiable on-chain.
+///
+/// SUPPLY CONVENTION: the constructor scales by 10**18 internally — pass the
+/// WHOLE-TOKEN count (e.g. 100000000 for 100M tokens, the decided supply).
+/// Passing parseUnits(...,18) double-scales to 1e18x the intended supply
+/// (found on the earlier deploy 2026-09-20).
+contract PYDToken is ERC20 {
+    constructor(uint256 _initialSupply) ERC20("ProYield", "PYD") {
+        require(_initialSupply > 0, "PYDToken: zero supply");
+        _mint(msg.sender, _initialSupply * 10 ** 18);
     }
 }
