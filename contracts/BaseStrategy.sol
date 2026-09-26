@@ -85,7 +85,10 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
 
     /// @notice Return funds to the vault so it can honor user withdrawals.
     /// Callable ONLY by the vault address (set via setVault). Capped at balance.
-    function recall(uint256 amount) external nonReentrant {
+    /// virtual: venue adapters (e.g. MorphoStrategy) unwind their positions
+    /// here so recalls are synchronous; the override still enforces
+    /// msg.sender == vault and pays out at most the real balance.
+    function recall(uint256 amount) external virtual nonReentrant {
         require(msg.sender == vault, "BaseStrategy: not vault");
         uint256 bal = underlying.balanceOf(address(this));
         if (amount > bal) amount = bal;

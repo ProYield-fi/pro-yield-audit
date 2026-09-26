@@ -634,20 +634,43 @@ async function main() {
   tx = await stakeC.connect(user1).withdraw(STAKE); await tx.wait();
   report("H3d withdraw returns staked principal", (await pydT.balanceOf(user1.address)) >= STAKE + claimed);
 
-  // ── I. MORPHO DRAIN-VECTOR (regression) ─────────────────────────
-  console.log("\n── I. Morpho strategy hardening ──");
+  // ── I. MORPHO STRATEGY (real adapter regression) ────────────────
+  console.log("\n── I. Morpho strategy (real adapter) ──");
+  const MockMorpho = await E.getContractFactory("MockMorpho");
+  const mm = await MockMorpho.deploy(); await mm.waitForDeployment();
   const Morpho = await E.getContractFactory("MorphoStrategy");
-  const morphoS = await Morpho.deploy(await usdc.getAddress(), owner.address, u4.address); // u4 = "morpho market"
+  const MORPHO_COLL = "0x5555555555555555555555555555555555555555";
+  const MORPHO_ORACLE = "0x194FFF37872BAC3531a41fA5C426090ff84f4f31";
+  const MORPHO_IRM = "0xD4a426F010986dCad727e8dd6eed44cA4A9b7483";
+  const morphoS = await Morpho.deploy(
+    await usdc.getAddress(), owner.address, await mm.getAddress(),
+    MORPHO_COLL, MORPHO_ORACLE, MORPHO_IRM, E.parseUnits("0.77", 18));
   await morphoS.waitForDeployment();
-  tx = await usdc.mint(await morphoS.getAddress(), E.parseUnits("50000", 18)); await tx.wait(); // parked principal
-  // OLD CODE: any caller could drain up to totalSupply; NEW CODE: vault/owner only
+  tx = await usdc.mint(await morphoS.getAddress(), E.parseUnits("50000", 18)); await tx.wait();
+  // I1: recall is vault-only (the old public drain vector stays dead)
   let morphoDrainReverted = false;
-  try { tx = await morphoS.connect(user1).withdraw(E.parseUnits("40000", 18)); await tx.wait(); } catch { morphoDrainReverted = true; }
-  report("I1 public drain of Morpho strategy reverts (vault/owner-only now)", morphoDrainReverted);
+  try { tx = await morphoS.connect(user1).recall(E.parseUnits("40000", 18)); await tx.wait(); } catch { morphoDrainReverted = true; }
+  report("I1 random caller cannot recall Morpho strategy (vault-only)", morphoDrainReverted);
+  // I2: deploy() (supply) is keeper/owner-only
+  let morphoDeployBlocked = false;
+  try { tx = await morphoS.connect(user1).deploy(); await tx.wait(); } catch { morphoDeployBlocked = true; }
+  report("I2 random caller cannot deploy Morpho strategy (keeper/owner-only)", morphoDeployBlocked);
+  // I3: supply moves principal into the market
+  tx = await morphoS.deploy(); await tx.wait();
+  report("I3 supply() moves principal into the market",
+    (await usdc.balanceOf(await mm.getAddress())) === E.parseUnits("50000", 18));
+  // I4: harvest with zero yield books nothing
   tx = await morphoS.harvest(); await tx.wait();
-  report("I2 morpho harvest no longer books principal as profit",
-    (await morphoS.totalDebt()) === 0n && (await usdc.balanceOf(await morphoS.getAddress())) === E.parseUnits("50000", 18),
-    `balance intact=${fmt(await usdc.balanceOf(await morphoS.getAddress()))}`);
+  report("I4 harvest with no yield books no profit", (await morphoS.totalDebt()) === 0n);
+  // I5: simulated interest -> harvest sweeps EXACTLY the yield, never principal
+  tx = await mm.accrue(await morphoS.marketId(), E.parseUnits("250", 18)); await tx.wait();
+  await (await morphoS.setVault(owner.address)).wait(); // vault role -> owner for the sweep
+  const ownerBalBeforeI5 = await usdc.balanceOf(owner.address);
+  tx = await morphoS.harvest(); await tx.wait();
+  const ownerGained = (await usdc.balanceOf(owner.address)) - ownerBalBeforeI5;
+  report("I5 harvest sweeps exactly the accrued yield (principal untouched)",
+    ownerGained === E.parseUnits("250", 18) && (await morphoS.totalDebt()) === E.parseUnits("250", 18),
+    `swept=${fmt(ownerGained)} debt=${fmt(await morphoS.totalDebt())}`);
 
   // ── J. KEEPER ROLE ──────────────────────────────────────────────
   console.log("\n── J. Keeper authorization ──");
