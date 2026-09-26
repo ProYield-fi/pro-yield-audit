@@ -1,0 +1,12 @@
+roster: 9 coins (verified 2026-09-26T04:50:00Z)
+✅ BTC   asset=0 pair=@142 tok=197 pxScale=100000 px=83973.0000 mid=83973.5 basis=0.00% vol=$29.34M fund=7.7% perpSzDec=5 maxLev=40
+✅ ETH   asset=1 pair=@151 tok=221 pxScale=1000000 px=2690.0000 mid=2689.75 basis=-0.00% vol=$11.57M fund=11.0% perpSzDec=4 maxLev=25
+✅ SOL   asset=5 pair=@156 tok=254 pxScale=10000000 px=120.6700 mid=120.655 basis=-0.00% vol=$12.84M fund=11.0% perpSzDec=2 maxLev=20
+✅ XRP   asset=25 pair=@267 tok=367 pxScale=1000000000 px=1.5561 mid=1.5567 basis=0.04% vol=$0.15M fund=11.0% perpSzDec=0 maxLev=20
+✅ HYPE  asset=159 pair=@107 tok=150 pxScale=100000000 px=92.1880 mid=92.1885 basis=0.00% vol=$60.55M fund=11.0% perpSzDec=2 maxLev=10
+✅ PUMP  asset=200 pair=@188 tok=299 pxScale=10000000000 px=0.0045 mid=0.00446535 basis=-0.01% vol=$2.06M fund=67.3% perpSzDec=0 maxLev=10
+✅ ZEC   asset=214 pair=@272 tok=419 pxScale=1000000 px=1537.7000 mid=1537.65 basis=-0.00% vol=$13.53M fund=11.0% perpSzDec=2 maxLev=10
+✅ MON   asset=215 pair=@243 tok=383 pxScale=1000000000 px=0.0263 mid=0.0263425 basis=-0.01% vol=$0.06M fund=21.4% perpSzDec=0 maxLev=5
+✅ XMR   asset=224 pair=@260 tok=404 pxScale=100000000 px=558.0200 mid=558.565 basis=0.10% vol=$5.08M fund=11.0% perpSzDec=3 maxLev=5
+
+══════ roster check: 9 ok, 0 failed ══════

@@ -1,0 +1,11 @@
+state: exists=true equity6=2023165 principal6=2080750 szi=-11 szDecimals=2
+profit: realized=0 swept=0 harvestable=0 syncedAt=1790396420
+funding: 10.95% annualized (HlPerp, HYPE)
+rotation: no capacity board in snapshot yet — skip
+vault: totalAssets = 26.39 USD
+strategy: totalAssets = 12.48 USD
+sizing: scout snapshot DN weight = 0.15 (age 954 min)
+sizing: vault 26.39 × DN weight 0.15 (scout) = target notional 10.15 USD
+position: szi=-11 (-0.11 HYPE) px=92.1885 current notional 10.14 USD (drift -0.09% vs target)
+decision: HOLD (dryRun=true)
+no sends (dry-run or nothing to do)

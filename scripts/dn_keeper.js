@@ -24,12 +24,15 @@
 //
 // Dry-run by default. Sends only with --execute.
 // Run: DN_STRATEGY=0x... npx hardhat run scripts/dn_keeper.js --network hyperTestnet [-- --execute]
+// Roster: scripts/dn_roster.json (verified perp+spot coins). Re-verify:
+//   npx hardhat run scripts/dn_roster_check.js --network hyperMainnet
 //
 // TODO(policy): negative-funding unwind threshold, margin top-up rule.
 // TODO(alerts): route mismatches to the Telegram notifier.
 
 const hre = require("hardhat");
 const fs = require("fs");
+const path = require("path");
 
 const CONFIG = {
   strategy: process.env.DN_STRATEGY || process.env.DN_ADAPTER || null,
@@ -47,6 +50,10 @@ const CONFIG = {
   targetOverrideUsd: parseFloat(process.env.DN_TARGET_USD || "0"), // 0 = use vault×weight sizing; >0 pins the hedge notional (demo/E2E runs)
   dryRun: !(process.argv.includes("--execute") || process.env.DN_EXECUTE === "1"),
 };
+
+/// DN roster (scripts/dn_roster.json) — verified perp+spot coin set. The keeper
+/// resolves coins THROUGH this file only; re-verify with dn_roster_check.js.
+const ROSTER_FILE = process.env.DN_ROSTER_FILE || path.join(__dirname, "dn_roster.json");
 
 /// @notice Telegram alert — reuses yield_scout's creds chain (env →
 /// ~/.hermes/secrets/telegram.json → ~/.hermes/.env). Never throws: alerts
@@ -111,20 +118,27 @@ async function hlInfo(body) {
   return res.json();
 }
 
-/// @returns annualized funding % for the strategy's perp asset (BTC=0, ETH=1)
+/// @returns {apr, coin, entry} — annualized funding % for the strategy's perp
+/// asset. Coin resolution is ROSTER-gated: the asset index must map to a
+/// verified roster coin (main perp + liquid HL spot hedge). An unknown asset
+/// REFUSES loudly — the keeper never guesses coins (a wrong coin = an
+/// unhedgeable position).
 async function fetchFundingApr(assetIndex) {
+  const { byAsset } = loadRoster();
+  const entry = byAsset[assetIndex];
+  if (!entry) {
+    throw new Error(`perp asset ${assetIndex} not in DN roster (${ROSTER_FILE}) — refusing to trade an unverified coin; re-verify with scripts/dn_roster_check.js`);
+  }
   // Test injection: DN_FORCE_APR overrides the live read (dry-run tests only).
-  if (process.env.DN_FORCE_APR) return parseFloat(process.env.DN_FORCE_APR);
+  if (process.env.DN_FORCE_APR) return { apr: parseFloat(process.env.DN_FORCE_APR), coin: entry.coin, entry };
   const predicted = await hlInfo({ type: "predictedFundings" });
   // shape: [[coin, [[venue, {fundingRate, nextFundingTime}], ...]], ...]
   // HlPerp venue = the validator perp book we hedge on. fundingRate is HOURLY.
-  const coin = assetIndex === 0 ? "BTC" : assetIndex === 1 ? "ETH" : assetIndex === 159 ? "HYPE" : null;
-  if (!coin) throw new Error(`unknown perp asset index ${assetIndex} — add its coin name before trusting funding math`);
-  const row = predicted.find((r) => r[0] === coin);
-  if (!row) throw new Error(`no predicted funding for ${coin}`);
+  const row = predicted.find((r) => r[0] === entry.coin);
+  if (!row) throw new Error(`no predicted funding for ${entry.coin}`);
   const venue = row[1].find((v) => v[0] === "HlPerp") || row[1][0];
   const hourly = parseFloat(venue[1].fundingRate);
-  return hourly * 24 * 365 * 100;
+  return { apr: hourly * 24 * 365 * 100, coin: entry.coin, entry };
 }
 
 /// @returns {weight, maxSleeveUsd} — DN sleeve share from the scout's blend.
@@ -145,6 +159,74 @@ async function loadSleeveWeight() {
     console.warn(`sizing: snapshot unreadable (${e.message}) — defaulting to ${DEFAULT_DN_WEIGHT}`);
   }
   return { weight: DEFAULT_DN_WEIGHT, source: "default" };
+}
+
+/// @returns {byAsset, byCoin} — DN roster. Throws when missing/invalid: the
+/// keeper must NEVER guess coins (a wrong coin = an unhedgeable position).
+function loadRoster() {
+  const r = JSON.parse(fs.readFileSync(ROSTER_FILE, "utf8"));
+  if (!r || typeof r.coins !== "object") throw new Error(`bad roster shape in ${ROSTER_FILE}`);
+  const byAsset = {}, byCoin = {};
+  for (const [coin, e] of Object.entries(r.coins)) {
+    if (typeof e.asset !== "number" || !e.spotPair || !e.spotToken || e.szDec == null || !e.pxScale) {
+      throw new Error(`roster entry incomplete for ${coin}`);
+    }
+    byAsset[e.asset] = { coin, ...e };
+    byCoin[coin] = { coin, ...e };
+  }
+  return { byAsset, byCoin };
+}
+
+/// Rotation advice (informational, never trades): compare the strategy's coin
+/// against the scout capacity board across the roster. Alerts when a roster
+/// alternative's verified 30d mean beats the current coin by >=
+/// DN_ROTATION_MIN_GAIN_PP (default 3pp) and clears 12%. Max one alert per
+/// (from->to) per 24h. Execution is operator-gated (scripts/dn_rotate_prep.js).
+async function rotationAdvice(currentCoin) {
+  if (process.env.DN_ROTATION_ADVICE === "0") return;
+  let snap;
+  try {
+    snap = JSON.parse(fs.readFileSync(CONFIG.scoutSnapshot, "utf8"));
+  } catch (e) {
+    console.log(`rotation: snapshot unreadable (${e.message}) — skip`);
+    return;
+  }
+  const board = snap?.hyperliquid_funding?.capacity_board?.board;
+  if (!Array.isArray(board) || !board.length) {
+    console.log("rotation: no capacity board in snapshot yet — skip");
+    return;
+  }
+  const { byCoin } = loadRoster();
+  const cur = board.find((b) => b.dex === "main" && b.name === currentCoin);
+  const curMean = cur ? cur.mean_30d_apr : null;
+  const minGain = parseFloat(process.env.DN_ROTATION_MIN_GAIN_PP || "3");
+  const alts = board
+    .filter((b) => b.dex === "main" && b.name !== currentCoin && byCoin[b.name])
+    .sort((a, b) => b.mean_30d_apr - a.mean_30d_apr);
+  console.log(
+    `rotation: current ${currentCoin}${curMean === null ? " (not on board)" : ` ${curMean}%/30d`}; ` +
+    `best roster alts: ${alts.slice(0, 3).map((a) => `${a.name} ${a.mean_30d_apr}%`).join(", ") || "none"}`
+  );
+  const best = alts.find((a) => a.mean_30d_apr >= 12 && (curMean === null || a.mean_30d_apr >= curMean + minGain));
+  if (!best) return;
+  const MARKER = process.env.DN_ROTATION_MARKER || path.join(process.env.HOME || "/tmp", ".proyield", "dn_rotation_alert.json");
+  const pair = `${currentCoin}->${best.name}`;
+  try {
+    const prev = JSON.parse(fs.readFileSync(MARKER, "utf8"));
+    if (prev.pair === pair && Date.now() - prev.ts < 24 * 3600 * 1000) {
+      console.log(`rotation: candidate ${pair} already alerted ${((Date.now() - prev.ts) / 3600000).toFixed(1)}h ago — skip`);
+      return;
+    }
+  } catch { /* no marker yet */ }
+  await sendAlert(
+    "🔁 DN ROTATION CANDIDATE",
+    `${currentCoin}${curMean === null ? "" : ` (${curMean}%/30d)`} → ${best.name} (${best.mean_30d_apr}%/30d, pos ${best.pos_30d_pct}%, min ${best.min_30d_apr}%, cap $${(best.cap_usd / 1e6).toFixed(1)}M). ` +
+    `Gain >= ${minGain}pp verified carry. Rotate: keeper UNWIND (or flat) -> scripts/dn_rotate_prep.js TARGET=${best.name} -> Safe txs -> next cycle opens.`
+  );
+  try {
+    fs.mkdirSync(path.dirname(MARKER), { recursive: true });
+    fs.writeFileSync(MARKER, JSON.stringify({ pair, ts: Date.now() }));
+  } catch { /* best effort */ }
 }
 
 /// @returns sleeve target in USD (float) given vault assets + DN weight.
@@ -241,9 +323,22 @@ async function main() {
   }
 
   // ── 2. Funding ──
-  const apr = await fetchFundingApr(asset);
-  const coinName = asset === 0 ? "BTC" : asset === 1 ? "ETH" : asset === 159 ? "HYPE" : `asset${asset}`;
-  console.log(`funding: ${apr.toFixed(2)}% annualized (HlPerp, ${coinName})`);
+  const { apr, coin, entry } = await fetchFundingApr(asset);
+  console.log(`funding: ${apr.toFixed(2)}% annualized (HlPerp, ${coin})`);
+
+  // Roster config-consistency guard (rotation safety): never OPEN unless the
+  // on-chain spot config matches the roster entry for the resolved coin — a
+  // half-applied rotation (asset switched, spot pair not yet) must not trade.
+  const onPair = Number(await strategy.spotPairIndex());
+  const onTok = Number(await strategy.spotTokenIndex());
+  const onScale = Number(await strategy.spotPxScale());
+  const cfgOk = onPair === entry.spotPair && onTok === entry.spotToken && onScale === Number(entry.pxScale);
+  if (!cfgOk) {
+    console.log(`config: ⚠ on-chain spot @${onPair}/${onTok}/${onScale} ≠ roster @${entry.spotPair}/${entry.spotToken}/${entry.pxScale}`);
+  }
+
+  // Rotation advice (informational): flag a better verified roster carry.
+  await rotationAdvice(coin);
 
   // ── 3. Size the sleeve (allocation policy hookup) ──
   // Vault totalAssets (6dp USDC units) → USD; × DN weight → sleeve notional.
@@ -283,14 +378,22 @@ async function main() {
   const sziHuman = Number(sziLive) / 10 ** szDec;
   const currentNotionalUsd = Math.abs(sziHuman) * pxHuman;
   const driftPct = targetNotionalUsd > 0 ? ((currentNotionalUsd - targetNotionalUsd) / targetNotionalUsd) * 100 : 0;
-  console.log(`position: szi=${sziLive} (${sziHuman} HYPE) px=${pxHuman} current notional ${currentNotionalUsd.toFixed(2)} USD (drift ${driftPct.toFixed(2)}% vs target)`);
+  console.log(`position: szi=${sziLive} (${sziHuman} ${coin}) px=${pxHuman} current notional ${currentNotionalUsd.toFixed(2)} USD (drift ${driftPct.toFixed(2)}% vs target)`);
 
   // ── 4. Decide ──
   const coreProfit6 = equityLive6 > principal6 ? equityLive6 - principal6 : 0n;
   let action = "HOLD";
   if (!exists) action = "BRIDGE_FIRST";
   else if (coreProfit6 > 0n && harvestable === 0n) action = "BRIDGE_PROFIT";
-  else if (targetNotionalUsd >= 10 && sziLive === 0n && apr >= CONFIG.fundingAprThreshold) action = "OPEN";
+  else if (targetNotionalUsd >= 10 && sziLive === 0n && apr >= CONFIG.fundingAprThreshold) {
+    action = cfgOk ? "OPEN" : "HOLD";
+    if (!cfgOk) {
+      await sendAlert(
+        "🟠 DN open blocked — spot config mismatch",
+        `${coin}: on-chain spot @${onPair}/${onTok}/${onScale} ≠ roster @${entry.spotPair}/${entry.spotToken}/${entry.pxScale}. Half-applied rotation? Run scripts/dn_rotate_prep.js TARGET=${coin} for the Safe txs.`
+      );
+    }
+  }
   else if (sziLive !== 0n && apr < CONFIG.unwindAprThreshold) action = "UNWIND";
   else if (sziLive !== 0n && targetNotionalUsd >= 10 && Math.abs(driftPct) > CONFIG.rebalanceBandPct) action = "REBALANCE";
   // (bare-truth guard: with a sub-$10 policy target a "rebalance" would reduce
@@ -388,12 +491,12 @@ async function main() {
           const step = 10n ** BigInt(8 - szDecS);
           const szS = (hs / step) * step;
           const sellPx = roundPxWire((pxRaw * 100n * (10000n - CONFIG.slippageBps)) / 10000n); // spot raw@1e6 → wire×100; SELL crosses below
-          console.log(`selling spot hedge: ${Number(szS) / 1e8} HYPE @ IOC ${sellPx}`);
+          console.log(`selling spot hedge: ${Number(szS) / 1e8} ${coin} @ IOC ${sellPx}`);
           const stx = await strategy.sellSpot(sellPx, szS, CONFIG.tifIoc);
           await stx.wait();
         } else {
           const dest = process.env.DN_HEDGE_RETURN_ADDR || (await strategy.owner());
-          console.log(`spot hedge ~$${valUsd.toFixed(2)} < $10.5 order min — spot-sending ${hs} (1e8 units) HYPE to ${dest}`);
+          console.log(`spot hedge ~$${valUsd.toFixed(2)} < $10.5 order min — spot-sending ${hs} (1e8 units) ${coin} to ${dest}`);
           const stx = await strategy.hedgeTransferOut(dest, hs);
           await stx.wait();
         }
@@ -504,7 +607,7 @@ async function main() {
       const pxScale = await strategy.spotPxScale();
       const pxDiv = Number(pxScale) > 0 ? Number(pxScale) : 1;
       const hedgeUsd = (Number(hedgeSz1e8) * Number(pxRaw) / pxDiv) / 1e6;
-      console.log(`spot hedge: ${Number(hedgeSz1e8) / 1e8} HYPE (~$${hedgeUsd.toFixed(2)}) vs short ${Number(shortSz1e8) / 1e8} HYPE`);
+      console.log(`spot hedge: ${Number(hedgeSz1e8) / 1e8} ${coin} (~$${hedgeUsd.toFixed(2)}) vs short ${Number(shortSz1e8) / 1e8} ${coin}`);
       if (hedgeSz1e8 < shortSz1e8) {
         const gap1e8 = shortSz1e8 - hedgeSz1e8;
         const gapUsd = (Number(gap1e8) * Number(pxRaw) / pxDiv) / 1e6;
@@ -513,19 +616,19 @@ async function main() {
           const step = 10n ** BigInt(8 - szDecS);
           const szS = (gap1e8 / step) * step;
           const buyPx = roundPxWire((pxRaw * 100n * (10000n + CONFIG.slippageBps)) / 10000n); // spot raw@1e6 → wire×100; BUY crosses above
-          console.log(`buying spot hedge gap: ${Number(szS) / 1e8} HYPE @ IOC ${buyPx}`);
+          console.log(`buying spot hedge gap: ${Number(szS) / 1e8} ${coin} @ IOC ${buyPx}`);
           const stx = await strategy.openSpotBuy(buyPx, szS, CONFIG.tifIoc);
           await stx.wait();
           await new Promise((r) => setTimeout(r, 8000));
           const hsAfter = await strategy.spotHedgeSz();
-          console.log(`verified hedge: ${Number(hsAfter) / 1e8} HYPE`);
+          console.log(`verified hedge: ${Number(hsAfter) / 1e8} ${coin}`);
           if (hsAfter < shortSz1e8) {
             await sendAlert("🟠 DN hedge still short after buy", `hedge ${hsAfter} < short ${shortSz1e8} (1e8 units) — check spot fills.`);
           }
         } else if (gapUsd > 1.0) {
           await sendAlert(
             "🟠 DN hedge gap — spot leg under-funded",
-            `short ${Number(shortSz1e8) / 1e8} vs spot ${Number(hedgeSz1e8) / 1e8} HYPE (gap $${gapUsd.toFixed(2)} — below HL's $10 spot order min). Fund the strategy's Core spot (transfer HYPE in) before claiming delta-neutral.`
+            `short ${Number(shortSz1e8) / 1e8} vs spot ${Number(hedgeSz1e8) / 1e8} ${coin} (gap $${gapUsd.toFixed(2)} — below HL's $10 spot order min). Fund the strategy's Core spot (transfer ${coin} in) before claiming delta-neutral.`
           );
         } else {
           // Sub-step gaps are order-granularity noise: spot sizes round to
@@ -533,7 +636,7 @@ async function main() {
           console.log(`hedge gap $${gapUsd.toFixed(2)} ≤ one order step ($1) — within granularity ✓`);
         }
       } else {
-        console.log(`hedge covers the short (${Number(hedgeSz1e8) / 1e8} >= ${Number(shortSz1e8) / 1e8} HYPE) — delta-neutral ✓`);
+        console.log(`hedge covers the short (${Number(hedgeSz1e8) / 1e8} >= ${Number(shortSz1e8) / 1e8} ${coin}) — delta-neutral ✓`);
       }
     }
   }

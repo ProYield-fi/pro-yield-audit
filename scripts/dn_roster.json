@@ -1,0 +1,16 @@
+{
+  "verified_utc": "2026-09-26T04:50:00Z",
+  "method": "meta ∩ spotMeta (USDC pairs) + mid-tracking vs perp + dayNtlVlm liquidity; pxScale = 10^(10 - spotSzDecimals). Re-verify each session: npx hardhat run scripts/dn_roster_check.js --network hyperMainnet",
+  "note": "TRUE-NEUTRAL gate: a coin is roster-eligible only with BOTH a main-validator perp (CoreWriter-tradable) AND a liquid HL spot pair that tracks the perp (hedge leg). No spot = directional bet = never roster.",
+  "coins": {
+    "BTC":  { "asset": 0,   "spotPair": 142, "spotToken": 197, "szDec": 5, "pxScale": "100000",     "note": "UBTC (Unit)" },
+    "ETH":  { "asset": 1,   "spotPair": 151, "spotToken": 221, "szDec": 4, "pxScale": "1000000",    "note": "UETH (Unit)" },
+    "SOL":  { "asset": 5,   "spotPair": 156, "spotToken": 254, "szDec": 3, "pxScale": "10000000",   "note": "USOL (Unit)" },
+    "XRP":  { "asset": 25,  "spotPair": 267, "spotToken": 367, "szDec": 1, "pxScale": "1000000000", "note": "FXRP — modest spot depth" },
+    "HYPE": { "asset": 159, "spotPair": 107, "spotToken": 150, "szDec": 2, "pxScale": "100000000",  "note": "canonical pair (live since beta)" },
+    "PUMP": { "asset": 200, "spotPair": 188, "spotToken": 299, "szDec": 0, "pxScale": "10000000000", "note": "UPUMP — the liquid pair (@20 PUMP is dust)" },
+    "ZEC":  { "asset": 214, "spotPair": 272, "spotToken": 419, "szDec": 4, "pxScale": "1000000",    "note": "UZEC (Unit Zcash)" },
+    "MON":  { "asset": 215, "spotPair": 243, "spotToken": 383, "szDec": 1, "pxScale": "1000000000", "note": "UMON — thin spot depth" },
+    "XMR":  { "asset": 224, "spotPair": 260, "spotToken": 404, "szDec": 2, "pxScale": "100000000",  "note": "XMR1 — issuer DD pending; verify before scaling" }
+  }
+}

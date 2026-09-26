@@ -11,6 +11,8 @@ const P_813 = "0x0000000000000000000000000000000000000813";
 const P_80F = "0x000000000000000000000000000000000000080f";
 const P_80A = "0x000000000000000000000000000000000000080a";
 const P_807 = "0x0000000000000000000000000000000000000807";
+const P_801 = "0x0000000000000000000000000000000000000801";
+const P_808 = "0x0000000000000000000000000000000000000808";
 const TESTNET_DEPOSIT_WALLET = "0x0B80659a4076E9E93C7DbE0f10675A16a3e5C206";
 
 let pass = 0, fail = 0;
@@ -56,8 +58,12 @@ async function main() {
   const marginAt = await mockAt("MockMarginSummary", P_80F);
   const perpInfoAt = await mockAt("MockPerpInfo", P_80A);
   const oracleAt = await mockAt("MockOraclePx", P_807);
+  const spotBalAt = await mockAt("MockSpotBalance", P_801);
+  const spotPxAt = await mockAt("MockSpotPx", P_808);
   const walletAt = await mockAt("MockCoreDepositWallet", TESTNET_DEPOSIT_WALLET);
   await (await walletAt.setToken("0x0000000000000000000000000000000000000000")).wait(); // shared-anvil reset
+  await (await spotBalAt.set(0n, 0n, 0n)).wait();
+  await (await spotPxAt.setPx(0n)).wait();
 
   await (await existsAt.setExists(true)).wait();
   await (await perpInfoAt.set("BTC", 1, 5, 40, false)).wait();
@@ -81,6 +87,9 @@ async function main() {
   await (await vault.addStrategy(sAddr)).wait();
   await (await strategy.setVault(vAddr)).wait();
   await (await strategy.setKeeper(keeper.address)).wait();
+  // Roster gate: BTC spot config must match dn_roster.json (142/197/1e5) or
+  // the keeper's config guard blocks the OPEN.
+  await (await strategy.setSpotConfig(142, 197, 100000n)).wait();
 
   // User deposit 1,000,000 USD → vault totalAssets = 1M → target sleeve =
   // 1M × 0.15 = 150k USD. Deploy 90% of it: 135k short notional.
@@ -106,7 +115,7 @@ async function main() {
   // ── Run the keeper DRY-RUN against this state ──
   console.log("\n── keeper dry-run (subprocess) ──");
   const out = execSync(
-    `DN_STRATEGY=${sAddr} DN_SILENCE_TELEGRAM=1 DN_ALERT_LOG=/tmp/dn_dryrun_alerts.log npx hardhat run scripts/dn_keeper.js --network hyperTestnet`,
+    `DN_STRATEGY=${sAddr} DN_FORCE_APR=8.0 DN_SILENCE_TELEGRAM=1 DN_ALERT_LOG=/tmp/dn_dryrun_alerts.log npx hardhat run scripts/dn_keeper.js --network hyperTestnet`,
     { cwd: process.cwd(), encoding: "utf8", timeout: 120000, stdio: ["pipe", "pipe", "pipe"] }
   );
   console.log(out);
@@ -116,7 +125,7 @@ async function main() {
   report("keeper computes target notional 150,000", out.includes("target notional 150000.00 USD"));
   report("keeper shows position drift vs target", out.includes("drift"));
   report("keeper is dry-run (no sends)", out.includes("dryRun=true"));
-  report("keeper decided correctly", out.includes("decision: OPEN") || out.includes("decision: HOLD"));
+  report("keeper decided OPEN (roster config matches)", out.includes("decision: OPEN"));
 
   console.log(`\n══════ ${pass} passed, ${fail} failed ══════`);
   process.exit(fail ? 1 : 0);
