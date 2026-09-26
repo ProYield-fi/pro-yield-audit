@@ -1,0 +1,16 @@
+=== 2026-09-26T04:55:49Z dn_keeper mainnet (strategy 0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4) ===
+synced Core equity: $2.02
+state: exists=true equity6=2022835 principal6=2080750 szi=-11 szDecimals=2
+profit: realized=0 swept=0 harvestable=0 syncedAt=1790396420
+funding: 10.95% annualized (HlPerp, HYPE)
+rotation: no capacity board in snapshot yet — skip
+vault: totalAssets = 26.39 USD
+strategy: totalAssets = 12.47 USD
+sizing: scout snapshot DN weight = 0.15 (age 956 min)
+sizing: vault 26.39 × DN weight 0.15 (scout) = target notional 10.15 USD
+position: szi=-11 (-0.11 HYPE) px=92.186 current notional 10.14 USD (drift -0.09% vs target)
+decision: HOLD (dryRun=false)
+no sends (dry-run or nothing to do)
+keeper exit=0
+harvest skipped: insufficient funds for gas * price + value: have 257132510687824 want 2497810297794399
+vault totalAssets: 26.390016 USDC
