@@ -160,12 +160,16 @@ async function main() {
   }
   const dnAssets = await readStrat(deployed.dn_core_strategy);
   if (dnAssets != null) {
+    const dnUsd = Number(hre.ethers.formatUnits(dnAssets, assetDec));
     strategies.push({
       kind: "funding",
       name: "Funding sleeve",
       address: deployed.dn_core_strategy,
       assets: fmt6(dnAssets),
       apyPct: fundingAprPct,
+      // Below HL's $10 order minimums the sleeve cannot trade — say so
+      // instead of implying the rate is being earned.
+      ...(dnUsd < 11 ? { note: "idle — below venue minimums until TVL grows" } : {}),
     });
   }
   const deployment = {
