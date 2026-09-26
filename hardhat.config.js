@@ -54,6 +54,14 @@ module.exports = {
       chainId: 999,
       accounts: [deployerKey],
     },
+    arbMainnet: {
+      // Arbitrum One (42161) — PT sleeve executor home. Same ops EOA
+      // (0xaDD8f267…) as every other chain; guards live in the deploy script
+      // (ARB_OK=1, chain 42161, expected-deployer check, manifest checks).
+      url: process.env.ARB_RPC_URL || "https://arb1.arbitrum.io/rpc",
+      chainId: 42161,
+      accounts: [deployerKey],
+    },
   },
   paths: {
     contracts: "./contracts",

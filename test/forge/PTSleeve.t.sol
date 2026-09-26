@@ -384,4 +384,33 @@ contract PTSleeveExecutorTest is Test {
         exec.ownerRescue(address(usdc), address(0xBEEF), 10e6);
         assertEq(usdc.balanceOf(address(0xBEEF)), 10e6);
     }
+
+    // ——— one-time return-address confirm (deploy bootstrap safety net) ———
+
+    function test_confirmStrategyReturn_once_then_locked() public {
+        assertEq(exec.strategyReturn(), bytes32(uint256(uint160(strategyHyperEvm))), "constructor value");
+        exec.confirmStrategyReturn(address(0x9999));
+        assertEq(exec.strategyReturn(), bytes32(uint256(uint160(address(0x9999)))), "corrected");
+        vm.expectRevert("PTE: already confirmed");
+        exec.confirmStrategyReturn(address(0x8888));
+    }
+
+    function test_confirmStrategyReturn_too_late_after_activity() public {
+        vm.prank(ops);
+        exec.buyPT(1e6, 0);
+        vm.expectRevert("PTE: too late");
+        exec.confirmStrategyReturn(address(0x9999));
+        // also too late once a return has been burned
+        exec.setMarket(marketAddr, address(pt)); // no-op sanity
+        vm.prank(ops);
+        exec.bridgeBack(1e6, 0);
+        vm.expectRevert("PTE: too late");
+        exec.confirmStrategyReturn(address(0x9999));
+    }
+
+    function test_confirmStrategyReturn_owner_only() public {
+        vm.prank(ops);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, ops));
+        exec.confirmStrategyReturn(address(0x9999));
+    }
 }

@@ -54,9 +54,10 @@ interface ITokenMessengerV2BurnArb {
 ///
 /// Trust model:
 ///  - `ops` (keeper key) can ONLY: buy PT on the configured market, sell PT on
-///    the configured market, and burn USDC back to the IMMUTABLE
-///    `strategyReturn` address on HyperEVM. It can never move funds anywhere
-///    else and can never change configuration.
+///    the configured market, and burn USDC back to the `strategyReturn` address
+///    on HyperEVM (fixed at deploy, correctable ONCE by the owner before any
+///    activity, then locked). It can never move funds anywhere else and can
+///    never change configuration.
 ///  - `owner` (the 2/3 treasury Safe) sets the market/PT pair (for rolls), the
 ///    ops key, and holds the rescue hatch (owner-only token transfer — e.g.
 ///    to redeem PT after expiry via the Safe).
@@ -68,18 +69,29 @@ contract PTSleeveExecutor is Ownable, ReentrancyGuard {
     IERC20 public immutable usdc;
     IPendleRouterMin public immutable router;
     ITokenMessengerV2BurnArb public immutable tokenMessenger;
-    bytes32 public immutable strategyReturn; // HyperEVM strategy (bytes32) — fixed
     uint32 public constant HYPEREVM_DOMAIN = 19;
+
+    /// @dev The HyperEVM strategy address (bytes32) that bridgeBack mints to.
+    /// Set at construction from the deploy script's address prediction/plan;
+    /// `confirmStrategyReturn` lets the owner correct it ONCE before any
+    /// activity (deploy-order bootstrap safety net), then it is locked forever.
+    bytes32 public strategyReturn;
+    bool public returnConfirmed;
 
     address public ops;
     address public market; // Pendle market — owner-set (rolls)
     address public pt; // PT token of that market — owner-set
+
+    uint256 public buyCount;
+    uint256 public sellCount;
+    uint256 public bridgeBackCount;
 
     event OpsSet(address indexed ops);
     event MarketSet(address indexed market, address indexed pt);
     event BoughtPt(uint256 usdcIn, uint256 ptOut);
     event SoldPt(uint256 ptIn, uint256 usdcOut);
     event BridgedBack(uint256 amount, uint256 maxFee);
+    event StrategyReturnConfirmed(address indexed strategy);
     event Rescued(address indexed token, address indexed to, uint256 amount);
 
     modifier onlyOps() {
@@ -121,6 +133,18 @@ contract PTSleeveExecutor is Ownable, ReentrancyGuard {
         emit MarketSet(_market, _pt);
     }
 
+    /// @notice One-time correction of the return destination (bootstrap safety
+    /// net for deploy-order address prediction). Locks forever after — and is
+    /// refused as soon as ANY buy/sell/return has happened.
+    function confirmStrategyReturn(address _strategy) external onlyOwner {
+        require(!returnConfirmed, "PTE: already confirmed");
+        require(buyCount == 0 && sellCount == 0 && bridgeBackCount == 0, "PTE: too late");
+        require(_strategy != address(0), "PTE: zero strategy");
+        strategyReturn = bytes32(uint256(uint160(_strategy)));
+        returnConfirmed = true;
+        emit StrategyReturnConfirmed(_strategy);
+    }
+
     /// @notice Buy PT with USDC on the configured market. minPtOut bounds slippage.
     function buyPT(uint256 usdcAmount, uint256 minPtOut) external onlyOps nonReentrant returns (uint256 ptOut) {
         require(market != address(0), "PTE: no market");
@@ -142,6 +166,7 @@ contract PTSleeveExecutor is Ownable, ReentrancyGuard {
             _emptyLimit()
         );
         require(ptOut >= minPtOut, "PTE: slippage");
+        buyCount += 1;
         emit BoughtPt(usdcAmount, ptOut);
     }
 
@@ -161,6 +186,7 @@ contract PTSleeveExecutor is Ownable, ReentrancyGuard {
         });
         (usdcOut,,) = router.swapExactPtForToken(address(this), market, ptAmount, output, _emptyLimit());
         require(usdcOut >= minUsdcOut, "PTE: slippage");
+        sellCount += 1;
         emit SoldPt(ptAmount, usdcOut);
     }
 
@@ -173,6 +199,7 @@ contract PTSleeveExecutor is Ownable, ReentrancyGuard {
         tokenMessenger.depositForBurn(
             amount, HYPEREVM_DOMAIN, strategyReturn, address(usdc), bytes32(0), maxFee, 2000
         );
+        bridgeBackCount += 1;
         emit BridgedBack(amount, maxFee);
     }
 
