@@ -35,5 +35,18 @@
   "max_action_usd6": "25000000",
   "keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
   "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB"
- }
+ },
+ "morpho_strategy": "0xBF4C5e339D63EEB393DA2797679879a0a5Af2D53",
+ "morpho_market": {
+  "core": "0x68e37dE8d93d3496ae143F2E900490f6280C57cD",
+  "market_id": "0xd7d38220652d19c87099c3b23de9a70a1893620a050c635d1a94bd947c9c59a8",
+  "loan": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+  "collateral": "0x5555555555555555555555555555555555555555",
+  "oracle": "0x194FFF37872BAC3531a41fA5C426090ff84f4f31",
+  "irm": "0xD4a426F010986dCad727e8dd6eed44cA4A9b7483",
+  "lltv": "0.77",
+  "note": "flagship USDC market (WHYPE collateral) — deepest + most liquid on HyperEVM"
+ },
+ "morpho_strategy_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+ "morpho_strategy_keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D"
 }

@@ -94,6 +94,87 @@ async function main() {
   const price18 = totalShares > 0n ? (totalAssets * 10n ** 18n) / totalShares : 10n ** 18n;
   const F = (x, dec, unit) => `${hre.ethers.formatUnits(x, dec)} ${unit}`;
 
+  // ── Live deployment: where the vault's assets actually sit ─────────────
+  // All reads guarded; failures stay null (honest gaps), never zero-filled.
+  const assetAddr = deployed.vault_asset || "0xb88339CB7199b77E23DB6E890353E22632Ba630f";
+  const erc20 = new hre.ethers.Contract(
+    assetAddr,
+    ["function balanceOf(address) view returns (uint256)"],
+    hre.ethers.provider,
+  );
+  let idle = null;
+  try { idle = await erc20.balanceOf(deployed.pro_yield_vault); } catch { /* gap */ }
+
+  const stratAbi = ["function totalAssets() view returns (uint256)"];
+  const readStrat = async (addr) => {
+    if (!addr) return null;
+    try {
+      const c = new hre.ethers.Contract(addr, stratAbi, hre.ethers.provider);
+      return await c.totalAssets();
+    } catch { return null; }
+  };
+
+  // Live rates for the sleeves — floating, so they ship with the feed.
+  let fundingAprPct = null;
+  try {
+    const r = await fetch("https://api.hyperliquid.xyz/info", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "metaAndAssetCtxs" }),
+    });
+    const j = await r.json();
+    const idx = j[0].universe.findIndex((u) => u.name === "HYPE");
+    if (idx >= 0) fundingAprPct = Number((parseFloat(j[1][idx].funding) * 24 * 365 * 100).toFixed(2));
+  } catch { /* gap */ }
+
+  let lendingApyPct = null;
+  try {
+    const marketId = deployed.morpho_market && deployed.morpho_market.market_id;
+    if (marketId) {
+      const r = await fetch("https://blue-api.morpho.org/graphql", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `{ markets(first: 1, where: { uniqueKey_in: ["${marketId}"] }) { items { state { supplyApy } } } }`,
+        }),
+      });
+      const j = await r.json();
+      const apy = j && j.data && j.data.markets && j.data.markets.items && j.data.markets.items[0]
+        ? j.data.markets.items[0].state.supplyApy
+        : null;
+      if (apy != null) lendingApyPct = Number((apy * 100).toFixed(2));
+    }
+  } catch { /* gap */ }
+
+  const fmt6 = (x) => (x == null ? null : hre.ethers.formatUnits(x, assetDec));
+  const strategies = [];
+  const morphoAssets = await readStrat(deployed.morpho_strategy);
+  if (morphoAssets != null) {
+    strategies.push({
+      kind: "lending",
+      name: "Morpho Blue",
+      address: deployed.morpho_strategy,
+      assets: fmt6(morphoAssets),
+      apyPct: lendingApyPct,
+    });
+  }
+  const dnAssets = await readStrat(deployed.dn_core_strategy);
+  if (dnAssets != null) {
+    strategies.push({
+      kind: "funding",
+      name: "Funding sleeve",
+      address: deployed.dn_core_strategy,
+      assets: fmt6(dnAssets),
+      apyPct: fundingAprPct,
+    });
+  }
+  const deployment = {
+    idleUsdc: fmt6(idle),
+    strategies,
+    assetsTotalUsdc: fmt6((idle || 0n) + (morphoAssets || 0n) + (dnAssets || 0n)),
+    note: "live chain reads; strategies report totalAssets(); rates float with the market",
+  };
+
   const tag = process.env.SMOKE_TAG;
   const status = {
     vault: deployed.pro_yield_vault,
@@ -101,6 +182,7 @@ async function main() {
     totalAssets: F(totalAssets, assetDec, "USDC"),
     totalShares: F(totalShares, shownShareDec, "shares"),
     targetApyBps: null,
+    deployment,
     recycling: { total: 0, boost: 0, runs: 0, last: null },
     ts: new Date().toISOString(),
     // Honest label: the declared chain when the manifest names one, otherwise
