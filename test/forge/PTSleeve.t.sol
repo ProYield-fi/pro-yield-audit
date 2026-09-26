@@ -26,6 +26,7 @@ import {PTSleeveExecutor} from "../../contracts/arbi/PTSleeveExecutor.sol";
 import {MockCctp, MockPT} from "../../contracts/mocks/MockCctp.sol";
 import {MockPendleRouterMin} from "../../contracts/mocks/MockPendleRouterMin.sol";
 import {MockUSDC} from "../../contracts/mocks/MockUSDC.sol";
+import {MockCurve} from "../../contracts/mocks/MockCurve.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract PTSleeveStrategyTest is Test {
@@ -287,7 +288,9 @@ contract PTSleeveStrategyTest is Test {
 
 contract PTSleeveExecutorTest is Test {
     MockUSDC usdc;
+    MockUSDC usdai;
     MockCctp cctp;
+    MockCurve curve;
     MockPendleRouterMin router;
     MockPT pt;
     PTSleeveExecutor exec;
@@ -298,43 +301,58 @@ contract PTSleeveExecutorTest is Test {
 
     function setUp() public {
         usdc = new MockUSDC();
+        usdai = new MockUSDC();
         pt = new MockPT();
-        router = new MockPendleRouterMin(address(usdc), address(pt));
+        curve = new MockCurve(address(usdc), address(usdai));
+        router = new MockPendleRouterMin(address(usdai), address(pt));
         cctp = new MockCctp(address(usdc));
-        exec = new PTSleeveExecutor(address(usdc), address(router), address(cctp), strategyHyperEvm, ops, address(this));
+        exec = new PTSleeveExecutor(
+            address(usdc), address(router), address(cctp), strategyHyperEvm, ops, address(this),
+            address(usdai), address(curve), 1, 0
+        );
         exec.setMarket(marketAddr, address(pt));
         usdc.mint(address(exec), 1_000e6);
     }
 
     function test_buyPT_flows_and_price() public {
-        uint256 px = 995e15; // 0.995 USD/PT, 18dp — same value as the mock default
+        uint256 px = 995e15; // 0.995 USDai/PT, 18dp — same value as the mock default
+        uint256 usdaiIn = 100e6 * 1e12 - (100e6 * 1e12 * 4 / 10000); // minus 4bp curve fee
         vm.prank(ops);
-        uint256 ptOut = exec.buyPT(100e6, 100e18);
-        assertEq(ptOut, (100e6 * 1e12 * 1e18) / px, "PT out at price");
+        uint256 ptOut = exec.buyPT(100e6, 99e18, 100e18);
+        assertEq(ptOut, (usdaiIn * 1e18) / px, "PT out at price");
         assertEq(exec.ptBalance(), ptOut, "PT held by executor");
         assertEq(exec.usdcBalance(), 900e6, "USDC spent");
         assertEq(router.buyCount(), 1);
     }
 
-    function test_buyPT_slippage_reverts() public {
+    function test_buyPT_curve_slippage_reverts() public {
+        vm.prank(ops);
+        vm.expectRevert("curve: slippage");
+        exec.buyPT(100e6, 100e18, 0); // curve gives 99.96e18 — demanding 100 reverts
+    }
+
+    function test_buyPT_router_slippage_reverts() public {
         vm.prank(ops);
         vm.expectRevert("router: minPtOut");
-        exec.buyPT(100e6, 101e18);
+        exec.buyPT(100e6, 0, 101e18);
     }
 
     function test_buyPT_auth() public {
         vm.prank(address(0xB0B));
         vm.expectRevert("PTE: not ops");
-        exec.buyPT(1e6, 0);
+        exec.buyPT(1e6, 0, 0);
     }
 
     function test_sellPT_flows() public {
         uint256 px = 995e15;
         pt.mint(address(exec), 100e18);
+        uint256 usdaiMid = (100e18 * px) / 1e18; // 99.5e18 from the router
+        uint256 expectUsdc = usdaiMid / 1e12;
+        expectUsdc -= (expectUsdc * 4) / 10000; // minus 4bp curve fee
         vm.prank(ops);
-        uint256 out = exec.sellPT(100e18, 99e6);
-        assertEq(out, (100e18 * px) / 1e18 / 1e12, "USDC out at price");
-        assertEq(exec.usdcBalance(), 1_000e6 + 99.5e6, "USDC received");
+        uint256 out = exec.sellPT(100e18, 99e18, 99e6);
+        assertEq(out, expectUsdc, "USDC out at price");
+        assertEq(exec.usdcBalance(), 1_000e6 + expectUsdc, "USDC received");
         assertEq(router.sellCount(), 1);
     }
 
@@ -342,7 +360,10 @@ contract PTSleeveExecutorTest is Test {
         pt.mint(address(exec), 100e18);
         vm.prank(ops);
         vm.expectRevert("router: minTokenOut");
-        exec.sellPT(100e18, 100e6); // real out is 99.5
+        exec.sellPT(100e18, 100e18, 0); // real usdai mid is 99.5e18
+        vm.prank(ops);
+        vm.expectRevert("curve: slippage");
+        exec.sellPT(100e18, 0, 100e6); // real usdc out is ~99.46e6
     }
 
     function test_bridgeBack_fixed_destination_and_standard_finality() public {
@@ -397,7 +418,7 @@ contract PTSleeveExecutorTest is Test {
 
     function test_confirmStrategyReturn_too_late_after_activity() public {
         vm.prank(ops);
-        exec.buyPT(1e6, 0);
+        exec.buyPT(1e6, 0, 0);
         vm.expectRevert("PTE: too late");
         exec.confirmStrategyReturn(address(0x9999));
         // also too late once a return has been burned

@@ -63,12 +63,20 @@ interface ITokenMessengerV2BurnArb {
 ///    to redeem PT after expiry via the Safe).
 ///  - Every buy/sell takes min-out parameters from the caller, enforced by the
 ///    router AND re-asserted here.
+interface ICurvePool {
+    function exchange(int128 i, int128 j, uint256 dx, uint256 minDy) external;
+}
+
 contract PTSleeveExecutor is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable usdc;
     IPendleRouterMin public immutable router;
     ITokenMessengerV2BurnArb public immutable tokenMessenger;
+    address public immutable usdai; // stable the Pendle SY accepts (USDai)
+    ICurvePool public immutable curve; // USDC <-> USDai hop
+    int128 public immutable curveIdxUsdc;
+    int128 public immutable curveIdxUsdai;
     uint32 public constant HYPEREVM_DOMAIN = 19;
 
     /// @dev The HyperEVM strategy address (bytes32) that bridgeBack mints to.
@@ -105,18 +113,28 @@ contract PTSleeveExecutor is Ownable, ReentrancyGuard {
         address _tokenMessenger,
         address _strategyReturn,
         address _ops,
-        address initialOwner
+        address initialOwner,
+        address _usdai,
+        address _curve,
+        int128 _idxUsdc,
+        int128 _idxUsdai
     ) Ownable(initialOwner) {
         require(
             _usdc != address(0) && _router != address(0) && _tokenMessenger != address(0)
-                && _strategyReturn != address(0) && _ops != address(0),
+                && _strategyReturn != address(0) && _ops != address(0)
+                && _usdai != address(0) && _curve != address(0),
             "PTE: zero addr"
         );
+        require(_idxUsdc != _idxUsdai, "PTE: same indices");
         usdc = IERC20(_usdc);
         router = IPendleRouterMin(_router);
         tokenMessenger = ITokenMessengerV2BurnArb(_tokenMessenger);
         strategyReturn = bytes32(uint256(uint160(_strategyReturn)));
         ops = _ops;
+        usdai = _usdai;
+        curve = ICurvePool(_curve);
+        curveIdxUsdc = _idxUsdc;
+        curveIdxUsdai = _idxUsdai;
     }
 
     function setOps(address _ops) external onlyOwner {
@@ -145,15 +163,24 @@ contract PTSleeveExecutor is Ownable, ReentrancyGuard {
         emit StrategyReturnConfirmed(_strategy);
     }
 
-    /// @notice Buy PT with USDC on the configured market. minPtOut bounds slippage.
-    function buyPT(uint256 usdcAmount, uint256 minPtOut) external onlyOps nonReentrant returns (uint256 ptOut) {
+    /// @notice Buy PT: USDC → Curve hop → USDai → Pendle market → PT.
+    /// USDai is the stable the market's SY accepts; the Curve hop is the only
+    /// venue the executor may touch besides the Pendle router.
+    function buyPT(uint256 usdcAmount, uint256 minUsdaiOut, uint256 minPtOut) external onlyOps nonReentrant returns (uint256 ptOut) {
         require(market != address(0), "PTE: no market");
         require(usdcAmount > 0 && usdcAmount <= usdc.balanceOf(address(this)), "PTE: bad amount");
-        usdc.forceApprove(address(router), usdcAmount);
+        // Hop 1: USDC → USDai on Curve.
+        usdc.forceApprove(address(curve), usdcAmount);
+        uint256 usdaiBefore = IERC20(usdai).balanceOf(address(this));
+        curve.exchange(curveIdxUsdc, curveIdxUsdai, usdcAmount, minUsdaiOut);
+        uint256 got = IERC20(usdai).balanceOf(address(this)) - usdaiBefore;
+        require(got >= minUsdaiOut, "PTE: curve slippage");
+        // Hop 2: USDai → PT on Pendle.
+        IERC20(usdai).forceApprove(address(router), got);
         TokenInput memory input = TokenInput({
-            tokenIn: address(usdc),
-            netTokenIn: usdcAmount,
-            tokenMintSy: address(usdc),
+            tokenIn: usdai,
+            netTokenIn: got,
+            tokenMintSy: usdai,
             pendleSwap: address(0),
             swapData: _noSwap()
         });
@@ -170,21 +197,28 @@ contract PTSleeveExecutor is Ownable, ReentrancyGuard {
         emit BoughtPt(usdcAmount, ptOut);
     }
 
-    /// @notice Sell PT for USDC on the configured market. minUsdcOut bounds slippage.
+    /// @notice Sell PT: PT → Pendle → USDai → Curve hop → USDC.
     /// Ops must roll PRE-EXPIRY (design: >= 3 days before maturity); after
     /// expiry the owner Safe uses the rescue hatch for manual redemption.
-    function sellPT(uint256 ptAmount, uint256 minUsdcOut) external onlyOps nonReentrant returns (uint256 usdcOut) {
+    function sellPT(uint256 ptAmount, uint256 minUsdaiOut, uint256 minUsdcOut) external onlyOps nonReentrant returns (uint256 usdcOut) {
         require(market != address(0) && pt != address(0), "PTE: no market");
         require(ptAmount > 0 && ptAmount <= IERC20(pt).balanceOf(address(this)), "PTE: bad amount");
         IERC20(pt).forceApprove(address(router), ptAmount);
         TokenOutput memory output = TokenOutput({
-            tokenOut: address(usdc),
-            minTokenOut: minUsdcOut,
-            tokenRedeemSy: address(usdc),
+            tokenOut: usdai,
+            minTokenOut: minUsdaiOut,
+            tokenRedeemSy: usdai,
             pendleSwap: address(0),
             swapData: _noSwap()
         });
-        (usdcOut,,) = router.swapExactPtForToken(address(this), market, ptAmount, output, _emptyLimit());
+        uint256 usdaiOut;
+        (usdaiOut,,) = router.swapExactPtForToken(address(this), market, ptAmount, output, _emptyLimit());
+        require(usdaiOut >= minUsdaiOut, "PTE: slippage");
+        // Hop 2: USDai → USDC on Curve.
+        IERC20(usdai).forceApprove(address(curve), usdaiOut);
+        uint256 usdcBefore = usdc.balanceOf(address(this));
+        curve.exchange(curveIdxUsdai, curveIdxUsdc, usdaiOut, minUsdcOut);
+        usdcOut = usdc.balanceOf(address(this)) - usdcBefore;
         require(usdcOut >= minUsdcOut, "PTE: slippage");
         sellCount += 1;
         emit SoldPt(ptAmount, usdcOut);

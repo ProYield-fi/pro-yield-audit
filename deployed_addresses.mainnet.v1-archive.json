@@ -49,9 +49,9 @@
  },
  "morpho_strategy_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
  "morpho_strategy_keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
- "pt_sleeve_strategy": "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b",
+ "pt_sleeve_strategy": "0x3AE855B65A021397f7a3ca838acc8E4c82cF815f",
  "pt_sleeve_strategy_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
  "pt_sleeve_strategy_keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
- "pt_sleeve_executor": "0xA2e535970dc1492f77843E26F25Ab314735F4dF5",
+ "pt_sleeve_executor": "0xcab4a8849Be05F09a11f9a0F6e43e5771a6a92E2",
  "pt_sleeve_note": "PT fixed-rate sleeve (R2): CCTP V2 <-> Arbitrum executor -> Pendle PT. See docs/PT_SLEEVE_DESIGN.md"
 }

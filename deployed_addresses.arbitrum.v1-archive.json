@@ -1,0 +1,9 @@
+{
+ "pt_sleeve_executor": "0xcab4a8849Be05F09a11f9a0F6e43e5771a6a92E2",
+ "pt_sleeve_executor_owner": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "pt_sleeve_executor_ops": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "pt_sleeve_strategy_return": "0x3AE855B65A021397f7a3ca838acc8E4c82cF815f",
+ "pt_sleeve_executor_market": "0xa8a0dea40174cfc30fea9e3a77f182ab33f46e25",
+ "pt_sleeve_executor_pt": "0xc9d24ad0bb25f34098e226a8c5192dea7bacccae",
+ "note": "PT fixed-rate sleeve executor — Arbitrum One. Ops can only buy/sell PT + CCTP-burn back to the HyperEVM strategy."
+}
