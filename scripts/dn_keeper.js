@@ -242,11 +242,21 @@ function roundPxWire(wire) {
   return BigInt(Math.round(Number(human.toPrecision(5)) * 1e8));
 }
 
-function computeTargetNotionalUsd(vaultTotalAssetsUsd, dnWeight) {
+function computeTargetNotionalUsd(vaultTotalAssetsUsd, dnWeight, sleeveCapitalUsd = null) {
   let sleeve = vaultTotalAssetsUsd * dnWeight;
   if (CONFIG.maxSleeveUsd > 0) sleeve = Math.min(sleeve, CONFIG.maxSleeveUsd);
   if (CONFIG.targetOverrideUsd > 0) sleeve = CONFIG.targetOverrideUsd; // demo/E2E pin
-  return sleeve; // hedge NOTIONAL = sleeve USD (1:1 delta-neutral)
+  // CAPITAL-AWARE CAP (2026-09-29): a fully-funded delta-neutral position needs
+  // hedge cash + perp margin ≈ notional × (1 + marginUtil) + fees — the weighted
+  // notional alone was NOT covered by the sleeve's own capital, so the first
+  // live open at real size half-opened an unhedgeable short. Cap the notional
+  // by the strategy's actual assets: the sleeve stays dormant until it can
+  // open AND hedge in full, then reopens automatically as TVL grows.
+  if (sleeveCapitalUsd !== null && sleeveCapitalUsd > 0) {
+    const costMult = 1 + Number(CONFIG.marginUtilBps) / 10000 + 0.06; // margin util + fee/spread buffer
+    sleeve = Math.min(sleeve, sleeveCapitalUsd / costMult);
+  }
+  return sleeve; // hedge NOTIONAL (1:1 delta-neutral), capital-capped
 }
 
 async function main() {
@@ -359,7 +369,11 @@ async function main() {
   console.log(`strategy: totalAssets = ${strategyAssetsUsd.toFixed(2)} USD`);
 
   const { weight: dnWeight, source } = await loadSleeveWeight();
-  const targetNotionalUsd = computeTargetNotionalUsd(vaultAssetsUsd, dnWeight);
+  // Capital-aware sizing (2026-09-29): pass the sleeve's actual visible assets
+  // so an under-funded sleeve sizes DOWN (or stays dormant below HL's $10 min)
+  // instead of half-opening an unhedgeable short. NOTE: Core spot CASH is not
+  // part of totalAssets() (known read gap) — the cap is deliberately conservative.
+  const targetNotionalUsd = computeTargetNotionalUsd(vaultAssetsUsd, dnWeight, strategyAssetsUsd);
   console.log(`sizing: vault ${vaultAssetsUsd.toFixed(2)} × DN weight ${dnWeight} (${source}) = target notional ${targetNotionalUsd.toFixed(2)} USD`);
   if (targetNotionalUsd < 10) {
     console.log("sizing: target below HL $10 min order — nothing to size");
@@ -538,38 +552,62 @@ async function main() {
       }
       return;
     }
-    // OPEN path (also the under-sized rebalance): short the full target.
-    // Margin check: strategy must hold enough USDC on Core (bridged earlier).
+    // OPEN path (also the under-sized rebalance): short the REMAINING gap to
+    // target (2026-09-29 fix — this used to short the FULL target, doubling an
+    // under-sized position whenever drift was slightly negative; observed live).
+    const addNotionalUsd = action === "REBALANCE"
+      ? Math.max(0, targetNotionalUsd - currentNotionalUsd)
+      : targetNotionalUsd;
+    // Hedge cash budget (2026-09-29): the spot buy draws the strategy's Core
+    // SPOT USDC; the short needs PERP margin. LEVEL the two accounts so BOTH
+    // legs are provably funded before any order: bridge the shortfall (if
+    // any), then set perp := margin need and leave EVERYTHING ELSE in spot
+    // for the hedge buy. (The old flow bridged margin only and class-moved it
+    // all to perp, leaving the hedge unfunded — observed live.)
+    const hedgeNeed6 = (await strategy.spotPairIndex()) !== 0n
+      ? BigInt(Math.floor(targetNotionalUsd * 1.01 * 1e6))
+      : 0n;
     const needMargin6 = BigInt(Math.floor(targetNotionalUsd * 1e6)) * CONFIG.marginUtilBps / 10000n;
-    if (equityLive6 < needMargin6) {
-      // Bridge more USDC in first (from idle EVM balance), THEN size the hedge
-      // in a LATER block (CoreWriter sequencing rule).
-      const idle = await strategy.underlying().then((u) => u).catch(() => null);
+    {
       const underlyingAddr = await strategy.underlying();
       const erc = await hre.ethers.getContractAt("IERC20", underlyingAddr, signer);
       const bal = await erc.balanceOf(CONFIG.strategy);
-      console.log(`margin top-up: equity ${equity6} < need ${needMargin6}; strategy idle balance ${bal}`);
       const scale = await strategy.coreScale();
-      const bridgeAmt = needMargin6 * scale; // 6dp → underlying units
-      const bridgeable = bridgeAmt < bal ? bridgeAmt : bal;
-      if (bridgeable === 0n) {
-        console.error("cannot bridge margin — strategy has no idle USDC. awaiting vault allocate().");
-        process.exit(4);
+      const needTotal6 = needMargin6 + hedgeNeed6;
+      const shortfall6 = needTotal6 > equityLive6 ? needTotal6 - equityLive6 : 0n;
+      if (shortfall6 > 0n) {
+        const needBridge = shortfall6 * scale;
+        if (bal < needBridge) {
+          await sendAlert(
+            "🟠 DN won't open — sleeve under-funded for both legs",
+            `need $${(Number(needTotal6) / 1e6).toFixed(2)} on Core (margin+hedge) against $${(Number(equityLive6) / 1e6).toFixed(2)} up + $${(Number(bal) / Number(scale) / 1e6).toFixed(2)} idle — a half-funded open would leave a naked short. NOT opening; fund or resize.`
+          );
+          process.exit(4);
+        }
+        console.log(`bridging ${needBridge} (underlying units) — margin + hedge cash together`);
+        const btx = await strategy.bridgeUsdcToCore(needBridge);
+        await btx.wait();
+        await new Promise((r) => setTimeout(r, 8000)); // action lands NEXT L1 block
+        console.log("bridge verified (earlier-block rule honored)");
       }
-      console.log(`bridging ${bridgeable} (underlying units) to Core`);
-      const btx = await strategy.bridgeUsdcToCore(bridgeable);
-      await btx.wait();
-      await new Promise((r) => setTimeout(r, 8000)); // action lands NEXT L1 block
-      console.log("bridge verified (earlier-block rule honored)");
-      // Bridge credits Core SPOT; orders need PERP collateral. Class-transfer
-      // now (action 7) and wait one action cycle — skipping this made live
-      // opens reject for zero margin (spot USDC is not perp collateral).
-      const moved6 = bridgeable / scale;
-      console.log(`class-transfer spot→perp: ${moved6} (6dp)`);
-      const mtx = await strategy.moveUsdcToPerp(moved6);
-      await mtx.wait();
-      await new Promise((r) => setTimeout(r, 8000));
-      const msum = await strategy.marginSummary();
+      // Level the perp side to exactly the margin need — excess walks to spot
+      // where the hedge buy can draw it; a deficit pulls back from spot.
+      let msum = await strategy.marginSummary();
+      if (msum.accountValue > needMargin6) {
+        const excess6 = msum.accountValue - needMargin6;
+        console.log(`class-transfer perp→spot (hedge cash): ${excess6} (6dp)`);
+        const mtx = await strategy.moveUsdcToSpot(excess6);
+        await mtx.wait();
+        await new Promise((r) => setTimeout(r, 8000));
+        msum = await strategy.marginSummary();
+      } else if (msum.accountValue < needMargin6) {
+        const pull6 = needMargin6 - msum.accountValue;
+        console.log(`class-transfer spot→perp (margin): ${pull6} (6dp)`);
+        const mtx = await strategy.moveUsdcToPerp(pull6);
+        await mtx.wait();
+        await new Promise((r) => setTimeout(r, 8000));
+        msum = await strategy.marginSummary();
+      }
       if (msum.accountValue < needMargin6) {
         await sendAlert(
           "🟠 DN margin still short after bridge + class-transfer",
@@ -577,18 +615,22 @@ async function main() {
         );
         process.exit(4);
       }
-      console.log(`perp equity after class-transfer: $${(Number(msum.accountValue) / 1e6).toFixed(2)} (need $${(Number(needMargin6) / 1e6).toFixed(2)})`);
+      console.log(`perp leveled to $${(Number(msum.accountValue) / 1e6).toFixed(2)} (need $${(Number(needMargin6) / 1e6).toFixed(2)}); hedge cash stays in spot`);
     }
-    const szFloat = targetNotionalUsd / pxHuman;
+    const szFloat = addNotionalUsd / pxHuman;
     const factor = 10 ** szDec;
     const sz = BigInt(Math.floor(szFloat * factor)) * 10n ** 8n / BigInt(factor);
     const limitPx = roundPxWire((pxWire * (10000n - CONFIG.slippageBps)) / 10000n); // SELL → cross below
-    console.log(`opening short: sz=${sz} @ IOC ${limitPx}`);
-    const tx = await strategy.openShort(asset, limitPx, sz, CONFIG.tifIoc);
-    await tx.wait();
-    await new Promise((r) => setTimeout(r, 8000));
+    if (sz === 0n) {
+      console.log(`rebalance add-size rounds below one lot ($${addNotionalUsd.toFixed(2)}) — within granularity, no order`);
+    } else {
+      console.log(`opening short: sz=${sz} @ IOC ${limitPx}`);
+      const tx = await strategy.openShort(asset, limitPx, sz, CONFIG.tifIoc);
+      await tx.wait();
+      await new Promise((r) => setTimeout(r, 8000));
+    }
     const after = await strategy.position();
-    if (after.szi === 0n) {
+    if (sz > 0n && after.szi === 0n) {
       console.error("MISMATCH: order not visible after delay — investigate (drop?)");
       await sendAlert("🔴 DN order MISMATCH", `order not visible after delay — possible silent drop. asset=${asset} Investigate immediately.`);
       process.exit(3);
