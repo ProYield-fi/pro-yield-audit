@@ -322,9 +322,11 @@ async function main() {
   // money. No on-chain write-down happens by itself — alert so the OWNER
   // reconciles with vault.reportLoss(<loss, underlying units>), keeping
   // depositor claims tied to real backing instead of phantom value.
-  // $0.10 dust floor: normal trading fees ($0.005/fill at beta sizes) dip
-  // equity below principal on every open — those are not reportLoss events.
-  if (exists && equityLive6 < principal6 && principal6 - equityLive6 > 100_000n) {
+  // Dust floor raised $0.10 → $2.00 (2026-09-29): real fills + venue fees at
+  // beta sizes burned ~$1 in the first live round-trip; sub-$2 equity-vs-
+  // principal gaps are normal fee noise, not reportLoss events. Keep the
+  // alert for REAL losses only.
+  if (exists && equityLive6 < principal6 && principal6 - equityLive6 > 2_000_000n) {
     const loss6 = principal6 - equityLive6;
     await sendAlert(
       "⚠️ DN equity below principal",
@@ -494,6 +496,7 @@ async function main() {
     // sub-$10 hedge sizes can't be expressed as spot orders → spot-send
     // (action 6) instead — that path exists precisely for this.
     let hedgeNote = "no spot leg configured";
+    let dustLeft = false;
     if ((await strategy.spotPairIndex()) !== 0n) {
       const hs = await strategy.spotHedgeSz();
       if (hs > 0n) {
@@ -508,17 +511,23 @@ async function main() {
           console.log(`selling spot hedge: ${Number(szS) / 1e8} ${coin} @ IOC ${sellPx}`);
           const stx = await strategy.sellSpot(sellPx, szS, CONFIG.tifIoc);
           await stx.wait();
-        } else {
+        } else if (valUsd >= 2) {
           const dest = process.env.DN_HEDGE_RETURN_ADDR || (await strategy.owner());
           console.log(`spot hedge ~$${valUsd.toFixed(2)} < $10.5 order min — spot-sending ${hs} (1e8 units) ${coin} to ${dest}`);
           const stx = await strategy.hedgeTransferOut(dest, hs);
           await stx.wait();
+        } else {
+          // 2026-09-29: moving $0.03 of dust cost ~$1 in venue fees on the first
+          // live unwind — never move sub-$2 dust; leave it in the hedge account.
+          dustLeft = true;
+          hedgeNote = `hedge dust $${valUsd.toFixed(2)} left in place (send fee would exceed value)`;
+          console.log(hedgeNote);
         }
         await new Promise((r) => setTimeout(r, 8000));
         const hsAfter = await strategy.spotHedgeSz();
-        hedgeNote = `hedge ${hs} → ${hsAfter} (1e8 units)`;
+        if (!dustLeft) hedgeNote = `hedge ${hs} → ${hsAfter} (1e8 units)`;
         console.log(`verified hedge after unwind: ${hsAfter}`);
-        if (hsAfter >= hs) {
+        if (!dustLeft && hsAfter >= hs) {
           await sendAlert("🔴 DN hedge NOT returned", `spot hedge unchanged (${hsAfter}) after unwind — investigate (action drop?).`);
           process.exit(3);
         }
