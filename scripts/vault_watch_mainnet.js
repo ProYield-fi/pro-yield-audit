@@ -133,9 +133,18 @@ async function main() {
       alerts.push(`⚠️ CAPS CHANGED\nTVL ${hre.ethers.formatUnits(prev.tvlCap, 6)} → ${hre.ethers.formatUnits(tvlCap, 6)} · per-user ${hre.ethers.formatUnits(prev.perUserCap, 6)} → ${hre.ethers.formatUnits(perUserCap, 6)}`);
     }
     if (prev.paused !== cur.paused) alerts.push(`⚠️ depositsPaused ${prev.paused} → ${paused}`);
-    // TVL moved with NO event — should be impossible; say so rather than hide it
+    // TVL moved with NO event. Legitimate no-event moves: harvest() sweeps +
+    // creditYield()/reportLoss() (owner ops). Small harvest deltas used to fire
+    // this on every sweep — alert only when the move is materially large; log
+    // the small ones quietly so real anomalies still stand out.
     if (prev.totalAssets !== cur.totalAssets && !alerts.some((a) => a.includes("Deposit") || a.includes("Withdraw"))) {
-      alerts.push(`⚠️ totalAssets moved ${hre.ethers.formatUnits(prev.totalAssets, 6)} → ${hre.ethers.formatUnits(totalAssets, 6)} USDC with NO matching event (investigate)`);
+      const delta = BigInt(totalAssets) - BigInt(prev.totalAssets);
+      const abs = delta < 0n ? -delta : delta;
+      if (abs >= 500000n) { // ≥ 0.50 USDC
+        alerts.push(`⚠️ totalAssets moved ${hre.ethers.formatUnits(prev.totalAssets, 6)} → ${hre.ethers.formatUnits(totalAssets, 6)} USDC with NO matching event (investigate)`);
+      } else {
+        console.log(`quiet move (likely harvest/accrual): ${hre.ethers.formatUnits(prev.totalAssets, 6)} → ${hre.ethers.formatUnits(totalAssets, 6)} USDC`);
+      }
     }
   }
 
