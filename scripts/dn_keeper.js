@@ -144,7 +144,7 @@ async function fetchFundingApr(assetIndex) {
 /// @returns {weight, maxSleeveUsd} — DN sleeve share from the scout's blend.
 /// Falls back to DEFAULT_DN_WEIGHT when the snapshot is missing/stale-shaped.
 async function loadSleeveWeight() {
-  const DEFAULT_DN_WEIGHT = 0.15;
+  const DEFAULT_DN_WEIGHT = 0.25;
   try {
     const snap = JSON.parse(fs.readFileSync(CONFIG.scoutSnapshot, "utf8"));
     const w = snap?.blend?.allocation?.DELTA_NEUTRAL?.weight;
