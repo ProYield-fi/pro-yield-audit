@@ -172,10 +172,32 @@ async function main() {
       ...(dnUsd < 11 ? { note: "idle — below venue minimums until TVL grows" } : {}),
     });
   }
+  // PT fixed-rate sleeve — entry rate from Pendle's public API; the rate is
+  // LOCKED at purchase, so the note labels it as the current entry rate + maturity.
+  const ptAssets = await readStrat(deployed.pt_sleeve_strategy);
+  if (ptAssets != null) {
+    let ptApyPct = null;
+    let ptExpiry = null;
+    try {
+      const mk = process.env.PT_MARKET || "0xa8a0dea40174cfc30fea9e3a77f182ab33f46e25";
+      const r = await fetch(`https://api-v2.pendle.finance/core/v1/42161/markets/${mk}`);
+      const j = await r.json();
+      if (j && j.impliedApy != null) ptApyPct = Number((j.impliedApy * 100).toFixed(2));
+      if (j && j.expiry) ptExpiry = String(j.expiry).slice(0, 10);
+    } catch { /* gap */ }
+    strategies.push({
+      kind: "fixed",
+      name: "Fixed-rate sleeve (PT)",
+      address: deployed.pt_sleeve_strategy,
+      assets: fmt6(ptAssets),
+      apyPct: ptApyPct,
+      note: `fixed-rate sleeve — locked at purchase; rate above is the current entry rate${ptExpiry ? ` · matures ${ptExpiry}` : ""}`,
+    });
+  }
   const deployment = {
     idleUsdc: fmt6(idle),
     strategies,
-    assetsTotalUsdc: fmt6((idle || 0n) + (morphoAssets || 0n) + (dnAssets || 0n)),
+    assetsTotalUsdc: fmt6((idle || 0n) + (morphoAssets || 0n) + (dnAssets || 0n) + (ptAssets || 0n)),
     note: "live chain reads; strategies report totalAssets(); rates float with the market",
   };
 
