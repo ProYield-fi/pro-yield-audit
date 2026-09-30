@@ -92,7 +92,8 @@ async function main() {
   await (await strategy.setSpotConfig(142, 197, 100000n)).wait();
 
   // User deposit 1,000,000 USD → vault totalAssets = 1M → target sleeve =
-  // 1M × 0.15 = 150k USD. Deploy 90% of it: 135k short notional.
+  // 1M × 0.25 (DN weight; scout snapshot / fallback) = 250k USD. Deploy 90%
+  // of it: 225k short notional.
   await (await usdc.mint(user1.address, U(1_000_000))).wait();
   await (await usdc.connect(user1).approve(vAddr, U(1_000_000))).wait();
   await (await vault.connect(user1).deposit(U(1_000_000))).wait();
@@ -122,7 +123,7 @@ async function main() {
 
   report("keeper prints vault totalAssets", out.includes("vault: totalAssets = 1000000.00 USD"));
   report("keeper reads scout DN weight", out.includes("DN weight"));
-  report("keeper computes target notional 150,000", out.includes("target notional 150000.00 USD"));
+  report("keeper computes target notional 250,000", out.includes("target notional 250000.00 USD"));
   report("keeper shows position drift vs target", out.includes("drift"));
   report("keeper is dry-run (no sends)", out.includes("dryRun=true"));
   report("keeper decided OPEN (roster config matches)", out.includes("decision: OPEN"));
