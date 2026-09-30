@@ -13,8 +13,8 @@ Pro Yield is a **non-custodial, stablecoin-lending vault on HyperEVM**. This rep
 ## Reproduce
 
 ```bash
-git clone https://github.com/ProYield-fi/pro-yield-fi
-cd pro-yield-fi
+git clone https://github.com/ProYield-fi/pro-yield-audit
+cd pro-yield-audit
 
 npx hardhat compile
 python3 scripts/security_monitor.py   # static gate: 0 critical vs justified baseline

@@ -3,7 +3,7 @@
 ## Reporting
 
 - **GitHub**: open an issue with the `audit` label on
-  https://github.com/ProYield-fi/pro-yield-fi (preferred — public, timestamped).
+  https://github.com/ProYield-fi/pro-yield-audit (preferred — public, timestamped).
 - **Email**: proyield@pyd.fi for sensitive disclosures.
 
 Please include: contract/function, reproduction (tx hash or test), impact

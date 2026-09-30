@@ -7,8 +7,8 @@ reviewer's front door (scope, architecture, invariants, threat model, evidence).
 ## Reproduce the evidence
 
 ```bash
-git clone https://github.com/ProYield-fi/pro-yield-fi
-cd pro-yield-fi
+git clone https://github.com/ProYield-fi/pro-yield-audit
+cd pro-yield-audit
 
 # 1. Static analysis gate (0 critical vs the justified baseline)
 npx hardhat compile
@@ -27,7 +27,7 @@ reproducible locally with the commands above.
 ## Report a finding
 
 - **GitHub issue** with the `audit` label (preferred — public, timestamped):
-  https://github.com/ProYield-fi/pro-yield-fi/issues
+  https://github.com/ProYield-fi/pro-yield-audit/issues
 - **Email** `proyield@pyd.fi` for sensitive disclosures.
 
 Include: contract/function, reproduction (tx hash or failing test), impact

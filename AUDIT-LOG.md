@@ -5,6 +5,14 @@ security claim. It complements `docs/AUDIT_SCOPE.md` (scope, invariants, threat
 model) and `SECURITY.md` (reporting policy). **Pre-mainnet** — no real funds at
 risk; the launch gate is the audited mainnet deployment.
 
+> **Repository note (2026-09-30).** This repository is the public audit surface
+> (contracts, tests, evidence, attestations, audit record). It is published as a
+> scope-filtered export of the ProYield development history; the app, planning,
+> and operations live in private repositories. Where entries below reference
+> internal design notes or cite commit hashes from before this export, those
+> refer to the development history — ask and we will point reviewers at the
+> relevant material. Nothing in the findings below depends on those references.
+
 ## How to verify (all commands reproducible)
 
 | Claim | Command |
