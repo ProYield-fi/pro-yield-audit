@@ -2,8 +2,11 @@
 
 This is the public record of findings, fixes, and the evidence behind every
 security claim. It complements `docs/AUDIT_SCOPE.md` (scope, invariants, threat
-model) and `SECURITY.md` (reporting policy). **Pre-mainnet** — no real funds at
-risk; the launch gate is the audited mainnet deployment.
+model) and `SECURITY.md` (reporting policy). **Live on HyperEVM mainnet since
+2026-09-25** — the vault holds real USDC and deposits are open; see
+`SECURITY.md` § Current status for live addresses, wired strategies and caps.
+The launch gate that used to be described here (an audited mainnet deploy)
+has been met; beta exposure is capped while the product stabilises.
 
 > **Repository note (2026-09-30).** This repository is the public audit surface
 > (contracts, tests, evidence, attestations, audit record). It is published as a
@@ -56,5 +59,6 @@ risk; the launch gate is the audited mainnet deployment.
 ## Known / accepted risks
 
 See `docs/AUDIT_SCOPE.md` §4 §6 and `security_baseline.json`. Notably:
-vault `owner` is an **EOA today** — moving to a 2-of-3 Safe is a tracked
-pre-mainnet item (see `docs/VAULT_UNLOCK_PLAN.md`).
+vault `owner` is now the **treasury Safe** `0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB`
+(verified on-chain 2026-09-30; the EOA-owner item in
+`docs/VAULT_UNLOCK_PLAN.md` is closed).

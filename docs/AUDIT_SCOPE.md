@@ -1,8 +1,10 @@
 # ProYield Vault — Community Audit Scope
 
-> Status: **pre-mainnet**. The audited mainnet deployment is the launch gate;
-> this document is the package auditors and community reviewers should read
-> first. Last updated: 2026-09-20.
+> Status: **live on HyperEVM mainnet since 2026-09-25**; beta exposure is
+> capped. The vault holds real USDC and deposits are open. This document is
+> the package auditors and community reviewers should read first. Scope and
+> threat model last updated 2026-09-20; deployment status corrected
+> 2026-09-30.
 
 ## 1. What is in scope
 
