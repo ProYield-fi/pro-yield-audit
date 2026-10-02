@@ -16,6 +16,25 @@ Contracts in `hypervault/contracts/` (see `docs/AUDIT_SCOPE.md` §1 for the
 table). Off-scope: mocks, scripts (off-chain keepers/tests), HyperCore itself,
 the website frontend.
 
+## Bug bounty
+
+Live under the **guarded-beta** posture (caps in code keep every mistake
+survivable — see `docs/VAULT_UNLOCK_PLAN.md`). Terms, fixed in advance so
+nobody negotiates under pressure:
+
+- **Recognition immediately**: credited (name or handle, your choice) in
+  `AUDIT-LOG.md` and the fix commit the moment a finding is acknowledged.
+- **USDC paid when revenue exists**: protocol fees fund payouts — 10%
+  performance fee only, so early payouts are small and grow with the vault.
+  No promise of a fixed schedule; no promise is cheaper than a fake one.
+- **Never PYD**: bounty payouts are USDC, never the governance token.
+- **Vesting 14–90 days** on cash payouts.
+- **Paid on acknowledged fix**: the finding must be valid, in scope, and the
+  fix shipped. Today the fund is **$0 by design** (deferred bounty —
+  `VAULT_UNLOCK_PLAN.md` §2, tier T0): recognition and the published fix are
+  immediate; cash follows revenue. A capped beta means there is very little
+  to take — test against the caps, not past them.
+
 ## Current status
 
 - **Live on HyperEVM mainnet since 2026-09-25.** Vault
