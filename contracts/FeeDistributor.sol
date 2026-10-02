@@ -17,12 +17,16 @@ contract FeeDistributor is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable usdc; // fee currency (was pyd — vault fees are USDC)
-    uint256 public totalFeesReceived;
+    uint256 public totalFeesReceived;   // CUMULATIVE lifetime fees (see receiveFees)
     uint256 public totalFeesRouted;
+    /// @notice Peak balance ever observed in this contract. Kept for the
+    /// dashboard's "fees sitting here" read, which must not go backwards as
+    /// fees are routed out.
+    uint256 public peakBalance;
 
     mapping(address => uint256) public routedTo;
 
-    event FeesReceived(uint256 amount);
+    event FeesReceived(uint256 amount, uint256 total);
     event FeesRouted(address indexed to, uint256 amount);
 
     constructor(address _usdc) Ownable(msg.sender) {
@@ -36,11 +40,28 @@ contract FeeDistributor is ReentrancyGuard, Ownable {
 
     /// @notice The vault's performance fee lands here as a plain USDC transfer
     /// (no hook). Anyone may reconcile accounting after a transfer.
+    ///
+    /// AUDIT F-13 FIX. This used to be a HIGH-WATER MARK: it only assigned
+    /// `totalFeesReceived = bal` when `bal` exceeded the stored value, so after
+    /// the first `route()` drained the contract, every later fee was smaller than
+    /// the peak and was silently IGNORED — the counter and the `FeesReceived`
+    /// event froze permanently, so lifetime fee income read as whatever the
+    /// first recycle happened to be. It is now CUMULATIVE: each observation adds
+    /// only the amount that has actually arrived since the last accounting pass,
+    /// which is derived from `totalFeesRouted`.
     function receiveFees() external {
         uint256 bal = usdc.balanceOf(address(this));
-        if (bal > totalFeesReceived) {
-            totalFeesReceived = bal;
-            emit FeesReceived(bal);
+        if (bal > peakBalance) peakBalance = bal;
+        // Lifetime USDC that has passed through this contract = what is still here
+        // plus what has already been routed out. Anything above the amount
+        // already counted is a NEW arrival. (Do NOT add totalFeesRouted to
+        // totalFeesReceived on the right-hand side — routed fees are already
+        // included in the received total, so that would double-count them.)
+        uint256 seen = bal + totalFeesRouted;
+        if (seen > totalFeesReceived) {
+            uint256 amount = seen - totalFeesReceived;
+            totalFeesReceived += amount;
+            emit FeesReceived(amount, totalFeesReceived);
         }
     }
 

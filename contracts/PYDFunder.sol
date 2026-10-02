@@ -40,6 +40,19 @@ contract PYDFunder is ReentrancyGuard, Ownable {
     uint256 public minConvertUsd6 = 10e6;    // dust skip
     bool public paused;
 
+    /// AUDIT F-8: `rewardRate = amount / duration` FLOORS, so an absurdly long
+    /// duration drives the rate to 0 and strands every PYD in the stream
+    /// permanently (unrecoverable — `leftover` is derived from the same zero
+    /// rate). The floor is deliberately ONE DAY, not 30: a 1-day stream is a
+    /// legitimate cadence (and what the test suite uses), so the bound targets
+    /// only the freeze. The ceiling stops the mirror attack (dumping 100% of the
+    /// pot in a single block). A rate floor is enforced at the call site below.
+    uint256 public constant MIN_STREAM_DURATION = 1 days;
+    uint256 public constant MAX_STREAM_DURATION = 365 days;
+    /// @notice Minimum tokens-per-second a stream must pay out, so `amount /
+    /// duration` can never round to zero for any realistic input size.
+    uint256 public constant MIN_REWARD_RATE = 1;
+
     error PYDFunder__ZeroAmount();
     error PYDFunder__BelowDust();
     error PYDFunder__Cap();
@@ -47,6 +60,9 @@ contract PYDFunder is ReentrancyGuard, Ownable {
     error PYDFunder__Paused();
     error PYDFunder__ZeroSwapper();
     error PYDFunder__NoOutput();
+    error PYDFunder__DurationTooShort();
+    error PYDFunder__DurationTooLong();
+    error PYDFunder__ZeroRate();
 
     event UsdcReceived(uint256 total);
     event Converted(address indexed swapper, uint256 usdcIn, uint256 pydOut);
@@ -98,11 +114,24 @@ contract PYDFunder is ReentrancyGuard, Ownable {
     ///
     /// Flow: USDC -> swapper -> PYD -> staking.fundRewards(pyd, duration).
     /// The stream size is whatever the swap yielded — never a modeled number.
+    ///
+    /// AUDIT F-8 FIX. `duration` was forwarded unvalidated into `fundRewards`,
+    /// where `rewardRate = amount / duration` FLOORS. A caller passing an absurd
+    /// duration (e.g. `1e27` seconds) drove the rate to 0, so the converted PYD
+    /// became permanently unclaimable — and a later top-up could not rescue it,
+    /// because `leftover` is computed as `remaining * rate = 0`. Anyone could
+    /// freeze the reward stream for free. The mirror attack (`duration = 1`)
+    /// released 100% instantly. The bounds below make both impossible while
+    /// keeping the call permissionless.
     function topUp(uint256 amount6, uint256 duration) external nonReentrant {
         if (paused) revert PYDFunder__Paused();
         if (address(swapper) == address(0)) revert PYDFunder__ZeroSwapper();
         if (amount6 == 0) revert PYDFunder__ZeroAmount();
         if (amount6 < minConvertUsd6) revert PYDFunder__BelowDust();
+        // Bound the stream length: too long floors rewardRate to zero and strands
+        // the PYD forever; too short dumps the whole pot at once.
+        if (duration < MIN_STREAM_DURATION) revert PYDFunder__DurationTooShort();
+        if (duration > MAX_STREAM_DURATION) revert PYDFunder__DurationTooLong();
         uint256 cap = amount6 > maxConvertUsd6 ? maxConvertUsd6 : amount6;
 
         uint256 balance = usdc.balanceOf(address(this));
@@ -120,6 +149,18 @@ contract PYDFunder is ReentrancyGuard, Ownable {
         uint256 got = swapper.swap(address(usdc), address(staking.pyd()), cap, 0);
         pydOut = IERC20(staking.pyd()).balanceOf(address(this)) - pydBefore;
         if (pydOut == 0) revert PYDFunder__NoOutput();
+        // AUDIT F-8: refuse a stream whose rate would floor to zero. This is the
+        // precise form of the freeze bug — `fundRewards` computes
+        // `rewardRate = amount / duration`, and a 0 rate makes the PYD
+        // unclaimable forever (a later top-up cannot rescue it, because
+        // `leftover` is derived from the same zero rate). Checking the actual
+        // output here is what the duration bounds alone cannot guarantee.
+        if (pydOut / duration < MIN_REWARD_RATE) revert PYDFunder__ZeroRate();
+        // AUDIT FIX: the pre-call emit above can only know 0, so the real figure
+        // was never logged anywhere — an off-chain consumer reading `Converted`
+        // always saw pydOut == 0 and could not reconcile a conversion. Emit the
+        // MEASURED output now that the balance delta has been taken.
+        emit Converted(address(swapper), cap, pydOut);
         // Revoke the allowance IMMEDIATELY after the swap — the swapper must
         // never hold a live approval on this contract's USDC.
         usdc.forceApprove(address(swapper), 0);

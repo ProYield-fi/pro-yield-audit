@@ -202,7 +202,12 @@ contract MorphoStrategy is BaseStrategy {
             _unwind(accrued - bal);
             bal = underlying.balanceOf(address(this));
         }
-        uint256 buffer = (totalAssets() * bufferBps) / 10000;
+        uint256 buffer = (bal * bufferBps) / 10000; // AUDIT F-9 FIX: must measure the IDLE
+        // balance, not totalAssets() (which includes the whole Morpho position).
+        // The old form made `sweepable = bal - buffer` collapse to zero for ANY
+        // non-zero buffer, so yield accrued in the market could never be swept
+        // back to the vault — the lending core silently stopped paying out.
+        // `deploy()` already used the idle form; this matches it.
         uint256 sweepable = bal > buffer ? bal - buffer : 0;
         uint256 sweep = accrued < sweepable ? accrued : sweepable;
         if (sweep == 0) return 0; // leave the baseline: yield stays claimable next sweep

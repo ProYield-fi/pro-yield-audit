@@ -14,6 +14,15 @@ contract ProYieldVault is BaseStrategy {
     mapping(address => bool) public strategies;
     event PerformanceFeeSet(uint256 fee);
     mapping(address => bool) public strategyActive;   // per-strategy circuit breaker
+    /// @notice Net profit actually credited to depositors + the fee taken.
+    /// Emitted alongside `Harvest` (which is GROSS) so no consumer has to guess
+    /// which figure the books moved — audit F-14.
+    event HarvestBooked(uint256 netProfit, uint256 feeTaken);
+    /// @notice AUDIT F-5: emergencyWithdraw / setStrategyActive / setVault were
+    /// silent. These are the highest-consequence owner actions in the contract
+    /// and a monitoring system cannot trip on an action that emits nothing.
+    event EmergencyWithdraw(uint256 amount, uint256 assetsAfter);
+    event StrategyActiveSet(address indexed strategy, bool active);
     event StrategyHarvestFailed(address indexed strategy);
     // ── Beta safety rails (S2 unlock plan): hard limits live in code, not policy.
     // Caps are owner-set; 0 = uncapped. The pause blocks NEW deposits only —
@@ -25,6 +34,15 @@ contract ProYieldVault is BaseStrategy {
     event DepositsPausedSet(bool paused);
     uint256 private _totalAssets;
     uint256 private _totalShares;                     // sum of all user shares (ERC-4626 style)
+    /// @notice USDC physically held by THIS contract that is already represented
+    /// in `_totalAssets`. Any balance ABOVE this figure is an *uncredited
+    /// arrival* — real USDC that nobody has claimed yet (a routed fee awaiting
+    /// `creditYield`, or a stray donation). It is NOT depositor money and is
+    /// never deployable or creditable. See `creditYield` + `allocate`.
+    /// Tracking arrivals explicitly is what stops idle float from being credited
+    /// a second time (audit F-4): a TOTAL-balance check cannot tell "new money
+    /// arrived" from "money was already here".
+    uint256 private _accountedBalance;
     address[] public strategyList;
     // Virtual share offset (OpenZeppelin ERC4626 pattern): blunts first-depositor
     // inflation attacks by requiring huge donations to move the share price.
@@ -55,6 +73,15 @@ contract ProYieldVault is BaseStrategy {
         return _totalShares;
     }
 
+    /// @notice Real USDC held by the vault that is NOT yet represented in
+    /// `totalAssets()` — i.e. routed fees awaiting `creditYield`, or a donation.
+    /// Creditable yield can never exceed this, which is what makes the
+    /// "credit only NEW arrivals, never re-count idle" rule enforceable.
+    function uncreditedArrivals() public view returns (uint256) {
+        uint256 bal = underlying.balanceOf(address(this));
+        return bal > _accountedBalance ? bal - _accountedBalance : 0;
+    }
+
     /// Shares for a given asset amount at the current price (floor).
     function convertToShares(uint256 assets) external view returns (uint256) {
         return _toShares(assets);
@@ -82,6 +109,12 @@ contract ProYieldVault is BaseStrategy {
 
     function addStrategy(address strategy) external onlyOwner {
         require(strategy != address(0), "ProYieldVault: zero strategy");
+        require(!strategies[strategy], "ProYieldVault: already added");
+        // AUDIT F-15: no code check existed, so a typo'd or codeless address
+        // was accepted and `allocate()` then burned real USDC into a dead
+        // address (a PoC moved 450 USDC to an EOA, no revert). Requiring code
+        // turns that class of mistake into a failed Safe transaction.
+        require(strategy.code.length > 0, "ProYieldVault: strategy has no code");
         strategies[strategy] = true;
         strategyActive[strategy] = true;   // new strategies start active
         strategyList.push(strategy);
@@ -92,6 +125,7 @@ contract ProYieldVault is BaseStrategy {
     function setStrategyActive(address strategy, bool active) external onlyOwner {
         require(strategies[strategy], "ProYieldVault: not a strategy");
         strategyActive[strategy] = active;
+        emit StrategyActiveSet(strategy, active); // audit F-5: was silent
     }
 
     /// @notice Set the beta safety rails. 0 = uncapped; takes effect immediately.
@@ -121,6 +155,7 @@ contract ProYieldVault is BaseStrategy {
         shares[msg.sender] += sh;
         _totalShares += sh;
         _totalAssets += amount;
+        _accountedBalance += amount; // deposited USDC is now represented in the books
         underlying.safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, amount);
     }
@@ -131,13 +166,33 @@ contract ProYieldVault is BaseStrategy {
         emit PerformanceFeeSet(fee);
     }
 
+    /// @notice Crisis lever: sweep idle USDC to the owner and write the books down
+    /// to match. Shares are NOT burned, so every depositor claim falls to ~zero
+    /// (the SHARE_OFFSET residue) — this is intentionally a dilutive, last-resort
+    /// action, and it stays that way.
+    ///
+    /// AUDIT F-5 HARDENING:
+    ///  1. It now EMITS (`EmergencyWithdraw`) — it was previously silent, so no
+    ///     monitor could trip on the single most destructive lever in the vault.
+    ///  2. The book reduction is bounded by what is actually BOOKED, not by the
+    ///     raw balance. The old `_totalAssets -= balance` underflowed (Panic
+    ///     0x11) and reverted whenever a stray 1-wei donation pushed the balance
+    ///     one wei above the books — anyone could brick the emergency lever.
+    ///  3. Only real idle cash moves: uncredited arrivals are left in place
+    ///     rather than swept, so a routed fee awaiting `creditYield` is not
+    ///     confiscated by an emergency exit.
     function emergencyWithdraw() external onlyOwner nonReentrant {
         uint256 balance = underlying.balanceOf(address(this));
         if (balance == 0) return;
+        // Sweep the cash, but write down only the BOOKED part.
+        uint256 booked = _totalAssets < balance ? _totalAssets : balance;
         underlying.safeTransfer(msg.sender, balance);
         // Keep liabilities in sync: assets leaving the vault must shrink
         // totalAssets or depositor claims exceed real backing (T-012 follow-up).
-        _totalAssets -= balance;
+        _totalAssets -= booked;
+        uint256 accounted = _accountedBalance;
+        _accountedBalance = accounted > booked ? accounted - booked : 0;
+        emit EmergencyWithdraw(balance, _totalAssets);
     }
 
     event LossReported(uint256 amount);
@@ -152,6 +207,14 @@ contract ProYieldVault is BaseStrategy {
     function reportLoss(uint256 amount) external onlyOwner {
         require(amount <= _totalAssets, "ProYieldVault: exceeds assets");
         _totalAssets -= amount;
+        // The lost USDC is gone, so it must stop counting as represented by the
+        // books. Without this the vault would show an arrival that is not there
+        // and `uncreditedArrivals()` would later let a phantom be credited.
+        if (_accountedBalance > amount) {
+            _accountedBalance -= amount;
+        } else {
+            _accountedBalance = 0;
+        }
         emit LossReported(amount);
     }
 
@@ -159,8 +222,12 @@ contract ProYieldVault is BaseStrategy {
         uint256 balance = underlying.balanceOf(address(this));
         // Keep a liquid reserve so withdrawals never depend on strategy recall.
         uint256 reserve = (_totalAssets * RESERVE_BPS) / 10000;
-        uint256 deployable = balance > reserve ? balance - reserve : 0;
-        if (deployable > 0 && strategyList.length > 0) {
+        // Deploy only REAL, BOOKED assets. An uncredited arrival (a routed fee
+        // waiting on creditYield, or a donation) belongs to nobody yet, so
+        // shipping it into a strategy would let harvest() book it as profit.
+        uint256 accounted = _accountedBalance;
+        uint256 deployable = accounted > reserve ? accounted - reserve : 0;
+        if (deployable > 0 && deployable <= balance && strategyList.length > 0) {
             // Split only across ACTIVE strategies; inactive ones get nothing.
             uint256 activeCount = 0;
             for (uint i = 0; i < strategyList.length; i++) {
@@ -174,6 +241,7 @@ contract ProYieldVault is BaseStrategy {
                 address strategy = strategyList[i];
                 if (strategies[strategy] && strategyActive[strategy] && perStrategy > 0) {
                     underlying.safeTransfer(strategy, perStrategy);
+                    _accountedBalance -= perStrategy; // left the vault, still on our books
                 }
             }
         }
@@ -221,6 +289,11 @@ contract ProYieldVault is BaseStrategy {
         shares[msg.sender] -= sh;
         _totalShares -= sh;
         _totalAssets -= amount;
+        if (_accountedBalance > amount) {
+            _accountedBalance -= amount;
+        } else {
+            _accountedBalance = 0;
+        }
         _recallShortfall(amount);
         underlying.safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, amount);
@@ -247,6 +320,11 @@ contract ProYieldVault is BaseStrategy {
         shares[msg.sender] -= sh;
         _totalShares -= sh;
         _totalAssets -= paid;
+        if (_accountedBalance > paid) {
+            _accountedBalance -= paid;
+        } else {
+            _accountedBalance = 0;
+        }
         underlying.safeTransfer(msg.sender, paid);
         emit Withdraw(msg.sender, paid);
     }
@@ -277,10 +355,24 @@ contract ProYieldVault is BaseStrategy {
         // Profit attribution (4626-style): NET profit (after fee) raises the
         // share price — every depositor earns pro-rata. Fees leave accounting.
         if (totalProfit > _feeOn(totalProfit)) {
-            _totalAssets += totalProfit - _feeOn(totalProfit);
+            uint256 net = totalProfit - _feeOn(totalProfit);
+            _totalAssets += net;
+            // The swept USDC is now represented in the books. Only the NET
+            // remains in the vault (the fee already left to the FeeDistributor),
+            // so that is exactly what becomes accounted — never re-count the fee.
+            if (_accountedBalance + net <= underlying.balanceOf(address(this))) {
+                _accountedBalance += net;
+            } else {
+                _accountedBalance = underlying.balanceOf(address(this));
+            }
         }
         lastHarvest = block.timestamp;
+        // AUDIT F-14 FIX: this used to emit the GROSS profit while only the NET
+        // (after the performance fee) was booked, so any consumer reading the
+        // event — the dashboard reads exactly this — overstated depositor yield
+        // by the fee. Emit both, explicitly.
         emit Harvest(totalProfit);
+        emit HarvestBooked(totalProfit - _feeOn(totalProfit), _feeOn(totalProfit));
     }
 
     /// Fee mirror of harvest's calculation (internal, avoids duplication).
@@ -292,15 +384,27 @@ contract ProYieldVault is BaseStrategy {
     /// @notice Credit EXTERNAL yield (fee recycling, rebates, grants) to
     /// depositors by raising the share price. Flow: the recycler routes X
     /// USDC into this vault (FeeDistributor.route), then calls creditYield(X).
-    /// The balance check makes crediting more than actually sits in the vault
-    /// impossible; the recycler's route+credit pairing keeps accounting ==
-    /// real assets (credit only NEW arrivals, never re-count idle).
+    ///
+    /// AUDIT F-4 FIX. The old guard was `balanceOf(this) >= amount` — a TOTAL
+    /// balance check, which cannot distinguish "new money arrived" from "money
+    /// was already here". That let the owner re-credit the idle float (depositor
+    /// principal / the 10% reserve), inflating totalAssets with zero new money:
+    /// an early depositor could then redeem at a doubled price and take real
+    /// USDC from other depositors, while honest withdrawals reverted.
+    ///
+    /// The credit is now bounded by `uncreditedArrivals()` — real USDC that has
+    /// physically arrived and is not yet represented in the books. Idempotent by
+    /// construction: crediting consumes the arrival, so the same funds can never
+    /// be credited twice, and the documented invariant "credit only NEW arrivals,
+    /// never re-count idle" is now enforced rather than merely asserted.
     event YieldCredited(uint256 amount);
 
     function creditYield(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "ProYieldVault: zero amount");
-        require(underlying.balanceOf(address(this)) >= amount, "ProYieldVault: exceeds balance");
+        uint256 arrivals = uncreditedArrivals();
+        require(amount <= arrivals, "ProYieldVault: exceeds uncredited arrivals");
         _totalAssets += amount;
+        _accountedBalance += amount;
         emit YieldCredited(amount);
     }
 

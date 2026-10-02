@@ -438,8 +438,55 @@ contract VaultInvariantsTest is Test {
         vault.deposit(1000e18);
         vm.stopPrank();
         vm.prank(address(handler));
-        vm.expectRevert("ProYieldVault: exceeds balance");
+        // AUDIT F-4: the guard is now the UNREDITED ARRIVALS delta, not the
+        // total balance — crediting the idle float back is refused.
+        vm.expectRevert("ProYieldVault: exceeds uncredited arrivals");
         vault.creditYield(2000e18);
+    }
+
+    /// AUDIT F-4 REGRESSION: the idle float cannot be re-credited. With a
+    /// 1000 USDC deposit sitting idle and zero arrivals, ANY credit must fail —
+    /// the old total-balance guard let this through and inflated the books.
+    function test_credit_yield_cannot_recount_idle_float() public {
+        vm.startPrank(actors[0]);
+        usdc.mint(actors[0], 1000e18);
+        vault.deposit(1000e18);
+        vm.stopPrank();
+
+        assertEq(vault.uncreditedArrivals(), 0, "a deposit is not an uncredited arrival");
+        assertEq(vault.totalAssets(), usdc.balanceOf(address(vault)), "books == reality");
+
+        // The exact exploit from the audit: credit the idle balance again.
+        vm.prank(address(handler));
+        vm.expectRevert("ProYieldVault: exceeds uncredited arrivals");
+        vault.creditYield(1000e18);
+
+        assertEq(vault.totalAssets(), 1000e18, "books unchanged by the refused credit");
+    }
+
+    /// …but a REAL arrival is creditable, exactly once (idempotence).
+    function test_credit_yield_accepts_real_arrival_once() public {
+        vm.startPrank(actors[0]);
+        usdc.mint(actors[0], 1000e18);
+        vault.deposit(1000e18);
+        vm.stopPrank();
+
+        // FeeDistributor routes a genuine fee into the vault.
+        usdc.mint(address(fd), 100e18);
+        vm.prank(address(fd));
+        usdc.transfer(address(vault), 100e18);
+
+        assertEq(vault.uncreditedArrivals(), 100e18, "the routed fee is a real arrival");
+
+        vm.prank(address(handler));
+        vault.creditYield(100e18);
+        assertEq(vault.totalAssets(), 1100e18, "arrival credited");
+        assertEq(vault.uncreditedArrivals(), 0, "arrival consumed");
+
+        // The SAME funds can never be credited twice.
+        vm.prank(address(handler));
+        vm.expectRevert("ProYieldVault: exceeds uncredited arrivals");
+        vault.creditYield(100e18);
     }
 
     /// First depositor gets 1:1; a later depositor into an appreciated vault

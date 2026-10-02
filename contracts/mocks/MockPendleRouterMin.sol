@@ -17,6 +17,17 @@ contract MockPendleRouterMin {
     uint256 public buyCount;
     uint256 public sellCount;
 
+    // Optional second sell-out token (the executor's exitAsset) — unset by
+    // default, in which case only `usdai` is accepted (prior behavior).
+    address public altTokenOut;
+    uint256 public altPrice18; // alt token per PT (18dp)
+
+    function setAltTokenOut(address token, uint256 price18) external {
+        require(token != address(0) && price18 > 0, "mockrouter: bad alt");
+        altTokenOut = token;
+        altPrice18 = price18;
+    }
+
     constructor(address _usdai, address _pt) {
         usdai = MockUSDC(_usdai);
         pt = MockPT(_pt);
@@ -51,11 +62,18 @@ contract MockPendleRouterMin {
         TokenOutput calldata output,
         LimitOrderData calldata
     ) external returns (uint256 netTokenOut, uint256 netSyFee, uint256 netSyInterm) {
-        require(output.tokenOut == address(usdai), "mockrouter: tokenOut");
+        uint256 price;
+        if (output.tokenOut == address(usdai)) {
+            price = ptPrice18;
+        } else if (altTokenOut != address(0) && output.tokenOut == altTokenOut) {
+            price = altPrice18;
+        } else {
+            revert("mockrouter: tokenOut");
+        }
         pt.transferFrom(msg.sender, address(this), exactPtIn);
-        netTokenOut = (exactPtIn * ptPrice18) / 1e18; // PT -> 18dp USDai at price
+        netTokenOut = (exactPtIn * price) / 1e18; // PT -> out token at price
         require(netTokenOut >= output.minTokenOut, "router: minTokenOut");
-        usdai.mint(receiver, netTokenOut);
+        MockUSDC(output.tokenOut).mint(receiver, netTokenOut);
         sellCount += 1;
         return (netTokenOut, 0, 0);
     }

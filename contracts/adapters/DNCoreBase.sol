@@ -204,6 +204,15 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
     function hedgeTransferOut(address destination, uint64 weiAmount) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         if (spotAsset == 0) revert DNCore__SpotDisabled();
         if (destination == address(0) || weiAmount == 0) revert DNCore__ZeroAmount();
+        // Per-action bound in USDC 6dp (community audit 2026-10-01, Firlinata:
+        // the written "worst case is bounded by maxActionUsd6 per action"
+        // claim was violated on this path). Valued with the same live spot
+        // mark the hedge valuation uses; if the mark can't be read, the send
+        // waits — a keeper never moves hedge funds through a price blackout.
+        uint64 px = spotPx();
+        if (px == 0 || spotPxScale == 0) revert DNCore__SpotDisabled();
+        uint256 usd6 = (uint256(weiAmount) * uint256(px)) / spotPxScale;
+        if (usd6 > maxActionUsd6) revert DNCore__Cap();
         emit HedgeTransferOut(destination, weiAmount);
         _send(HLConstants.SPOT_SEND_ACTION, abi.encode(destination, spotTokenIndex, weiAmount));
     }

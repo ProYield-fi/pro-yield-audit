@@ -47,6 +47,15 @@ contract PTSleeveStrategyTest is Test {
         usdc.mint(address(strat), 1_000e6);
     }
 
+    /// ETH-lane regression: CCTP destination domain 0 is VALID (Ethereum).
+    /// The original `!= 0` constructor guard (an Arb-lane assumption, domain 3)
+    /// made the HyperEVM -> Ethereum lane impossible — the live ETH-lane deploy
+    /// reverted "PT: zero domain" on 2026-09-30.
+    function test_constructor_domainZero_isEthereum() public {
+        PTSleeveStrategy s0 = new PTSleeveStrategy(address(usdc), address(this), address(cctp), address(cctp), executorAddr, 0);
+        assertEq(s0.destDomain(), 0, "domain 0 = Ethereum");
+    }
+
     // ------------------------------------------------------------ deployToArb
 
     function test_deployToArb_burn_args_and_accounting() public {

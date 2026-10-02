@@ -55,12 +55,14 @@ contract DNCoreStrategy is BaseStrategy, DNCoreBase {
     error DNCore__BufferTooHigh();
     error DNCore__Inactive();
     error DNCore__NotAuthorized();
+    error DNCore__BelowSwept();
 
     /*//////////////////////// Events (strategy-specific) ////////////////////////*/
     event BridgeToCore(uint256 evmAmount, uint64 coreAmount6);
     event BridgeToEvm(uint64 amount6, uint64 principalReduced6, uint64 profitRealized6);
     event CoreSynced(int256 equity6, int64 szi, uint256 timestamp);
     event ProfitSwept(uint256 amount);
+    event ProfitReconciled(uint256 oldRealized, uint256 newRealized);
     event BufferSet(uint256 bufferBps);
 
     constructor(address _underlying, address initialOwner, uint32 _perpAsset, uint256 _maxActionUsd6)
@@ -161,6 +163,29 @@ contract DNCoreStrategy is BaseStrategy, DNCoreBase {
     /// @notice Realized profit still waiting to be swept (underlying units).
     function harvestableProfit() external view returns (uint256) {
         return profitRealized > profitSwept ? profitRealized - profitSwept : 0;
+    }
+
+    /*//////////////////////// Reconciliation (admin) ////////////////////////*/
+    /// @notice Owner-only bookkeeping reconciliation for `profitRealized`.
+    ///
+    /// AUDIT F-3 FIX. `bridgeBackToEvm` commits `corePrincipal6 -= principalRed`
+    /// BEFORE the fire-and-forget `_sendUsdcToEvm`. Hyperliquid's CoreWriter drops
+    /// actions for accounts without a Core account, so a silently-dropped send
+    /// still decrements the principal basis — and because the send can be retried
+    /// without bound, `profitRealized` could be inflated repeatedly with no USDC
+    /// ever moving. The next harvest would then transfer REAL idle principal to
+    /// the vault as "profit".
+    ///
+    /// This is the correction hatch (ported from HLEarnStrategy.sol:306, which
+    /// shipped it for exactly this failure). It is funds-safe: the counter only
+    /// sizes future harvests and can never be set below what has already been
+    /// swept to the vault, so a bad reconcile can strand credit but can never
+    /// claw back money the vault already holds.
+    function reconcileProfit(uint256 newRealized) external onlyOwner {
+        if (newRealized < profitSwept) revert DNCore__BelowSwept();
+        uint256 old = profitRealized;
+        profitRealized = newRealized;
+        emit ProfitReconciled(old, newRealized);
     }
 
     /*//////////////////////// Harvest ////////////////////////*/

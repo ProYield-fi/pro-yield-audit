@@ -14,6 +14,8 @@ library HLConstants {
     address internal constant PERP_ASSET_INFO_PRECOMPILE = 0x000000000000000000000000000000000000080a;
     address internal constant ACCOUNT_MARGIN_SUMMARY_PRECOMPILE = 0x000000000000000000000000000000000000080F;
     address internal constant CORE_USER_EXISTS_PRECOMPILE = 0x0000000000000000000000000000000000000810;
+    address internal constant BORROW_LEND_USER_STATE_PRECOMPILE = 0x0000000000000000000000000000000000000811;
+    address internal constant BORROW_LEND_RESERVE_STATE_PRECOMPILE = 0x0000000000000000000000000000000000000812;
     address internal constant SPOT_BALANCE_PRECOMPILE = 0x0000000000000000000000000000000000000801;
     address internal constant SPOT_PX_PRECOMPILE = 0x0000000000000000000000000000000000000808;
     address internal constant SPOT_INFO_PRECOMPILE = 0x000000000000000000000000000000000000080b;
@@ -39,6 +41,10 @@ library HLConstants {
     uint24 internal constant USD_CLASS_TRANSFER_ACTION = 7;
     uint24 internal constant CANCEL_ORDER_BY_CLOID_ACTION = 11;
     uint24 internal constant SEND_ASSET_ACTION = 13;
+    /// borrowLend — (uint8 operation, uint64 token, uint64 wei). operation: 0=Supply, 1=Withdraw;
+    /// wei=0 on Withdraw = full reserve balance. Contracts can SUPPLY/WITHDRAW only — the wire
+    /// action carries no borrow/repay, so a contract cannot lever here (by design).
+    uint24 internal constant BORROW_LEND_ACTION = 15;
 
     /*//////////////////////// Time in force ////////////////////////*/
     uint8 internal constant TIF_ALO = 1;

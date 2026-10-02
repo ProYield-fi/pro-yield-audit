@@ -81,7 +81,10 @@ contract BaseStrategy is Ownable, ReentrancyGuard {
     function setVault(address vault_) external onlyOwner nonReentrant {
         require(vault_ != address(0), "BaseStrategy: zero vault");
         vault = vault_;
+        emit VaultSet(vault_); // audit F-5: the recall authority changed silently
     }
+
+    event VaultSet(address indexed vault);
 
     /// @notice Return funds to the vault so it can honor user withdrawals.
     /// Callable ONLY by the vault address (set via setVault). Capped at balance.

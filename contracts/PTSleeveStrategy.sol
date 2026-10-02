@@ -50,8 +50,8 @@ contract PTSleeveStrategy is BaseStrategy {
 
     ITokenMessengerV2Burn public immutable tokenMessenger;
     IMessageTransmitterV2Recv public immutable messageTransmitter;
-    address public immutable arbExecutor; // mint target on Arbitrum (immutable)
-    uint32 public immutable destDomain; // CCTP domain — Arbitrum = 3
+    address public immutable arbExecutor; // CCTP mint target on the destination chain (Arbitrum or Ethereum; immutable)
+    uint32 public immutable destDomain; // CCTP destination domain — Arbitrum = 3, Ethereum = 0
 
     uint256 public constant MAX_HEADROOM_BPS = 3000; // hard cap: +30%
     uint256 public headroomBps = 2000; // default attestation headroom: +20%
@@ -92,7 +92,10 @@ contract PTSleeveStrategy is BaseStrategy {
             _tokenMessenger != address(0) && _messageTransmitter != address(0) && _arbExecutor != address(0),
             "PT: zero addr"
         );
-        require(_destDomain != 0, "PT: zero domain");
+        // NOTE: no `!= 0` sentinel on _destDomain — CCTP domain 0 is VALID
+        // (it is Ethereum). The original guard (an Arb-lane assumption) made
+        // the ETH lane impossible: its constructor reverted "PT: zero domain"
+        // on 2026-09-30. The domain is fixed at deploy and reviewed per lane.
         tokenMessenger = ITokenMessengerV2Burn(_tokenMessenger);
         messageTransmitter = IMessageTransmitterV2Recv(_messageTransmitter);
         arbExecutor = _arbExecutor;

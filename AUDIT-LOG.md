@@ -62,3 +62,18 @@ See `docs/AUDIT_SCOPE.md` §4 §6 and `security_baseline.json`. Notably:
 vault `owner` is now the **treasury Safe** `0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB`
 (verified on-chain 2026-09-30; the EOA-owner item in
 `docs/VAULT_UNLOCK_PLAN.md` is closed).
+
+## 2026-10-02 — external finding acknowledged & fixed (round 2 opens)
+
+- **[Low] DNCoreBase.hedgeTransferOut had no per-action size bound** (issue #2,
+  Firlinata, PoC suite 3/3). Confirmed against source: the written claim
+  "worst case is bounded by maxActionUsd6 per action" (AUDIT_SCOPE §4) was
+  violated on this path.
+- **Fix (this snapshot, ships with r3):** the send is valued with the live
+  spot mark and reverts `DNCore__Cap` above `maxActionUsd6`; a failed price
+  read refuses the send. Regression: `test/forge/DNCoreHedgeBound.t.sol`
+  (in-cap ok · over-cap reverts · blackout refuses · non-keeper reverts).
+- **Recognition:** Firlinata credited as the first external finding, per the
+  published bounty terms (recognition immediate).
+- **Round 2 scope:** `docs/ROUND2.md` — the full r3 contract delta + the new
+  auto-earn sweep surface.
