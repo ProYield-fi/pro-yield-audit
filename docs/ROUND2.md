@@ -46,3 +46,19 @@ gated deploy (r3). Cap raises stay gated on external review regardless.
   is live, the contract fix is in the r3 queue.
 - The recycler script is testnet-locked by design; mainnet fee splits run via
   the 2-of-3 Safe (`safe_exec_mainnet.js`), dry-verified 2026-10-02.
+
+## Amendment (2026-10-02, after finding #3)
+
+The sweep keeper is rewritten as v2 in response to issue #3:
+
+- The permit **spender is the vault itself** (was the keeper EOA). The vault
+  pulls from the user within their signed allowance and mints to them — one
+  atomic tx, no keeper custody window at any point. No user had signed when
+  the spender changed (0 permits, verified), so the change is free.
+- The sweep is **capability-gated**: it selector-probes the deployed vault for
+  `depositFor` and is a **gated no-op** until the r3 deploy ships it. No
+  permits submitted, no funds moved, clean exit.
+- Per-row fault isolation: junk rows mark `last_error` and the run continues;
+  the whole-run crash is gone.
+- Web card copy states plainly that auto-earn activates with the next
+  contract update.
