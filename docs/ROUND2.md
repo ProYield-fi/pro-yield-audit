@@ -62,3 +62,23 @@ The sweep keeper is rewritten as v2 in response to issue #3:
   the whole-run crash is gone.
 - Web card copy states plainly that auto-earn activates with the next
   contract update.
+
+## Slither standing gate (2026-10-02, free-tooling round)
+
+Full run: 75 contracts / 101 detectors → 167 findings. Triage:
+
+- **Mocks excluded** (test-only: MockCoreWriter, MockMorpho, MockPendleRouter,
+  MockCctp, MockSwapper, MockCurve, MockEvilStrategy) — most unchecked-return
+  and High findings live there.
+- **`reentrancy-balance` [High] on PTSleeve executors + PYDFunder**: triaged as
+  balance-delta pattern noise — every flagged entry is `onlyOps nonReentrant`,
+  and the balance reads are delta measurements around Curve/Pendle hops, not
+  accounting state. Still fair game if a reviewer sees a real path through it.
+- **`reentrancy-no-eth` [Med] on vault/DN/Morpho**: same delta pattern; the
+  vault carries 8 `nonReentrant` guards, the strategies 3–7 each.
+- **Worth a reviewer's eye (real, low)**: `unused-return` in MorphoStrategy
+  (ignored call returns), `incorrect-equality` exact-amount guards (intentional
+  but confirm), constant/immutable style items.
+
+Raw JSON preserved in the dev repo; this triage is the standing pre-deploy
+gate output. Nothing here changes the r3 deploy set.
