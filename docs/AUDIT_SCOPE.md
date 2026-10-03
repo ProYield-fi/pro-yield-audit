@@ -24,8 +24,10 @@ Primary (holds or routes user funds):
 | `contracts/PYDFunder.sol` | 152 | Capped USDC→PYD conversion → PYDStaking streams (dormant until a swapper is set) |
 
 Legacy/secondary (deployed but pending migration review):
-`DeltaNeutralStrategy.sol`, `SkyStrategy.sol`, `MorphoStrategy.sol`,
-`PendleStrategy.sol` — reentrancy-hardened 2026-09-18 (23 findings fixed).
+`DeltaNeutralStrategy.sol`, `SkyStrategy.sol` (dormant by standing decision,
+hybrid hold: adapter unbuilt, breaker open; revisit only if Spark USDC-class
+rates ≥ Morpho +100bps for 7+ days — auto-checked daily),
+`MorphoStrategy.sol`, `PendleStrategy.sol` — reentrancy-hardened 2026-09-18 (23 findings fixed).
 
 **Out of scope:** `contracts/mocks/*` (test-only), `contracts/mocks/DecodeVerifier.sol`
 (read-verification harness), HyperCore itself (Hyperliquid's system), everything in
