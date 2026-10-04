@@ -34,11 +34,36 @@ security-class hits. Fold into the r3 tidy-up pass.
 | PYDFeeDiscount | 98.1% | done |
 | PTSleeveStrategy | 97.3% | done |
 | MorphoStrategy | 96.2% | done |
+| **PYDFunder** | **100%** (2026-10-03) | done — `test/forge/PYDFunder.t.sol`, 18 tests incl. the F-8 rate-freeze family, allowance-revocation discipline, and a re-entering swapper |
 | FeeDistributor | 90.9% | good |
-| DNCoreStrategy | 88.2% | good |
-| BaseStrategy | 73.2% | recall/harvest edge paths to add |
-| **DNCoreBase** | **48.2%** | **gap — the shared HyperCore execution surface (CoreWriter sends, precompile reads, gates) is half-untested. Target ≥90% before the r3 redeploy.** |
-| **PYDFunder** | **0.0%** | dormant (no swapper set) but funds-touching — unit-test before any activation |
+| DNCoreStrategy | 92.7% | good (up from 88.2%) |
+| **DNCoreBase** | **100%** stmts / 93.8% branch (2026-10-03) | done — was 48.2%; `test/forge/DNCoreBase.coverage.t.sol` (33 tests): every gate (keeper/paused/core-account), every action's byte-exact CoreWriter encoding, all precompile reads incl. blackout fail-safe paths, bridge in/out |
+| BaseStrategy | 73.2% | recall/harvest edge paths to add (last remaining sub-90 surface) |
+
+## 3b. Property fuzzing (2026-10-03, queued item CLOSED)
+
+- **Foundry invariants — DNCoreBase order paths** (`test/forge/DNCoreBase.invariants.t.sol`):
+  8 properties over randomized action sequences (12,800 calls, 64 runs):
+  writer payload well-formedness, order cap + $10 min-notional, USD-transfer
+  cap, pause freezes the writer, strangers never mutate, admin never mutates
+  while hedged, `totalAssets()` never reverts (even mid precompile blackout),
+  action-count monotonicity. All passing.
+- **Echidna — vault money path** (`echidna/echidna_vault.sol` + config):
+  3 properties (share-sum, price floor, solvency) × 20,066 calls, passing,
+  corpus populated. Second-engine cross-check of the foundry suite.
+  - **Harness lesson**: Echidna's senders call the TARGET contract — routing
+    vault calls through wrapper functions on the property contract collapses
+    every sender identity into the property contract's address (falsified the
+    share-sum property spuriously until replayed in foundry). Wrappers stay;
+    the share-sum property is expressed over the COMPLETE shareholder set of
+    the harness ({property contract, U0, U1, U2}), so it remains exact.
+  - `--multi-abi` does not exist in Echidna 2.3.3 (`--all-contracts` is the
+    flag — and it fuzzes file-level contracts, NOT deployed children, so it
+    passes vacuously; non-vacuousness must be verified from the corpus).
+- **Echidna on DNCoreBase: NOT APPLICABLE** — Echidna has no cheatcodes, so
+  the precompile etch-mocking the DN surface requires is impossible (every
+  CoreWriter action reverts on the 0x810 gate read). The DN surface is
+  property-fuzzed by the foundry invariant suite instead.
 
 ## 4. Deploy-drift audit (repo vs live bytecode, selector-level)
 
@@ -68,7 +93,12 @@ that the r3 deploy closes.
 
 - This toolchain joins the standing gate: Slither + Aderyn + coverage +
   drift-audit run before every deploy; results land here.
-- **Queued next (free, downloadable): Foundry invariant suite + Echidna/Medusa
-  property fuzzing** on the vault core (share/asset accounting, cap
-  enforcement, pause semantics) and DNCoreBase order paths — property-based
-  testing is the biggest remaining internal gap after coverage.
+- ~~Queued next: Foundry invariant suite + Echidna/Medusa property fuzzing~~
+  **DONE 2026-10-03** — see §3b (foundry DNCoreBase invariants 8 props; Echidna
+  vault campaign 3 props × 20k calls). Remaining fuzzing follow-up: Medusa
+  (optional third engine) — deprioritized; two independent engines already
+  cover the queued scope.
+- **Remaining before r3 redeploy**: BaseStrategy recall/harvest edge coverage
+  (73.2%), the two CEI-order contract fixes (vault.emergencyWithdraw,
+  FD.route) + drift-list reconciliation as the r3 diff, then the r3 deploy
+  itself behind the pause drill (§ ladder).
