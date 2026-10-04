@@ -39,6 +39,8 @@ security-class hits. Fold into the r3 tidy-up pass.
 | DNCoreStrategy | 92.7% | good (up from 88.2%) |
 | **DNCoreBase** | **100%** stmts / 93.8% branch (2026-10-03) | done — was 48.2%; `test/forge/DNCoreBase.coverage.t.sol` (33 tests): every gate (keeper/paused/core-account), every action's byte-exact CoreWriter encoding, all precompile reads incl. blackout fail-safe paths, bridge in/out |
 | **BaseStrategy** | **100%** stmts/branch (2026-10-03) | done — `test/forge/BaseStrategy.coverage.t.sol`, 18 tests: base deposit/harvest defaults, inactive-harvest revert, recall clamp + silent-noop edges, setter guards/events. All product contracts ≥90% |
+| **FrontierBase** | inherits (abstract; folds into CreditPoolStrategy) | done — the Frontier venue-class gate: DD gate fail-closed + per-name ≤15% cap enforced in code (ceiling immutable even for the owner) |
+| **CreditPoolStrategy** | **94.6%** stmts / 80.8% branch (2026-10-04) | done — `test/forge/CreditPool.t.sol` (20 tests: gate default-locked, re-lock never traps, cap block/pass/ceiling-immutable/unverifiable, first-loss re-baseline + LossObserved, yield sweep, partial recall, locked-pool tolerance, zero-position recall, buffer edges) + `test/forge/CreditPool.invariants.t.sol` (handler-only targeting; cap-ceiling, totalAssets identity, USDC conservation invariants + deploy/harvest post-conditions) |
 
 ## 3b. Property fuzzing (2026-10-03, queued item CLOSED)
 
@@ -64,6 +66,56 @@ security-class hits. Fold into the r3 tidy-up pass.
   the precompile etch-mocking the DN surface requires is impossible (every
   CoreWriter action reverts on the 0x810 gate read). The DN surface is
   property-fuzzed by the foundry invariant suite instead.
+
+## 3c. Frontier credit-pool build (2026-10-04)
+
+The Frontier venue-class engineering is **built and tested** (hypervault
+commit `a9e21f8f`), deployed code path proven on hardhat network, NOT
+deployed to mainnet (the adapter's immutable `pool` address IS the venue
+decision — deploy waits for a DD-cleared venue):
+
+- `FrontierBase` — every Frontier venue adapter inherits two in-code rules:
+  (1) **DD gate** — `venueCleared` false by default, owner-only flip, and
+  the gate guards the SUPPLY path only (recall/withdraw are never gated, so
+  a locked venue can never trap vault money); (2) **per-name cap** — the
+  venue's share of the vault book can never be supplied past `maxShareBps`,
+  default and hard ceiling 1500 bps (15%) which **even the owner cannot
+  raise** (`Frontier__BpsTooHigh`). Cap check is fail-closed: unwired vault
+  (`Frontier__CapUnverifiable`) or empty book (`Frontier__CapExceeded`)
+  blocks supply. Cap is a supply gate — venue revaluation can drift the live
+  share afterwards; keeper monitors `projectedShareBps()`.
+- `CreditPoolStrategy` — junior-tranche (first-loss) adapter over a minimal
+  `ICreditPool` seam (supply/redeem/positionValue/positionTokens — the
+  concrete venue replaces the interface at DD). First-loss accounting is
+  honest: a mark DROP re-baselines DOWN, fires `LossObserved`, books zero
+  profit (the loss is already visible in `totalAssets()`); yield above the
+  moved baseline sweeps as real USDC. Recall/`_unwind` are partial-fill and
+  locked-pool tolerant (try/catch — queues/lockups are normal for credit
+  venues); the vault measures what arrived, never what the venue claims.
+- Slither triage (21 findings, all known classes): reentrancy-no-eth/benign
+  on `_doHarvest`/`deploy` — external venue calls are `nonReentrant`-guarded
+  at the BaseStrategy surface and the venue is DD-trusted with a ≤15% blast
+  radius; `incorrect-equality` on `sweep == 0` is the intentional
+  buffer-aware "yield stays claimable" semantics; `unused-return` on
+  `pool.redeem` is intentional (balance-delta discipline).
+- Deploy tooling: `scripts/deploy_credit_pool.js` — DRY by default,
+  dormant by construction (deploys with `venueCleared=false`, refuses to
+  register with the vault; `ALLOW_PLACEHOLDER_POOL` refused on mainnet).
+  Manifest gains `credit_pool_strategy` with the dormancy status.
+
+## 3d. Invariant-testing harness lessons (CreditPool round)
+
+- **Transitive targeting bites mocks**: by default the fuzzer reaches every
+  public function of transitively-deployed contracts — it called
+  `MockCreditPool.supply` directly (bypassing the DD gate) and
+  `injectLossBps(2^250)` (arithmetic panic). Fix: `targetContract(handler)`.
+- **Timing-blind global invariants**: "pool tokens imply venueCleared"
+  fails on legitimate states (tokens REMAIN after an incident re-lock; the
+  end-of-sequence check can't see when growth happened). Fix: post-conditions
+  inside the handler actions (deploy/harvest) where the timing is known.
+- "Baseline ≤ mark" holds only AFTER the harvest that observes a loss —
+  between loss and harvest the gap is designed behavior (the mark shows the
+  loss instantly; the baseline catches up at that harvest).
 
 ## 4. Deploy-drift audit (repo vs live bytecode, selector-level)
 
