@@ -30,3 +30,14 @@ interactive DRILL confirm, chainid 999 gate, evidence marker →
   one-Safe-tx `setCaps` decision for the owner.
 - S3b clock: daily attestations, 10/30 on 2026-10-04 → 30 by ~Oct 23.
 - S4/T1 audit gate after S3a/S3b headroom.
+## S3a caps raised (2026-10-04, tx `0x60c6ab4d…cfa66`)
+
+With the drill evidence above complete, the owner Safe executed
+`setCaps(10_000e6, 1_000e6)` — TVL cap **$10,000**, per-user cap **$1,000**
+(S3a levels). Safe tx `0x60c6ab4d6336ff76d84b9a4d916573627089440d12ff8fe93f6
+c69fbfe0cfa66`, safeTxHash `0x855fe27196c697c457ae1915e33c7fbd7542ea2f7e48b9
+784aa2a8168c9bc675`, block 47612583. Verified on-chain: `tvlCap=10_000e6`,
+`perUserCap=1_000e6`, `depositsPaused=false`, `totalAssets` unchanged.
+Behavioral proof: a simulated $500 deposit from a fresh wallet now passes the
+cap gate (reverts only on ERC20 allowance — the wallet-side prerequisite);
+under the previous $500 caps the identical call reverted "TVL cap reached".
