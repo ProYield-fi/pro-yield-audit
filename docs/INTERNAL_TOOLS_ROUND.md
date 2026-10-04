@@ -38,7 +38,7 @@ security-class hits. Fold into the r3 tidy-up pass.
 | FeeDistributor | 90.9% | good |
 | DNCoreStrategy | 92.7% | good (up from 88.2%) |
 | **DNCoreBase** | **100%** stmts / 93.8% branch (2026-10-03) | done — was 48.2%; `test/forge/DNCoreBase.coverage.t.sol` (33 tests): every gate (keeper/paused/core-account), every action's byte-exact CoreWriter encoding, all precompile reads incl. blackout fail-safe paths, bridge in/out |
-| BaseStrategy | 73.2% | recall/harvest edge paths to add (last remaining sub-90 surface) |
+| **BaseStrategy** | **100%** stmts/branch (2026-10-03) | done — `test/forge/BaseStrategy.coverage.t.sol`, 18 tests: base deposit/harvest defaults, inactive-harvest revert, recall clamp + silent-noop edges, setter guards/events. All product contracts ≥90% |
 
 ## 3b. Property fuzzing (2026-10-03, queued item CLOSED)
 
@@ -98,7 +98,9 @@ that the r3 deploy closes.
   vault campaign 3 props × 20k calls). Remaining fuzzing follow-up: Medusa
   (optional third engine) — deprioritized; two independent engines already
   cover the queued scope.
-- **Remaining before r3 redeploy**: BaseStrategy recall/harvest edge coverage
-  (73.2%), the two CEI-order contract fixes (vault.emergencyWithdraw,
-  FD.route) + drift-list reconciliation as the r3 diff, then the r3 deploy
-  itself behind the pause drill (§ ladder).
+- **Remaining before r3 redeploy**: DONE — BaseStrategy coverage 100% and
+  both CEI-order fixes committed on repo HEAD (FD.route books before transfer;
+  vault.emergencyWithdraw writes down before sweep; 233/233 green, slither
+  re-run pending in this doc). The r3 deploy itself closes the §4 drift list.
+  Sequence from here: pause drill (owner GO) → 30-day attest clock (10/30,
+  ETA ~Oct 23) → r3 redeploy → S4/T1 audit gate.
