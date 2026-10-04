@@ -100,7 +100,12 @@ that the r3 deploy closes.
   cover the queued scope.
 - **Remaining before r3 redeploy**: DONE — BaseStrategy coverage 100% and
   both CEI-order fixes committed on repo HEAD (FD.route books before transfer;
-  vault.emergencyWithdraw writes down before sweep; 233/233 green, slither
-  re-run pending in this doc). The r3 deploy itself closes the §4 drift list.
+  vault.emergencyWithdraw writes down before sweep; 233/233 green). Slither verified 2026-10-03/04: the reentrancy finding set is IDENTICAL to
+  the pre-fix baseline (diff: only line-number shifts) — the CEI reorder
+  introduced nothing new; FeeDistributor.route and vault.emergencyWithdraw
+  carry no reentrancy findings in any detector class. The remaining
+  reentrancy-class results are the pre-existing triaged set (PTSleeve
+  executor balance-delta output verification, trusted-caller loops).
+  The r3 deploy itself closes the §4 drift list.
   Sequence from here: pause drill (owner GO) → 30-day attest clock (10/30,
   ETA ~Oct 23) → r3 redeploy → S4/T1 audit gate.
