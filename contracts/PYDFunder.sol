@@ -37,7 +37,7 @@ contract PYDFunder is ReentrancyGuard, Ownable {
     ISwapper public swapper; // set by owner; swaps USDC -> PYD
 
     uint256 public maxConvertUsd6 = 1000e6;  // per-call cap
-    uint256 public minConvertUsd6 = 10e6;    // dust skip
+    uint256 public constant minConvertUsd6 = 10e6; // dust skip (never modified — constable)
     bool public paused;
 
     /// AUDIT F-8: `rewardRate = amount / duration` FLOORS, so an absurdly long

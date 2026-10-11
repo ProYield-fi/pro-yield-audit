@@ -1,10 +1,9 @@
 # ProYield Vault — Community Audit Scope
 
-> Status: **live on HyperEVM mainnet since 2026-09-25**; beta exposure is
-> capped. The vault holds real USDC and deposits are open. This document is
-> the package auditors and community reviewers should read first. Scope and
-> threat model last updated 2026-09-20; deployment status corrected
-> 2026-09-30.
+> Status: **live on mainnet** (HyperEVM 999) + **testnet**. The audited mainnet
+> deployment is the launch gate; this document is the package auditors and
+> community reviewers should read first.
+> Last updated: **2026-10-11** (live `strategyList` reconciled 7-vs-5, see §1.2).
 
 ## 1. What is in scope
 
@@ -12,26 +11,79 @@ Primary (holds or routes user funds):
 
 | Contract | Lines | Role |
 |---|---|---|
-| `contracts/ProYieldVault.sol` | 245 | ERC-4626-style vault: deposits, withdrawals, allocation, harvest, share price |
-| `contracts/BaseStrategy.sol` | 99 | Strategy base: recall, harvest booking, keeper/vault auth |
-| `contracts/DNCoreStrategy.sol` | 199 | Delta-neutral sleeve: honest Core accounting + vault wiring |
-| `contracts/adapters/DNCoreBase.sol` | ~290 | Shared HyperCore execution: CoreWriter sends, read precompiles, gates |
-| `contracts/adapters/DNCoreAdapter.sol` | 77 | Standalone DN execution wrapper (same surface, no vault) |
-| `contracts/FeeDistributor.sol` | 60 | Fee routing (60/20/20 recycle policy) |
-| `contracts/PYDStaking.sol` | 161 | PYD reward streaming (Synthetix-style) |
+| `contracts/ProYieldVault.sol` | 313 | ERC-4626-style vault: deposits, withdrawals, allocation, harvest, share price |
+| `contracts/BaseStrategy.sol` | 107 | Strategy base: recall, harvest booking, keeper/vault auth |
+| `contracts/DNCoreStrategy.sol` | 210 | Delta-neutral sleeve: honest Core accounting + vault wiring |
+| `contracts/adapters/DNCoreBase.sol` | 326 | Shared HyperCore execution: CoreWriter sends, read precompiles, gates |
+| `contracts/adapters/DNCoreAdapter.sol` | 67 | Standalone DN execution wrapper (same surface, no vault) |
+| `contracts/FeeDistributor.sol` | 79 | Fee routing (60/20/20 recycle policy) |
+| `contracts/PYDStaking.sol` | 171 | PYD reward streaming (Synthetix-style) |
 | `contracts/PYDToken.sol` | 26 | Fixed-supply OZ ERC20 (standard events); no mint path |
 | `contracts/PYDFeeDiscount.sol` | 250 | Tiered fee rebates accrued from real fee deltas (staker-facing) |
-| `contracts/PYDFunder.sol` | 152 | Capped USDC→PYD conversion → PYDStaking streams (dormant until a swapper is set) |
+| `contracts/PYDFunder.sol` | 175 | Capped USDC→PYD conversion → PYDStaking streams (dormant until a swapper is set) |
+
+**PT fixed-rate sleeve (LIVE, holding real USDC — audited in round 1):**
+
+| Contract | Lines | Role |
+|---|---|---|
+| `contracts/PTSleeveStrategy.sol` | 221 | HyperEVM side: CCTP burn/return, keeper-attested Arb value. **Live** `0x2D3E5bf1…` (+ a second instance `0x3AE855B6…`) |
+| `contracts/arbi/PTSleeveExecutor.sol` | 273 | Arbitrum side: buys/sells PT via the Pendle router, burns USDC back. **Live** `0xA2e53597…` |
+| `contracts/ethi/PTSleeveEthExecutor.sol` | 348 | Ethereum lane (CCTP domain 0). Built + fork-tested, **not deployed** |
+| `contracts/arbi/PendleTypes.sol` | 111 | Pendle router structs (shared by both executors) |
+
+**Lending / secondary:**
+
+| Contract | Lines | Role |
+|---|---|---|
+| `contracts/MorphoStrategy.sol` | 219 | **LIVE** `0xBF4C5e33…` — Morpho Blue supply on HyperEVM, position-based yield accounting |
+| `contracts/HLEarnStrategy.sol` | 345 | HYPE-earning sleeve. Testnet only (`0x08EC018f…` on chain 998); **not** in the live vault's `strategyList` |
 
 Legacy/secondary (deployed but pending migration review):
-`DeltaNeutralStrategy.sol`, `SkyStrategy.sol` (dormant by standing decision,
-hybrid hold: adapter unbuilt, breaker open; revisit only if Spark USDC-class
-rates ≥ Morpho +100bps for 7+ days — auto-checked daily),
-`MorphoStrategy.sol`, `PendleStrategy.sol` — reentrancy-hardened 2026-09-18 (23 findings fixed).
+`DeltaNeutralStrategy.sol`, `SkyStrategy.sol`, `PendleStrategy.sol` —
+reentrancy-hardened 2026-09-18 (23 findings fixed). **Verified 2026-09-30: all three
+are dead code** — absent from every manifest and from the live vault's
+`strategyList`. `DeltaNeutralStrategy` was never deployed.
+
+### 1.1 Scope corrections made 2026-09-30 (round-1 audit)
+
+This document previously (last edited 2026-09-20) omitted the entire PT sleeve while
+`PTSleeveStrategy` and `PTSleeveExecutor` were **live and holding real USDC**, and it
+listed `MorphoStrategy` as merely "legacy" when it is the live lending core. Both are
+now corrected above. Findings and fixes: `AUDIT_HANDOFF_2026-09-30.md` and
+`docs/AUDIT_ROUND1.md`.
+
+**SUSD3 sleeve (registered + ACTIVE on the live vault):**
+
+| Contract | Lines | Role |
+|---|---|---|
+| `contracts/SUSD3Strategy.sol` | — | Legacy sUSD3 CCTP sleeve (v1). **Live** `0x9978e8745cdb0d3e5B970aC36C38575eC70D612A` (registered + ACTIVE, index 6; superseded by the dormant `0x7dc1874F…` replacement but never de-registered). |
+| `contracts/ethi/SUSD3Executor.sol` | — | Ethereum-side executor for the sUSD3 sleeve |
+
+### 1.2 Live `strategyList` — 7 registered strategies → sources (reconciled 2026-10-11)
+
+The vault `0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1` holds **7 registered
+strategies** on-chain. The manifest previously named only 5 (indices 2 and 6
+were absent, and index 6 is ACTIVE); it was reconciled 7-vs-5 on 2026-10-10
+(`deployed_addresses.mainnet.json:strategyList_reconciled`). **The on-chain
+`strategyList` is the source of truth — never enumerate strategies from the
+manifest.** Every registered address maps to a source file below; the legacy
+SUSD3 adapter, previously unmapped, is included.
+
+| # | Live strategy address | Active | Source |
+|---|---|---|---|
+| 0 | `0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4` | yes | `contracts/DNCoreStrategy.sol` (+ `contracts/adapters/DNCoreBase.sol`) |
+| 1 | `0xBF4C5e339D63EEB393DA2797679879a0a5Af2D53` | yes | `contracts/MorphoStrategy.sol` |
+| 2 | `0x3AE855B65A021397f7a3ca838acc8E4c82cF815f` | no | `contracts/PTSleeveStrategy.sol` (v1, quarantined 2026-10-10) |
+| 3 | `0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b` | yes | `contracts/PTSleeveStrategy.sol` |
+| 4 | `0xA96D0BB29cEE6F9e26239529789CEb74912C4b25` | yes | `contracts/PTSleeveStrategy.sol` (ETH lane, CCTP domain 0) |
+| 5 | `0xA2e535970dc1492f77843E26F25Ab314735F4dF5` | yes | `contracts/HLEarnStrategy.sol` |
+| 6 | `0x9978e8745cdb0d3e5B970aC36C38575eC70D612A` | yes | `contracts/SUSD3Strategy.sol` (legacy v1) |
 
 **Out of scope:** `contracts/mocks/*` (test-only), `contracts/mocks/DecodeVerifier.sol`
 (read-verification harness), HyperCore itself (Hyperliquid's system), everything in
-`scripts/` (keepers/tests are off-chain liveness, they hold no funds).
+`scripts/` (keepers/tests are off-chain liveness, they hold no funds — with the
+exception of deploy scripts, whose ownership defaults ARE in scope as an
+attack-surface concern; see audit F-1).
 
 ## 2. Architecture in one page
 

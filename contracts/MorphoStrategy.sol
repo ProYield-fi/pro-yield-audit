@@ -123,11 +123,11 @@ contract MorphoStrategy is BaseStrategy {
 
     /// @notice Value of the supplied position in underlying units (rounds DOWN).
     function positionValue() public view returns (uint256) {
-        (uint256 shares,,) = morpho.position(marketId, address(this));
-        if (shares == 0) return 0;
+        (uint256 posShares,,) = morpho.position(marketId, address(this));
+        if (posShares == 0) return 0;
         (uint128 tsa, uint128 tss,,,,) = morpho.market(marketId);
         if (tss == 0) return 0;
-        return (shares * tsa) / tss;
+        return (posShares * tsa) / tss;
     }
 
     function totalAssets() public view override returns (uint256) {
@@ -143,10 +143,10 @@ contract MorphoStrategy is BaseStrategy {
         uint256 amount = bal > buffer ? bal - buffer : 0;
         require(amount > 0, "Morpho: nothing to supply");
         underlying.forceApprove(address(morpho), amount);
-        (, uint256 shares) = morpho.supply(_marketParams(), amount, 0, address(this), "");
+        (, uint256 supplied) = morpho.supply(_marketParams(), amount, 0, address(this), "");
         totalSupplied += amount;
         lastHarvestPosition = positionValue(); // new principal is never yield
-        emit Supplied(amount, shares);
+        emit Supplied(amount, supplied);
     }
 
     /// @notice Vault-only: return funds, unwinding the Morpho position as
@@ -176,11 +176,11 @@ contract MorphoStrategy is BaseStrategy {
     /// @dev Withdraw `need`-worth of assets from the market (by shares, ceil,
     /// capped by the position). try/catch: an illiquid market = partial no-op.
     function _unwind(uint256 need) internal {
-        (uint256 shares,,) = morpho.position(marketId, address(this));
+        (uint256 posShares,,) = morpho.position(marketId, address(this));
         (uint128 tsa, uint128 tss,,,,) = morpho.market(marketId);
-        if (shares == 0 || tss == 0) return;
+        if (posShares == 0 || tss == 0) return;
         uint256 sharesOut = (need * tss + tsa - 1) / tsa; // ceil
-        if (sharesOut > shares) sharesOut = shares;
+        if (sharesOut > posShares) sharesOut = posShares;
         try morpho.withdraw(_marketParams(), 0, sharesOut, address(this), address(this)) {} catch {}
     }
 

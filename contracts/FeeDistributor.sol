@@ -73,9 +73,13 @@ contract FeeDistributor is ReentrancyGuard, Ownable {
         uint256 bal = usdc.balanceOf(address(this));
         if (amount > bal) amount = bal;
         require(amount > 0, "FeeDistributor: nothing to route");
-        usdc.safeTransfer(to, amount);
+        // CEI ORDER (r3 tidy-up): book the routing BEFORE the external transfer.
+        // Interactions-first left a window where a reentering `to` could observe
+        // the USDC gone but the books not yet written; the nonReentrant guard is
+        // kept as defense-in-depth, but ordering — not the guard — is the fix.
         totalFeesRouted += amount;
         routedTo[to] += amount;
-        emit FeesRouted(to, amount);
+        emit FeesRouted(to, amount); // event precedes the external call
+        usdc.safeTransfer(to, amount);
     }
 }

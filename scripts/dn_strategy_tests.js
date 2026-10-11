@@ -156,22 +156,26 @@ async function main() {
     (await strategy.spotAsset()) === 10107n &&
     (await strategy.spotTokenIndex()) === 150n &&
     (await strategy.spotPxScale()) === 10n ** 8n);
-  await (await spotBalAt.set(9_862_989n, 0n, 0n)).wait(); // 0.09862989 HYPE @1e8
+  await (await spotBalAt.setToken(150n, 9_862_989n, 0n, 0n)).wait(); // 0.09862989 HYPE @1e8 (token 150)
   report("spotHedgeSz reads 0.09862989 HYPE (1e8 units)", (await strategy.spotHedgeSz()) === 9_862_989n);
   report("spotPx reads 91727000 raw", (await strategy.spotPx()) === 91_727_000n);
   report("spotValue6 = $9.047023 (6dp)", (await strategy.spotValue6()) === 9_047_023n);
   report("totalAssets counts the spot hedge: 905 + 9.047023",
     (await strategy.totalAssets()) === U(905) + 9_047_023n * 10n ** 12n);
   // Spot readings are failure-safe: an unset pair contributes 0, not a revert.
-  await (await spotBalAt.set(0n, 0n, 0n)).wait();
+  await (await spotBalAt.setToken(150n, 0n, 0n, 0n)).wait();
   report("totalAssets back to 905 with no hedge", (await strategy.totalAssets()) === U(905));
 
   // ── 4. Bridge back: principal vs profit split at fresh equity ──
+  // A3 FIX 1: the outflow is sourced from Core SPOT USDC, so the keeper stages
+  // moveUsdcToSpot(amount) first (perp margin → spot) before bridging.
+  await (await marginAt.set(0n, 0n, 0n, 0n)).wait();
+  await (await spotBalAt.setToken(0n, 50_500_000_000n, 0n, 0n)).wait(); // $505 USDC (1e8 spot wei)
   await (await k.bridgeBackToEvm(505_000_000n)).wait();
   const want = E.concat(["0x0100000d", coder.encode(
     ["address", "address", "uint32", "uint32", "uint64", "uint64"],
     ["0x2000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000",
-     4294967295, 4294967295, 0, 505_000_000n])]);
+     4294967295, 4294967295, 0, 50_500_000_000n])]);
   report("bridgeBackToEvm bytes (action 13)", (await coreWriterAt.lastAction()).toLowerCase() === want.toLowerCase());
   report("split: principal reduced to 0, profit 5e6 realized",
     (await strategy.corePrincipal6()) === 0n && (await strategy.profitRealized()) === U(5));
@@ -203,7 +207,11 @@ async function main() {
 
   // ── 7. Loss case: equity below principal -> no fake profit ──
   await (await k.bridgeUsdcToCore(U(300))).wait();
-  await (await marginAt.set(290_000_000n, 0n, 0n, 0n)).wait(); // 290 < 300 principal
+  // Staged moveUsdcToSpot(290): perp margin → Core spot; allLegs 290 < 300
+  // principal → a loss, so every bridged unit is principal (A3 FIX 1: the
+  // outflow is bounded by, and sourced from, Core spot USDC).
+  await (await marginAt.set(0n, 0n, 0n, 0n)).wait();
+  await (await spotBalAt.setToken(0n, 29_000_000_000n, 0n, 0n)).wait(); // $290 USDC
   await (await k.syncCore()).wait();
   await (await k.bridgeBackToEvm(290_000_000n)).wait();
   report("loss: principal 300->10, profit realized UNCHANGED at 5",
@@ -267,6 +275,36 @@ async function main() {
   await expectRevert(strategy.setPerpAsset.staticCall(1), "NotFlat", "setPerpAsset guard (open position)");
   await (await positionAt.set(0n, 0n, 0n, 10, false)).wait();
   report("permissionless syncCore works", await (async () => { await strategy.syncCore(); return true; })());
+
+  // ── 11. A3 regression (security review t_3a89fe76): hedged profit on ALL LEGS ──
+  // Hedge held → perp equity BELOW principal, all-legs equity (perp + Core spot
+  // USDC + hedge) ABOVE it. Pre-fix the perp-only split booked the outflow as
+  // PRINCIPAL (shaving the ledger); post-fix it realizes as PROFIT.
+  const strat2 = await (await E.getContractFactory("DNCoreStrategy")).deploy(
+    await usdc.getAddress(), owner.address, 0, cap
+  );
+  await strat2.waitForDeployment();
+  const s2 = await strat2.getAddress();
+  await (await strat2.setKeeper(keeper.address)).wait();
+  await (await strat2.setSpotConfig(107, 150n, 10n ** 8n)).wait();
+  await usdc.mint(s2, U(25));
+  const k2 = strat2.connect(keeper);
+  await (await k2.bridgeUsdcToCore(U(25))).wait();             // principal 25e6
+  await (await marginAt.set(20_000_000n, 0n, 0n, 0n)).wait(); // perp 20e6 < 25e6
+  await (await spotPxAt.setPx(100_000_000n)).wait();          // $100 (raw/1e6)
+  await (await spotBalAt.setToken(150n, 10_000_000n, 0n, 0n)).wait(); // hedge $10
+  await (await spotBalAt.setToken(0n, 500_000_000n, 0n, 0n)).wait();  // Core spot USDC $5 (1e8 spot wei)
+  await (await k2.syncCore()).wait();
+  report("A3: perp-only equity < principal while hedged",
+    (await strat2.coreEquity6()) === 20_000_000n && (await strat2.corePrincipal6()) === 25_000_000n);
+  report("A3: contract advertises the all-legs split (keeper feature marker)",
+    (await strat2.coreProfitUsesAllLegs()) === true);
+  report("A3: all-legs equity (20 + 5 + 10) > principal (25)",
+    (await strat2.coreAllLegsEquity6()) === 35_000_000n);
+  const prinBefore = await strat2.corePrincipal6();
+  await (await k2.bridgeBackToEvm(3_000_000n)).wait(); // $3 ≤ profitAvail $10
+  report("A3: hedged outflow realizes as PROFIT, principal UNTOUCHED",
+    (await strat2.profitRealized()) === U(3) && (await strat2.corePrincipal6()) === prinBefore);
 
   console.log(`\n══════ ${pass} passed, ${fail} failed ══════`);
   process.exit(fail ? 1 : 0);

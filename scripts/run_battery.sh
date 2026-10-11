@@ -38,7 +38,9 @@ LOG_DIR="${BATTERY_LOGS:-$ROOT/.battery_logs}"
 mkdir -p "$LOG_DIR"
 
 KEEP=0; WITH_DEPLOY="${BATTERY_WITH_DEPLOY:-0}"
-SUITES="${BATTERY_SUITES:-integration_tests.js dn_strategy_tests.js dn_adapter_tests.js pyd_demand_tests.js dn_keeper_dryrun_test.js dn_keeper_unwind_test.js vault_caps_test.js test_all.js dn_realread_replay.js ecosystem_journey_test.js ecosystem_audit.js chainid_guard_test.js}"
+# (public export) book_policy_test.js / vault_status_books_test.js are internal-dep
+# suites (the book registry is not published) — they run in the dev battery only.
+SUITES="${BATTERY_SUITES:-integration_tests.js dn_strategy_tests.js dn_adapter_tests.js pyd_demand_tests.js dn_keeper_dryrun_test.js dn_keeper_unwind_test.js dn_keeper_hedgedprofit_test.js vault_caps_test.js test_all.js dn_realread_replay.js ecosystem_journey_test.js ecosystem_audit.js chainid_guard_test.js dn_keeper_roster_test.js dn_keeper_hedge_sizing_test.js dn_keeper_rebalance_min_test.js dn_keeper_fresh_open_test.js}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1 ;;

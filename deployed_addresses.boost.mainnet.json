@@ -1,0 +1,74 @@
+{
+ "chain": {
+  "id": 999,
+  "name": "hyperevm-mainnet",
+  "rpc": "https://rpc.hyperliquid.xyz/evm"
+ },
+ "chain_id": 999,
+ "book": "boost",
+ "book_index": 2,
+ "deployed_utc": "2026-10-09T20:12:43.394Z",
+ "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+ "vault_asset": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+ "fee_distributor": "0x535Fe981A9a3D536ECA02bdaA5a63679F900323b",
+ "pro_yield_vault": "0xdeD29C2EcC1bc26D6cE0844498Dd608e1C725d3e",
+ "txs": {
+  "fee_distributor": "0x9dd0129e1fbd5b7bd76c2b9db1ec6c4715507d68747680b8495baa09f33dd288",
+  "pro_yield_vault": "0xf612f5f9c41a41723ef2560fc78778bb7b8e982dea2adf826daef66e1f6bbde6",
+  "set_caps": "0x72545342f9321dee10d313f9d4a5c89b3ef5ec982663ce1959c031904c7c1707",
+  "transfer_vault_ownership": "0x10b1b9b629294d2d9927e8aefd9d9e257c1119e49d99687df42c37131f026665",
+  "transfer_fd_ownership": "0x11b662e7617970102010a35d562162782fa02529a9c2e985d1822ab017b96599"
+ },
+ "caps": {
+  "tvl_cap_usdc": "10000.0",
+  "per_user_cap_usdc": "1000.0"
+ },
+ "fees": {
+  "performance_fee_bps": 1000,
+  "withdrawal_fee_bps": 0
+ },
+ "stage": "S2-team",
+ "policy_seed": {
+  "source": "yield_scout/tier_model.py",
+  "tier_key": "boost",
+  "weights": {
+   "lending": 0.05,
+   "funding": 0.85,
+   "fixed": 0.1
+  },
+  "note": "5/85/10 — owner-approved 2026-10-02 reweight. NOT the stale 10/75/15 design-note draft."
+ },
+ "_notes": [
+  "Book #2 (Boost) deployed the HEAD-FIXED (audit-lineage fixed) ProYieldVault build — NOT book-#1-identical bytecode. Different source lineage: r1 (c652e006) + r3 CEI (609ad90b) + sUSD3 F-1..F-5 remediation (e9c899a8); interface adds onStrategyReturn(uint256)=0x22a18b2e + uncreditedArrivals()=0x5f36bab8 and drops MAX_PERFORMANCE_FEE()=0xbdca9165 + MAX_WITHDRAWAL_FEE()=0xeb6ed330.",
+  "Build provenance: source commit 91062aa8 (vault/FD unchanged since e9c899a8), solc 0.8.28+commit.7893614a, optimizer runs=200, no viaIR, evmVersion paris. Pinned runtime sha256 — ProYieldVault 6c3cd195f6f2f80bd59682cf2201f43454b51fda6a530b874de9f69c89302d1e (11,256 B), FeeDistributor e7cceb785de5ecf2571d4cc98b1cca9f3533411839226c9b0654c25b75b004b5 (2,106 B) — per deploy-artifacts/head-fixed/. Live read-back 2026-10-10 (chain 999): vault 11,256 B, FD 2,106 B, byte-identical to the pinned build modulo constructor immutables (USDC / own FD).",
+  "Minimal set — vault + FeeDistributor only; strategies/satellites absent (added later via the vault's own owner flow).",
+  "Ownership transferred to the treasury Safe at deploy time (2-of-3), never left on the deployer EOA.",
+  "Caps = guarded-beta $10,000 TVL / $1,000 per user, inherited from book #1; raises ride the audit ladder only.",
+  "Never overwrites deployed_addresses.mainnet.json — book #1 manifest is untouched."
+ ],
+ "dn_boost_strategy": "0x3b8f8A96929E3206676FB785E38694ff08cA0d63",
+ "dn_boost_strategy_meta": {
+  "deployed_utc": "2026-10-09T20:49:15.382Z",
+  "perp_asset": 159,
+  "spot_pair": 107,
+  "spot_asset": 10107,
+  "max_action_usd6": "10000000000",
+  "vault": "0xdeD29C2EcC1bc26D6cE0844498Dd608e1C725d3e",
+  "keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB"
+ },
+ "morpho_boost_strategy": "0x80a6796B9478877FF245A8Fd265447090eDcc816",
+ "morpho_boost_strategy_market": {
+  "core": "0x68e37dE8d93d3496ae143F2E900490f6280C57cD",
+  "market_id": "0xd7d38220652d19c87099c3b23de9a70a1893620a050c635d1a94bd947c9c59a8",
+  "loan": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+  "collateral": "0x5555555555555555555555555555555555555555",
+  "oracle": "0x194FFF37872BAC3531a41fA5C426090ff84f4f31",
+  "irm": "0xD4a426F010986dCad727e8dd6eed44cA4A9b7483",
+  "lltv": "0.77",
+  "note": "flagship USDC market (WHYPE collateral) — deepest + most liquid on HyperEVM"
+ },
+ "morpho_boost_strategy_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+ "morpho_boost_strategy_keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D"
+}

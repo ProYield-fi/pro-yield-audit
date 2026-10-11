@@ -128,15 +128,43 @@ contract MockSpotBalance {
     uint64 public total;
     uint64 public hold;
     uint64 public entryNtl;
+    // Token-aware overrides (2026-10-10, DN all-legs equity): the DN contract
+    // reads BOTH the hedge token (spotTokenIndex) AND USDC (token 0) through
+    // 0x801, so the two legs must be configurable independently. `set()` keeps
+    // the legacy token-agnostic DEFAULT (every existing suite relies on it);
+    // `setToken()` overrides one token.
+    //
+    // GENERATION STAMP (t_c8427d27): mock storage persists across suites on the
+    // shared anvil, so a suite that set token 197 and never cleared it poisoned
+    // every later suite reading that token (a stale hedge value). `set()` is the
+    // token-agnostic RESET every suite already calls, so it now invalidates all
+    // earlier overrides instead of leaving them live.
+    uint64 public generation;
+    mapping(uint64 => uint64) public tokenTotal;
+    mapping(uint64 => uint64) public tokenGeneration;
+    mapping(uint64 => bool) public tokenSet;
 
     function set(uint64 t, uint64 h, uint64 e) external {
         total = t;
         hold = h;
         entryNtl = e;
+        generation += 1;
+    }
+
+    function setToken(uint64 token, uint64 t, uint64 h, uint64 e) external {
+        tokenTotal[token] = t;
+        tokenGeneration[token] = generation;
+        hold = h;
+        entryNtl = e;
+        tokenSet[token] = true;
     }
 
     fallback(bytes calldata _data) external returns (bytes memory) {
         require(_data.length == 64, "bad calldata shape (spotBalance: address,uint64)");
+        (, uint64 token) = abi.decode(_data, (address, uint64));
+        if (tokenSet[token] && tokenGeneration[token] == generation) {
+            return abi.encode(tokenTotal[token], hold, entryNtl);
+        }
         return abi.encode(total, hold, entryNtl);
     }
 }

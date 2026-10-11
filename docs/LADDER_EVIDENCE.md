@@ -1,43 +1,52 @@
-# Ladder evidence — S3a live pause-path drill (2026-10-04)
+# S3b Attestation Ladder — Criteria & Per-Day Manifest
 
-The S3a gate required the pause path to be drilled for real on mainnet
-(suite-tested only until now). DRILLED 2026-10-04 ~04:31–04:32 UTC, watched,
-reversible, zero money movement.
+**Status:** 17/30 clean days on the LIVE vault → 30th clean day ≈ **Oct 24, 2026** (not Oct 23).
 
-## Chain evidence (mainnet 999, vault `0x8954…D1C1`)
+## The rule (settled 2026-10-05, after the ladder audit)
 
-| Step | Tx / check | Result |
-|---|---|---|
-| Owner Safe pauses deposits | `setDepositsPaused(true)` tx `0xfb105afd391fa2c13a1290df901b81c2022f8ac3e136a1d5dc21e8ae1f03a999` | `depositsPaused=true` verified on-chain |
-| Deposit blocked | `eth_call` `deposit(1000)` from a fresh address | reverts exactly `"ProYieldVault: deposits paused"` |
-| Withdrawals stay open (product promise) | `eth_call` `withdraw(1e6 shares)` + `withdrawUpTo(~90% of idle)` from the owner wallet | both SUCCESS — no pause gate on the withdrawal path |
-| Books stable during pause | `totalAssets` / `totalShares` before vs during vs after | identical: 158,692,010 / 154,362,850 (no drift, no loss) |
-| Owner Safe restores | `setDepositsPaused(false)` tx `0xd6d13f21481c49915a3f55df8804b97c97fe63c6403dfd447235045942e5d41b` | `depositsPaused=false` verified on-chain |
-| Deposit path re-opened | `eth_call` `deposit(1000)` post-restore | reverts on ERC20 allowance (not pause) — gate fully lifted |
+A day counts toward the S3b cap raise **iff all of the following hold:**
 
-Notes: the larger simulated withdraw (77 shares) reverted for a LIQUIDITY
-reason (idle USDC ~$15.87 vs PT sleeves not yet matured), not a pause gate —
-documented as the known async-recall shape, not a drill failure. Drill runner:
-`hypervault/scripts/pause_drill.sh` (read-only preflight by default,
-interactive DRILL confirm, chainid 999 gate, evidence marker →
-`.proyield/pause_drill.state.done.*`). Full log:
-`~/.hermes/logs/pause_drill.log`.
+1. **Right vault:** the attestation names the currently-deployed mainnet vault
+   `0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1`. Attestations of superseded vault
+   generations do NOT count (09-24 attests the r0 vault `0xadaE15e2…`, superseded
+   2026-09-25 17:43 UTC — it is published for history, not counted).
+2. **Complete:** every read resolved — no `unavailable` entries, no null headline.
+3. **Unedited after publication:** the day's slot is written once by the daily cron
+   (from 2026-10-06, same-day reruns are versioned `-rN` instead of overwriting).
+4. **Cap raise trigger:** 30 consecutive clean days (per this rule) → TVL cap
+   $10,000 → $50,000 and per-user cap $1,000 → $5,000 (S3b), followed by the
+   S4/T1 external audit engagement.
 
-## Ladder position after this drill
+## Per-day manifest (generated 2026-10-05; sha256 truncated to 16 hex)
 
-- **S3a evidence COMPLETE**: insurance first-loss live ✓ + live pause-path
-  drill ✓ (this record). Cap raise to S3a levels ($1K/user, $10K TVL) is a
-  one-Safe-tx `setCaps` decision for the owner.
-- S3b clock: daily attestations, 10/30 on 2026-10-04 → 30 by ~Oct 23.
-- S4/T1 audit gate after S3a/S3b headroom.
-## S3a caps raised (2026-10-04, tx `0x60c6ab4d…cfa66`)
+| date | vault | sha256-16 | status | total_assets ($) |
+|---|---|---|---|---|
+| 2026-09-24 | 0xadaE15e23b | 5ed92d60e5b661ef | **SUPERSEDED — not counted** | 0 |
+| 2026-09-25 | 0x8954a73Bb3 | 54d0fd9a32a7be57 | clean | 0 |
+| 2026-09-26 | 0x8954a73Bb3 | f1db93a74652fea1 | clean | 26.39053 |
+| 2026-09-27 | 0x8954a73Bb3 | f332028744801e3b | clean | 26.39053 |
+| 2026-09-28 | 0x8954a73Bb3 | ff0180fe1837e147 | clean | 26.39053 |
+| 2026-09-29 | 0x8954a73Bb3 | 50926a35af2d18ab | clean | 26.39053 |
+| 2026-09-30 | 0x8954a73Bb3 | f5c9114a7502f000 | clean | 51.959014 |
+| 2026-10-01 | 0x8954a73Bb3 | f50b6397d3dce92e | clean | 53.392731 |
+| 2026-10-02 | 0x8954a73Bb3 | 9ad4492fc47d1a6d | clean | 53.395516 |
+| 2026-10-03 | 0x8954a73Bb3 | 42c7cd7a614188b9 | clean | 53.398415 |
+| 2026-10-04 | 0x8954a73Bb3 | b7663d4865c98fc6 | clean | 158.693386 |
+| 2026-10-05 | 0x8954a73Bb3 | 490447de44eb94be | clean | 176.238867 |
+| 2026-10-06 | 0x8954a73Bb3 | ca61b4392d8c76bc | clean | 176.238867 |
+| 2026-10-07 | 0x8954a73Bb3 | 0cea1d9de57c9b9a | clean | 176.251334 |
+| 2026-10-08 | 0x8954a73Bb3 | 8984533bf04ee363 | clean | 176.258375 |
+| 2026-10-09 | 0x8954a73Bb3 | 743817fac4ab10ec | clean | 176.262619 |
+| 2026-10-10 | 0x8954a73Bb3 | 4d9cb8e32dc0c210 | clean | 126.269032 |
+| 2026-10-11 | 0x8954a73Bb3 | dc2c5539f90277b5 | clean | 126.274108 |
 
-With the drill evidence above complete, the owner Safe executed
-`setCaps(10_000e6, 1_000e6)` — TVL cap **$10,000**, per-user cap **$1,000**
-(S3a levels). Safe tx `0x60c6ab4d6336ff76d84b9a4d916573627089440d12ff8fe93f6
-c69fbfe0cfa66`, safeTxHash `0x855fe27196c697c457ae1915e33c7fbd7542ea2f7e48b9
-784aa2a8168c9bc675`, block 47612583. Verified on-chain: `tvlCap=10_000e6`,
-`perUserCap=1_000e6`, `depositsPaused=false`, `totalAssets` unchanged.
-Behavioral proof: a simulated $500 deposit from a fresh wallet now passes the
-cap gate (reverts only on ERC20 allowance — the wallet-side prerequisite);
-under the previous $500 caps the identical call reverted "TVL cap reached".
+**Clean days on the live vault: 17 (09-25 … 10-11). Next possible completion: 2026-10-24.**
+
+## Audit trail
+
+This doc exists because of the 2026-10-05 ladder audit (proyield-security seat):
+the "12/30 → Oct 23" headline silently counted the 09-24 attestation of the
+superseded r0 vault. Verified independently: the 09-24 file's `product.vault` is
+`0xadaE15e2…` and its TVL is $0. Remaining generator fixes (cap fields in each
+attestation, clean/degraded flag, block-hash pinning, same-day versioning) are
+tracked on the kanban board (ops lane).

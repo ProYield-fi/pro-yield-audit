@@ -80,3 +80,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Run forge suite (invariants, targeted, regressions)
         run: forge test
+      # Pure-maths min-out pins (stdlib assert, no framework). These carry the
+      # PT decimal fix and the sUSD3 live-derived-bounds fix; a regression here
+      # silently disarms slippage protection, so they gate the build too.
+      - name: Pure-maths regression pins (node)
+        run: node test/pt_math.test.js && node test/susd3_bounds.test.js

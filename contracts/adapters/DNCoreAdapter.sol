@@ -22,7 +22,7 @@ contract DNCoreAdapter is Ownable, ReentrancyGuard, DNCoreBase {
     error Adapter__ZeroAmount();
 
     event BridgeToCore(uint256 evmAmount);
-    event BridgeToEvm(uint64 weiAmount);
+    event BridgeToEvm(uint64 amount6);
     event KeeperSet(address indexed keeper);
 
     constructor(address owner_, address keeper_, address usdc_, uint32 perpAsset_, uint256 maxActionUsd6_)
@@ -57,11 +57,12 @@ contract DNCoreAdapter is Ownable, ReentrancyGuard, DNCoreBase {
     }
 
     /// @notice Step 4 (unwind) — return USDC Core→EVM via sendAsset to the system
-    /// address. NOTE: the contract must hold some HYPE on Core to pay transfer gas,
-    /// otherwise the action is dropped (silently).
-    function bridgeBackToEvm(uint64 weiAmount) external onlyKeeper notPaused coreAccountRequired nonReentrant {
-        if (weiAmount == 0) revert Adapter__ZeroAmount();
-        emit BridgeToEvm(weiAmount);
-        _sendUsdcToEvm(weiAmount);
+    /// address. `amount6` is USDC 6dp (EVM units); `_sendUsdcToEvm` scales it to
+    /// Core wei (1e8/USDC) on the wire. NOTE: the contract must hold some HYPE on
+    /// Core to pay transfer gas, otherwise the action is dropped (silently).
+    function bridgeBackToEvm(uint64 amount6) external onlyKeeper notPaused coreAccountRequired nonReentrant {
+        if (amount6 == 0) revert Adapter__ZeroAmount();
+        emit BridgeToEvm(amount6);
+        _sendUsdcToEvm(amount6);
     }
 }

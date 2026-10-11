@@ -1,0 +1,10 @@
+# Echidna config — KinkWrapper fuzz campaign (free review tier)
+testLimit: 3000
+timeout: 30
+workers: 1
+sender:
+  - "0x10000"
+  - "0x20000"
+  - "0x30000"
+deployer: "0x30000"
+corpusDir: "echidna_corpus_kink"

@@ -14,6 +14,14 @@ import {DNCoreBase} from "./adapters/DNCoreBase.sol";
 /// back through the read precompiles. Execution lives ONCE in DNCoreBase;
 /// this contract adds the honest-accounting + vault wiring.
 ///
+/// ⚠️ PENDING RE-AUDIT + OWNER GO — DO NOT DEPLOY (security review t_3a89fe76).
+/// The A3 fix below changes `bridgeBackToEvm` on a LIVE, in-scope contract. It
+/// is prepared here for the DN lane (card t_8c66d27f): forge regression added,
+/// security re-review requested. No deploy until the diff is re-audited AND the
+/// owner writes GO on the task thread. The keeper's all-legs profit basis stays
+/// INERT (`DN_ALL_LEGS_PROFIT` unset + this getter absent on the deployed build)
+/// until the coordinated change lands.
+///
 /// HONEST ACCOUNTING (repo discipline — see SkyStrategy/MorphoStrategy audits):
 /// - `corePrincipal6`  = net USDC we sent to Core (never counted as yield).
 /// - `coreEquity6`     = Core account value, refreshed by syncCore() reads.
@@ -52,6 +60,7 @@ contract DNCoreStrategy is BaseStrategy, DNCoreBase {
     error DNCore__SubDust();
     error DNCore__ExceedsBalance();
     error DNCore__ExceedsEquity();
+    error DNCore__ExceedsSpot();
     error DNCore__BufferTooHigh();
     error DNCore__Inactive();
     error DNCore__NotAuthorized();
@@ -101,25 +110,56 @@ contract DNCoreStrategy is BaseStrategy, DNCoreBase {
 
     /// @notice Return USDC Core->EVM (sendAsset to the USDC system address).
     /// Requires HYPE on Core for transfer gas. Splits the amount at the
-    /// FRESHLY-SYNCED equity: while equity > principal, an outflow draws from
-    /// the PROFIT portion FIRST (principal stays invested, keeping the hedge
-    /// margin sized), so a profit-sized skim realizes profit instead of
-    /// silently consuming principal basis (round-2 HIGH-1).
-    ///   profitAvail = max(0, equity - principal)
+    /// FRESHLY-SYNCED **all-legs** equity: while equity > principal, an outflow
+    /// draws from the PROFIT portion FIRST (principal stays invested, keeping
+    /// the hedge margin sized), so a profit-sized skim realizes profit instead
+    /// of silently consuming principal basis (round-2 HIGH-1).
+    ///   profitAvail = max(0, allLegsEquity - principal)
     ///   profitRed   = min(amount, profitAvail);  principalRed = amount - profitRed
     /// Full-amount drains are unchanged (profitAvail is realized, the rest is
-    /// principal); in a loss (equity < principal) every unit is principal.
+    /// principal); in a loss (allLegsEquity < principal) every unit is principal.
+    ///
+    /// A3 FIX 1 (security re-review t_42954aa0, FINDING 1). The SPLIT stays on
+    /// the honest ALL-LEGS equity (perp account value + Core spot USDC cash +
+    /// spot hedge at the live mark): while a hedge is held most of the bridged
+    /// capital sits in the spot leg, so perp-only `coreEquity6` sits far below
+    /// `corePrincipal6` and a perp-only split booked every outflow as PRINCIPAL
+    /// (shaving the ledger; AUDIT_SCOPE inv1). The BOUND, however, must be the
+    /// SOURCE OF FUNDS: `_sendUsdcToEvm` draws the Core SPOT USDC balance, so
+    /// `amount6` is bounded by `coreSpotUsdc6()` — the all-legs equity includes
+    /// perp margin + the hedge, which cannot be sent as USDC. This mirrors the
+    /// shipped sibling `HLEarnStrategy.bridgeBackToEvm`.
+    ///   profitAvail = max(0, allLegsEquity - principal)
+    ///   profitRed   = min(amount, profitAvail);  principalRed = amount - profitRed
     function bridgeBackToEvm(uint64 amount6) external onlyKeeper notPaused coreAccountRequired nonReentrant {
         if (amount6 == 0) revert DNCore__ZeroAmount();
         _syncCore();
-        if (int256(uint256(amount6)) > coreEquity6) revert DNCore__ExceedsEquity();
-        uint64 profitAvail = coreEquity6 > int256(corePrincipal6)
-            ? uint64(uint256(coreEquity6 - int256(corePrincipal6)))
+        // A3 FIX 1: bound the outflow on the balance it is actually sourced from
+        // (Core spot USDC), not the all-legs equity. Pre-fix an unsourceable
+        // amount was admitted, the sendAsset dropped SILENTLY by HyperCore, and
+        // the contract still mutated principal/profitRealized — booking real
+        // principal as yield.
+        uint64 spot6 = coreSpotUsdc6();
+        if (amount6 > spot6) revert DNCore__ExceedsSpot();
+        // Split STAYS on the all-legs basis (correct). The trailing check keeps
+        // `amount <= all-legs` so `principalRed` can never exceed `corePrincipal6`
+        // (amount > all-legs would underflow the ledger decrement below).
+        int256 allLegs6 = coreAllLegsEquity6();
+        if (int256(uint256(amount6)) > allLegs6) revert DNCore__ExceedsEquity();
+        uint64 profitAvail = allLegs6 > int256(corePrincipal6)
+            ? uint64(uint256(allLegs6 - int256(corePrincipal6)))
             : 0;
         uint64 profitRed = amount6 < profitAvail ? amount6 : profitAvail;
         uint64 principalRed = amount6 - profitRed;
         corePrincipal6 -= principalRed;
-        coreEquity6 -= int256(uint256(amount6));
+        // A3 FIX 2 (FINDING 2): do NOT debit the perp leg (`coreEquity6`) for a
+        // spot-sourced outflow — `coreEquity6` is the PERP account value, which
+        // this action does not change. totalAssets() now counts Core spot USDC
+        // cash live, so the Core->EVM move is naturally NAV-neutral (spot down,
+        // idle EVM up). The removed `coreEquity6 -= amount6` was a fudge that
+        // (a) double-decremented on the keeper's staged moveUsdcToSpot ->
+        // bridge path (inv3 break), and (b) could drive `coreEquity6` negative,
+        // inflating totalAssets via its `> 0` clamp.
         if (profitRed > 0) {
             profitRealized += uint256(profitRed) * coreScale;
         }
@@ -150,19 +190,58 @@ contract DNCoreStrategy is BaseStrategy, DNCoreBase {
     }
 
     /// @notice Strategy assets in underlying units: synced Core equity (perp
-    /// margin side) + the SPOT HEDGE at the live spot mark (HIGH-2 — the long
-    /// leg is a real asset and must count) + idle EVM balance. Every spot read
-    /// is failure-safe (spotValue6() → 0), so withdraw math can never revert
-    /// on a precompile hiccup.
+    /// margin side) + Core spot USDC CASH (A3 FIX 2) + the SPOT HEDGE at the
+    /// live spot mark (HIGH-2 — the long leg is a real asset and must count) +
+    /// idle EVM balance. Counting spot cash keeps a Core->EVM bridge NAV-neutral
+    /// (spot down, idle EVM up) and matches the all-legs split basis. The hedge
+    /// is counted ONCE here (spotValue6) and spot cash is a distinct leg — no
+    /// double-count. Every spot read is failure-safe (spotValue6()/coreSpotUsdc6()
+    /// → 0), so withdraw math can never revert on a precompile hiccup.
+    ///
+    /// RESIDUAL FIX (security re-review t_281b833e): the three Core legs are
+    /// summed as SIGNED 6dp and the NON-NEGATIVITY clamp is applied to the TOTAL,
+    /// not to the perp term alone. A genuine unrealized perp LOSS (`coreEquity6`
+    /// < 0) must reduce NAV. The old per-term clamp (`coreEquity6 > 0 ? … : 0`)
+    /// dropped the loss while still adding the offsetting spot-hedge GAIN, so a
+    /// delta-neutral book whose hedge rallied while its short ran at a loss
+    /// reported NAV OVERSTATED by |perp equity|. Sum-then-clamp matches the
+    /// all-legs basis `coreAllLegsEquity6()` used by the split, and is identical
+    /// to the old result whenever `coreEquity6 >= 0` (the normal case).
     function totalAssets() public view override(BaseStrategy) returns (uint256) {
-        uint256 eqU = coreEquity6 > 0 ? uint256(coreEquity6) * coreScale : 0;
-        uint256 spotU = uint256(spotValue6()) * coreScale;
-        return eqU + spotU + underlying.balanceOf(address(this));
+        int256 legs6 = coreEquity6
+            + int256(uint256(coreSpotUsdc6()))
+            + int256(uint256(spotValue6()));
+        uint256 legsU = legs6 > 0 ? uint256(legs6) * coreScale : 0;
+        return legsU + underlying.balanceOf(address(this));
     }
 
     /// @notice Realized profit still waiting to be swept (underlying units).
     function harvestableProfit() external view returns (uint256) {
         return profitRealized > profitSwept ? profitRealized - profitSwept : 0;
+    }
+
+    /*//////////////////////// All-legs Core equity (A3 fix) ////////////////////////*/
+    /// @notice Honest ALL-LEGS Core equity (6dp): perp account value + Core spot
+    /// USDC cash + the spot hedge at the live mark. This is the SAME basis the
+    /// keeper's profit/loss path uses (dn_keeper.js `equityAllLegs6`). While a
+    /// hedge is held, the perp-only `coreEquity6` sits far below
+    /// `corePrincipal6` (most of the bridged capital becomes the spot hedge),
+    /// so a perp-only split books every outflow as principal and never realizes
+    /// funding profit (security review t_3a89fe76, A3). The hedge is counted
+    /// ONCE here and once, under its own term, in totalAssets(); neither basis
+    /// double-counts it. Live-read each call.
+    function coreAllLegsEquity6() public view returns (int256) {
+        return coreEquity6 + int256(uint256(coreSpotUsdc6())) + int256(uint256(spotValue6()));
+    }
+
+    /// @notice Keeper feature marker. Returns true iff this build's
+    /// `bridgeBackToEvm` splits on the ALL-LEGS basis, i.e. the keeper may
+    /// realize hedged funding profit against it. The pre-fix deployed build has
+    /// no such getter, so an all-legs keeper MUST stay inert until this build is
+    /// live — firing a hedged BRIDGE_PROFIT against a perp-only contract books
+    /// the amount as principal and shaves the principal ledger.
+    function coreProfitUsesAllLegs() external pure returns (bool) {
+        return true;
     }
 
     /*//////////////////////// Reconciliation (admin) ////////////////////////*/

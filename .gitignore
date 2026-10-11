@@ -16,3 +16,15 @@ coverage/
 coverage.json
 mutation_campaign*/
 
+out/
+lcov.info
+
+# build debug mappings — hardhat rewrites these on every compile, dirtying the
+# tree and blocking `git pull --rebase` in the daily cron (attestation audit F7).
+# Generated output, never source.
+artifacts/**/*.dbg.json
+
+# degraded attestation evidence (audit F4) — quarantined, never published or
+# counted toward the S3b ladder.
+attestations/degraded/
+echidna_corpus_kink/

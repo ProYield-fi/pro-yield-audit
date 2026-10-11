@@ -1,0 +1,35 @@
+{
+ "pt_sleeve_eth_executor": "0xadaE15e23b0007de2A85b1F3874332762Bc23bb0",
+ "pt_sleeve_eth_executor_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+ "pt_sleeve_eth_executor_ops": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "pt_sleeve_eth_strategy_return": "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25",
+ "pt_sleeve_eth_executor_market": "0xaf0349FB9B1bA07D34381870c59b560b31412660",
+ "pt_sleeve_eth_executor_pt": "0xAF687B5EcB525Ccea96115088999B4eD80C388b6",
+ "pt_sleeve_eth_note": "PT fixed-rate sleeve ETH-lane executor — Ethereum mainnet. Ops can only buy/sell PT + CCTP-burn back to the HyperEVM strategy.",
+ "pt_sleeve_eth_executor_dormant_2026-10-05": {"address": "0xC0e4a357B21b1D65586Af208cf479BbD235d1809", "strategy_return": "0x9238320Cc802863c7c1d78D1aaA6cbe0F7975092", "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB", "ops": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D", "market": "0xaf0349FB9B1bA07D34381870c59b560b31412660", "pt": "0xAF687B5EcB525Ccea96115088999B4eD80C388b6", "status": "DORMANT pair with PTSleeveStrategy 0x9238320C… (HyperEVM; NOT registered, totalAssets 0). Old registered ETH lane 0xA96D0BB2 / 0xadaE15e2 keeps serving until it unwinds (~2026-11-05).", "deployed_utc": "2026-10-05"},
+ "susd3_executor": {
+  "address": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+  "tx": "0x4603887e154a94a95f251e861fcebe8a9b1b836c0fbad16f21255a9372f8a1cc",
+  "block": 26127765,
+  "usdc": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  "usd3": "0x056B269Eb1f75477a8666ae8C7fE01b64dD55eCc",
+  "susd3": "0xf689555121e529ff0463e191f9bd9d1e496164a7",
+  "ops": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+  "strategy_return": "0x7dc1874FFfCb0481b68501eb2f28c17d18C616DB",
+  "return_confirmed": false,
+  "deployed_utc": "2026-10-05T17:49:23Z",
+  "status": "DORMANT pair with SUSD3Strategy 0x7dc1874F…616DB (HyperEVM; venueCleared=false, NOT registered). strategyReturn bound at construction (SUSD3_STRATEGY_ADDR); returnConfirmed stays false and is NOT required for bridgeBack (bridgeBack reads strategyReturn only). Inert until funded. Supersedes the 2026-10-04 executor 0x3ccc2126…, which is permanently locked to the OLD strategy 0x9978e874… (bridgeBackCount=1)."
+ },
+ "susd3_executor_legacy_2026-10-04": {
+  "address": "0x3ccc212636daa90d531615899db4e286663349de",
+  "tx": "0xd5ee8073c038cb1364e7d8f982be0fed16423dae3e1e9a5f2a722d98571014d1",
+  "block": 26117199,
+  "strategy_return": "0x9978e8745cdb0d3e5B970aC36C38575eC70D612A",
+  "return_confirmed": false,
+  "ops": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+  "status": "SUPERSEDED — permanently locked to the old strategy 0x9978e874… (bridgeBackCount=1 → confirmStrategyReturn reverts SUSD3E__TooLate). Holds 0 USDC; still owned by the treasury Safe. Kept for the historical record only."
+ },
+ "last_deploy_utc": "2026-10-05T17:49:23Z"
+}

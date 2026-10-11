@@ -13,7 +13,9 @@
 //      ~33% of notional, effective ≈3× max) — deliberately NOT 1:1; the head-
 //      room covers fees/spread. (Round-2: the old "1:1 notional vs margin"
 //      comment contradicted the 3300bps policy — aligned.)
-//   4. Decide: BRIDGE_FIRST → OPEN → REBALANCE → BRIDGE_PROFIT → HOLD.
+//   4. Decide: OPEN → REBALANCE → BRIDGE_PROFIT → HOLD. A fresh strategy
+//      (its Core account not yet created) also reaches OPEN — that path
+//      bridges USDC to Core first (initializing the account) before any act.
 //   5. Execute staged calls (bridge must land in an EARLIER block than actions).
 //   6. VERIFY every CoreWriter action after the on-chain delay (they drop
 //      silently otherwise) and alert on mismatch.
@@ -40,15 +42,38 @@ const CONFIG = {
   fundingAprThreshold: parseFloat(process.env.DN_OPEN_APR || "5.0"), // annualized % below which opening a hedge is not justified (env override for E2E runs)
   unwindAprThreshold: parseFloat(process.env.DN_UNWIND_APR || "-2.0"), // short PAYS when funding > 0; below this → close
   rebalanceBandPct: 5,      // |positionDrift| > band → rebalance
-  slippageBps: 20n,         // IOC limit vs oracle (0.20%)
+  // Slippage buffer for perp limits, in bps of the oracle px.
+    // ENV-OVERRIDABLE (added 2026-10-01). Hardcoding this at 20bps left the DN
+    // sleeve UNCLOSEABLE when its notional drifted under the contract's $10
+    // minimum: _order() computes notional6 from limitPx, so a $9.82 position
+    // only clears MIN_ORDER_USD6 if the limit is pushed ABOVE the market — and
+    // at 20bps the limit sat at $89.34 => notional $9.83 => revert
+    // DNCore__BelowMinNotional, forever. Raising the limit is safe for an IOC
+    // (it caps the fill, it does not set it), so the escape is a wider buffer.
+    slippageBps: BigInt(process.env.DN_SLIPPAGE_BPS || "20"),
   tifIoc: 3,
   // ── Sizing policy ──
   scoutSnapshot: process.env.SCOUT_SNAPSHOT || "/home/user/yield_scout/data/snapshot.json",
   deployPct: parseFloat(process.env.DN_DEPLOY_PCT || "0.90"), // fraction of sleeve bridged to Core
   marginUtilBps: BigInt(process.env.DN_MARGIN_UTIL_BPS || "3300"), // perp margin needed per 1e4 notional (BTC maxLev 40 → 1/40 = 250bps; pad to 3300 for fees/spread). Env override for small-size demo runs (e.g. 1700).
   maxSleeveUsd: parseFloat(process.env.DN_MAX_SLEEVE_USD || "0"), // 0 = no override cap
+  maxSleevePct: parseFloat(process.env.DN_MAX_SLEEVE_PCT || "0"), // 0.15 = cap at 15% of vault TVL (launch mandate: "DN sleeve = TVL×0.15"); the scout weight (0.25 observed 2026-10-03) can exceed the mandate — this clamps it
   targetOverrideUsd: parseFloat(process.env.DN_TARGET_USD || "0"), // 0 = use vault×weight sizing; >0 pins the hedge notional (demo/E2E runs)
   dryRun: !(process.argv.includes("--execute") || process.env.DN_EXECUTE === "1"),
+  // ── Safety guards (security review t_3a89fe76) ──
+  // A3: realize hedged funding profit on the ALL-LEGS basis ONLY when this flag
+  // is set AND the deployed contract advertises coreProfitUsesAllLegs(). Default
+  // off → the live path keeps its legacy perp-only basis and BRIDGE_PROFIT stays
+  // inert while hedged (firing it against the pre-fix contract would shave the
+  // principal ledger — see the coordinated-change note on the card).
+  allLegsProfit: String(process.env.DN_ALL_LEGS_PROFIT || "0") === "1",
+  // A1: the HL spot fee is charged in the BASE asset, so an exact-size hedge
+  // order always under-fills by the fee. Size the request up by this buffer
+  // (observed ~7 bps; 15 bps default) before rounding up to a lot step.
+  spotFeeBps: BigInt(process.env.DN_SPOT_FEE_BPS || "15"),
+  // A2: equity-vs-principal loss floor, 6dp units. Default $2.00; env-overridable
+  // (DN_LOSS_FLOOR6) so a small book can tighten it without a code change.
+  lossAlertFloor6: BigInt(process.env.DN_LOSS_FLOOR6 || "2000000"),
 };
 
 /// DN roster (scripts/dn_roster.json) — verified perp+spot coin set. The keeper
@@ -70,6 +95,11 @@ async function sendAlert(title, body) {
     try { require("fs").appendFileSync(QLOG, `${new Date().toISOString()} ${line} (test run — telegram silenced)\n`); } catch { /* best effort */ }
     return;
   }
+  // ALSO start an agent session via the gateway webhook (kanban t_d307f4b3).
+  // Fire-and-forget: a down/slow gateway can never affect the Telegram alert
+  // below (the primary channel). Honours DN_SILENCE_TELEGRAM so test batteries
+  // that deliberately provoke alerts never spawn agent sessions.
+  try { require("./alert_webhook").notifyWebhookFor(title, line); } catch { /* best effort */ }
   try {
     const fs2 = require("fs");
     let tok, chat;
@@ -95,10 +125,14 @@ async function sendAlert(title, body) {
         `${new Date().toISOString()} ${line}\n`);
       return;
     }
+    // Telegram HTML mode rejects an unescaped "<" as an unsupported start tag
+    // (HTTP 400) — alert bodies carry operator math like "$5.10 < need $5.11".
+    // Escape the interpolated content so a real alert can never be silently dropped.
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const res = await fetch(`https://api.telegram.org/bot${tok}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chat, text: `<b>${title}</b>\n${body}`, parse_mode: "HTML" }),
+      body: JSON.stringify({ chat_id: chat, text: `<b>${esc(title)}</b>\n${esc(body)}`, parse_mode: "HTML" }),
     });
     if (!res.ok) throw new Error(`telegram ${res.status}`);
   } catch (e) {
@@ -107,6 +141,30 @@ async function sendAlert(title, body) {
         `${new Date().toISOString()} ${line} (send failed: ${e.message})\n`);
     } catch { /* nothing more we can do */ }
   }
+}
+
+/// Alert at most once per `windowMs` per key (marker in the DN state dir).
+/// A standing condition (e.g. an un-trimmable drift) must be visible in EVERY
+/// run's log but must not page the operator every 6h. Test runs
+/// (DN_SILENCE_TELEGRAM=1) never write the marker — a battery run must not
+/// suppress the next live alert.
+async function sendAlertThrottled(key, title, body, windowMs = 24 * 3600 * 1000) {
+  const dir = process.env.DN_STATE_DIR || path.join(__dirname, "..", "cache");
+  const mark = path.join(dir, `dn_alert_${key}.json`);
+  const silenced = process.env.DN_SILENCE_TELEGRAM === "1";
+  try {
+    const prev = JSON.parse(fs.readFileSync(mark, "utf8"));
+    if (Date.now() - Number(prev.ts) < windowMs) {
+      console.log(`[throttled] ${title} — already alerted ${((Date.now() - Number(prev.ts)) / 3600000).toFixed(1)}h ago`);
+      return;
+    }
+  } catch { /* no marker yet */ }
+  await sendAlert(title, body);
+  if (silenced) return;
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(mark, JSON.stringify({ ts: Date.now(), title }));
+  } catch { /* best effort */ }
 }
 
 async function hlInfo(body) {
@@ -242,9 +300,59 @@ function roundPxWire(wire) {
   return BigInt(Math.round(Number(human.toPrecision(5)) * 1e8));
 }
 
+/// ── Order-feasibility mirrors of DNCoreBase._order (t_c8427d27) ───────────
+/// The contract computes `notional6 = limitPx × sz / 1e10` (both wire fields
+/// are 10^8 × human) and reverts DNCore__BelowMinNotional / DNCore__Cap when
+/// that lands outside [MIN_ORDER_USD6, maxActionUsd6]. The keeper must plan
+/// with the SAME math: a $5.31 reduce against a $10 minimum is a guaranteed
+/// revert that aborts the whole cycle (chronic REBALANCE reverts — the sleeve
+/// sat ~31% over target for days emitting doomed orders every 6h).
+const ORDER_NOTIONAL_DIV = 10000000000n; // 1e10
+
+/// Corrective-order limit price, crossing the mark by the slippage buffer
+/// (BUY above / SELL below) — identical to both act paths.
+function correctionLimitPx(pxWire, slippageBps, isBuy) {
+  const b = BigInt(slippageBps);
+  return roundPxWire(isBuy ? (pxWire * (10000n + b)) / 10000n : (pxWire * (10000n - b)) / 10000n);
+}
+
+/// Size in CoreWriter wire units (10^8 × human), floored to the asset's lot
+/// step — identical to both act paths.
+function sizeToLot(notionalUsd, pxHuman, szDec) {
+  const factor = 10 ** szDec;
+  return BigInt(Math.floor((notionalUsd / pxHuman) * factor)) * 10n ** 8n / BigInt(factor);
+}
+
+/// @returns {sz, limitPx, notional6, ok, reason} — would DNCoreBase._order
+/// accept this corrective order? ok=false ⇒ the contract reverts; the keeper
+/// must not send it (and must say why, in dollars).
+function planCorrection(notionalUsd, pxWire, szDec, slippageBps, isBuy, minOrder6, maxAction6) {
+  const limitPx = correctionLimitPx(pxWire, slippageBps, isBuy);
+  const pxHuman = Number(pxWire) / 1e8;
+  const sz = sizeToLot(notionalUsd, pxHuman, szDec);
+  if (sz === 0n) {
+    return { sz, limitPx, notional6: 0n, ok: false, reason: "rounds below one lot" };
+  }
+  const notional6 = (limitPx * sz) / ORDER_NOTIONAL_DIV;
+  if (notional6 < minOrder6) {
+    return {
+      sz, limitPx, notional6, ok: false,
+      reason: `order notional $${(Number(notional6) / 1e6).toFixed(2)} < minimum order value $${(Number(minOrder6) / 1e6).toFixed(2)} (HL minimum; the contract mirrors it as MIN_ORDER_USD6)`,
+    };
+  }
+  if (maxAction6 > 0n && notional6 > maxAction6) {
+    return {
+      sz, limitPx, notional6, ok: false,
+      reason: `order notional $${(Number(notional6) / 1e6).toFixed(2)} > per-action cap $${(Number(maxAction6) / 1e6).toFixed(2)}`,
+    };
+  }
+  return { sz, limitPx, notional6, ok: true, reason: "" };
+}
+
 function computeTargetNotionalUsd(vaultTotalAssetsUsd, dnWeight, sleeveCapitalUsd = null) {
   let sleeve = vaultTotalAssetsUsd * dnWeight;
   if (CONFIG.maxSleeveUsd > 0) sleeve = Math.min(sleeve, CONFIG.maxSleeveUsd);
+  if (CONFIG.maxSleevePct > 0) sleeve = Math.min(sleeve, vaultTotalAssetsUsd * CONFIG.maxSleevePct);
   if (CONFIG.targetOverrideUsd > 0) sleeve = CONFIG.targetOverrideUsd; // demo/E2E pin
   // CAPITAL-AWARE CAP (2026-09-29): a fully-funded delta-neutral position needs
   // hedge cash + perp margin ≈ notional × (1 + marginUtil) + fees — the weighted
@@ -281,6 +389,24 @@ async function main() {
   const strategy = await hre.ethers.getContractAt("DNCoreStrategy", CONFIG.strategy, signer);
   const asset = Number(await strategy.perpAsset());
   const szDec = Number(await strategy.perpSzDecimals());
+  // Order-policy bounds, read from the DEPLOYED contract (t_c8427d27) so the
+  // keeper mirrors live policy instead of hardcoding it: MIN_ORDER_USD6 is the
+  // $10 HL minimum order value, maxActionUsd6 the per-action cap. Every
+  // corrective order is planned against both (planCorrection) — the contract
+  // reverts below/above them and aborts the cycle.
+  let minOrder6 = 10000000n; // $10 (HL minimum order value; contract default)
+  let maxAction6 = 0n; // 0 = unknown → no upper bound applied
+  try {
+    minOrder6 = await strategy.MIN_ORDER_USD6();
+  } catch (e) {
+    console.warn(`order policy: MIN_ORDER_USD6 unreadable (${String(e.message || e).slice(0, 80)}) — assuming $10`);
+  }
+  try {
+    maxAction6 = await strategy.maxActionUsd6();
+  } catch (e) {
+    console.warn(`order policy: maxActionUsd6 unreadable (${String(e.message || e).slice(0, 80)}) — no per-action cap applied`);
+  }
+  console.log(`order policy: min order $${(Number(minOrder6) / 1e6).toFixed(2)} · per-action cap ${maxAction6 > 0n ? "$" + (Number(maxAction6) / 1e6).toFixed(2) : "unset"}`);
 
   // ── 1. State ──
   const exists = await strategy.coreAccountExists();
@@ -326,12 +452,78 @@ async function main() {
   // beta sizes burned ~$1 in the first live round-trip; sub-$2 equity-vs-
   // principal gaps are normal fee noise, not reportLoss events. Keep the
   // alert for REAL losses only.
-  if (exists && equityLive6 < principal6 && principal6 - equityLive6 > 2_000_000n) {
-    const loss6 = principal6 - equityLive6;
+  //
+  // 2026-10-01 — MUST count spot capital. equityLive6 is the CORE (perp)
+  // account value only. An unwind moves margin perp→spot, so a flat, healthy,
+  // fully-returned position reads equity $0.00 against principal $13.75 and
+  // the old check fired "loss $13.75 → OWNER ACTION: vault.reportLoss(...)".
+  // That capital was sitting in the strategy's spot account the whole time;
+  // acting on the alert would have written off ~$13 that exists. The strategy
+  // exposes no spot-USDC getter, so it is read from the HL spot API here.
+  let spotUsdc6 = 0n;
+  try {
+    const sp = await hlInfo({ type: "spotClearinghouseState", user: CONFIG.strategy });
+    const bal = (sp.balances || []).find((b) => b.coin === "USDC");
+    if (bal && bal.total) spotUsdc6 = BigInt(Math.round(Number(bal.total) * 1e6));
+  } catch (e) {
+    console.warn("spot USDC read failed (loss check will understate capital):", String(e.message || e).slice(0, 100));
+  }
+  const equityWithSpot6 = equityLive6 + spotUsdc6;
+  // 2026-10-03 — the hedge leg MUST count too. Read via the strategy's own
+  // views (spotHedgeSz × spotPx / spotPxScale — the same formula the unwind
+  // path uses): the long leg is a real asset. Ignoring it made a healthy
+  // delta-neutral sleeve alarm as "REAL loss $11.38" through the 2026-10-03
+  // HYPE pump (perp −$10.6, hedge +$10.6, net ≈ −$0.8 in fees/funding). The
+  // owner caught it: "how the fuck did we get underwater — DN was never
+  // supposed to lose". Same read-gap class as the two phantom alerts above.
+  let hedgeVal6 = 0n;
+  try {
+    const hs = await strategy.spotHedgeSz();
+    if (hs > 0n) {
+      const pxRaw = await strategy.spotPx();
+      const pxScaleS = await strategy.spotPxScale();
+      if (Number(pxRaw) > 0 && Number(pxScaleS) > 0) {
+        hedgeVal6 = BigInt(Math.floor((Number(hs) * Number(pxRaw)) / Number(pxScaleS)));
+      }
+    }
+  } catch (e) {
+    console.warn("spot hedge read failed (loss check will understate capital):", String(e.message || e).slice(0, 100));
+  }
+  const equityAllLegs6 = equityWithSpot6 + hedgeVal6;
+  console.log(
+    `equity: Core $${(Number(equityLive6) / 1e6).toFixed(2)} + spot $${(Number(spotUsdc6) / 1e6).toFixed(2)} + hedge $${(Number(hedgeVal6) / 1e6).toFixed(2)} = $${(Number(equityAllLegs6) / 1e6).toFixed(2)} (principal $${(Number(principal6) / 1e6).toFixed(2)})`
+  );
+  const lossFloor6 = CONFIG.lossAlertFloor6;
+  if (exists && equityAllLegs6 < principal6 && principal6 - equityAllLegs6 > lossFloor6) {
+    const loss6 = principal6 - equityAllLegs6;
     await sendAlert(
       "⚠️ DN equity below principal",
-      `Core equity $${(Number(equityLive6) / 1e6).toFixed(2)} < principal $${(Number(principal6) / 1e6).toFixed(2)} — loss $${(Number(loss6) / 1e6).toFixed(2)}. OWNER ACTION: vault.reportLoss(<loss in underlying units>) so claims stop being phantom (round-2 H1).`
+      `Core $${(Number(equityLive6) / 1e6).toFixed(2)} + spot $${(Number(spotUsdc6) / 1e6).toFixed(2)} + hedge $${(Number(hedgeVal6) / 1e6).toFixed(2)} = $${(Number(equityAllLegs6) / 1e6).toFixed(2)} < principal $${(Number(principal6) / 1e6).toFixed(2)} — REAL loss $${(Number(loss6) / 1e6).toFixed(2)} (perp + spot cash + hedge). OWNER ACTION: vault.reportLoss(<loss in underlying units>).`
     );
+  }
+  // A2 (security review t_3a89fe76): the $1.00 HL Core-account activation fee is
+  // a real one-time cost, but the loss floor (calibrated for a larger book)
+  // silently swallows it on a small one. Emit a DEDICATED one-time note per
+  // strategy the FIRST cycle a sub-floor equity-vs-principal gap appears, so the
+  // cost is surfaced — WITHOUT lowering the global floor (a lowered floor would
+  // re-fire every cycle until funding earns the gap back). Owner can tighten the
+  // floor per-book with DN_LOSS_FLOOR6.
+  if (exists && equityAllLegs6 < principal6 && principal6 - equityAllLegs6 <= lossFloor6) {
+    try {
+      const markDir = process.env.DN_STATE_DIR || path.join(__dirname, "..", "cache");
+      fs.mkdirSync(markDir, { recursive: true });
+      const mark = path.join(markDir, `dn_activation_note_${String(CONFIG.strategy).toLowerCase()}`);
+      if (!fs.existsSync(mark)) {
+        const gap6 = principal6 - equityAllLegs6;
+        await sendAlert(
+          "ⓘ DN small equity-vs-principal gap (first-cycle cost?)",
+          `all-legs $${(Number(equityAllLegs6) / 1e6).toFixed(2)} < principal $${(Number(principal6) / 1e6).toFixed(2)} by $${(Number(gap6) / 1e6).toFixed(2)} — below the $${(Number(lossFloor6) / 1e6).toFixed(2)} loss floor, so not alerted as a loss. On a FRESH Core account the one-time $1.00 HL activation fee is a REAL cost the vault NAV does not yet reflect: OWNER ACTION: vault.reportLoss(${gap6}) (underlying units) to keep NAV honest. (Notified once per strategy.)`
+        );
+        fs.writeFileSync(mark, `${new Date().toISOString()}\n`);
+      }
+    } catch (e) {
+      console.warn("activation-fee note skipped:", String(e.message || e).slice(0, 100));
+    }
   }
 
   // ── 2. Funding ──
@@ -373,9 +565,25 @@ async function main() {
   const { weight: dnWeight, source } = await loadSleeveWeight();
   // Capital-aware sizing (2026-09-29): pass the sleeve's actual visible assets
   // so an under-funded sleeve sizes DOWN (or stays dormant below HL's $10 min)
-  // instead of half-opening an unhedgeable short. NOTE: Core spot CASH is not
-  // part of totalAssets() (known read gap) — the cap is deliberately conservative.
-  const targetNotionalUsd = computeTargetNotionalUsd(vaultAssetsUsd, dnWeight, strategyAssetsUsd);
+  // instead of half-opening an unhedgeable short.
+  //
+  // 2026-10-01 — Core spot CASH is now INCLUDED. It was a known read gap,
+  // deliberately left conservative, but "conservative" here meant "permanently
+  // dormant": after the unwind the sleeve held $12.99 USDC in its Core spot
+  // account while totalAssets() reported $2.91 (Core equity + spot HYPE only —
+  // spotValue6() prices the HYPE hedge, it does not count spot USDC). The cap
+  // then sized $2.30 of notional against a $10 venue minimum and the sleeve
+  // refused to open with 26% MORE capital than it needed. Sizing against the
+  // true figure ($12.99 -> $10.27 notional) clears the minimum and opens.
+  // Same root cause as the phantom reportLoss alert fixed above: a read that
+  // ignored where the money actually sits.
+  const sleeveCapitalUsd = strategyAssetsUsd + Number(spotUsdc6) / 1e6;
+  if (Number(spotUsdc6) > 0n) {
+    console.log(
+      `sizing: Core spot cash $${(Number(spotUsdc6) / 1e6).toFixed(2)} included (totalAssets() omits it) -> sleeve capital $${sleeveCapitalUsd.toFixed(2)}`
+    );
+  }
+  const targetNotionalUsd = computeTargetNotionalUsd(vaultAssetsUsd, dnWeight, sleeveCapitalUsd);
   console.log(`sizing: vault ${vaultAssetsUsd.toFixed(2)} × DN weight ${dnWeight} (${source}) = target notional ${targetNotionalUsd.toFixed(2)} USD`);
   if (targetNotionalUsd < 10) {
     console.log("sizing: target below HL $10 min order — nothing to size");
@@ -397,10 +605,46 @@ async function main() {
   console.log(`position: szi=${sziLive} (${sziHuman} ${coin}) px=${pxHuman} current notional ${currentNotionalUsd.toFixed(2)} USD (drift ${driftPct.toFixed(2)}% vs target)`);
 
   // ── 4. Decide ──
-  const coreProfit6 = equityLive6 > principal6 ? equityLive6 - principal6 : 0n;
+  // Profit basis (A3, security review t_3a89fe76). LEGACY = perp-only
+  // equityLive6 (the pre-fix basis: it reads 0 while a hedge is held, because
+  // the bridged capital sits in the spot leg → BRIDGE_PROFIT never fires).
+  // ALL-LEGS = equityAllLegs6 (perp + Core spot USDC + hedge) — the honest
+  // basis, but SAFE to realize ONLY once the CONTRACT also splits on all-legs;
+  // otherwise a correct profit amount is booked as a principal reduction and
+  // shaves the principal ledger (proven in the review). Gated on the explicit
+  // env flag AND the deployed contract's own feature marker, so a half-landed
+  // change can never fire against the pre-fix build.
+  let contractAllLegsSupported = false;
+  if (CONFIG.allLegsProfit) {
+    try {
+      if (typeof strategy.coreProfitUsesAllLegs === "function") {
+        contractAllLegsSupported = Boolean(await strategy.coreProfitUsesAllLegs());
+      }
+    } catch (_) {
+      contractAllLegsSupported = false;
+    }
+    if (!contractAllLegsSupported) {
+      await sendAlert(
+        "🟠 DN all-legs profit requested but contract does not support it",
+        "DN_ALL_LEGS_PROFIT=1 but the deployed strategy lacks coreProfitUsesAllLegs() (pre-fix build) — profit basis stays perp-only (inert). Do NOT fire BRIDGE_PROFIT until the re-audited all-legs contract is live; firing it would shave principal."
+      );
+    }
+  }
+  const profitBasisAllLegs = CONFIG.allLegsProfit && contractAllLegsSupported;
+  const coreProfit6 = profitBasisAllLegs
+    ? (equityAllLegs6 > principal6 ? equityAllLegs6 - principal6 : 0n)
+    : (equityLive6 > principal6 ? equityLive6 - principal6 : 0n);
+  console.log(`profit basis: ${profitBasisAllLegs ? "ALL-LEGS" : "perp-only (legacy/inert)"} → coreProfit6=${coreProfit6}`);
   let action = "HOLD";
-  if (!exists) action = "BRIDGE_FIRST";
-  else if (coreProfit6 > 0n && harvestable === 0n) action = "BRIDGE_PROFIT";
+  // A brand-new strategy (no Core account yet) must NOT short-circuit to a
+  // no-op "BRIDGE_FIRST". The OPEN path below bridges USDC to Core first
+  // (which initializes the account), waits ≥1 L1 block, then moves margin and
+  // opens — exactly the sequencing rule in docs/DN_COREWRITER_ADAPTER.md.
+  // (2026-10-09 fix: the old `if (!exists) action = "BRIDGE_FIRST"` pre-empted
+  // that path, and BRIDGE_FIRST returned before bridging — so a fresh strategy
+  // never created its Core account and never opened. Book #1 escaped it only
+  // because its Core account already existed.)
+  if (coreProfit6 > 0n && harvestable === 0n) action = "BRIDGE_PROFIT";
   else if (targetNotionalUsd >= 10 && sziLive === 0n && apr >= CONFIG.fundingAprThreshold) {
     action = cfgOk ? "OPEN" : "HOLD";
     if (!cfgOk) {
@@ -411,13 +655,37 @@ async function main() {
     }
   }
   else if (sziLive !== 0n && apr < CONFIG.unwindAprThreshold) action = "UNWIND";
-  else if (sziLive !== 0n && targetNotionalUsd >= 10 && Math.abs(driftPct) > CONFIG.rebalanceBandPct) action = "REBALANCE";
-  // (bare-truth guard: with a sub-$10 policy target a "rebalance" would reduce
-  // the position below HL's order minimum — that's not a trade the venue
-  // accepts, so hold instead.)
+  else if (sziLive !== 0n && targetNotionalUsd >= 10 && Math.abs(driftPct) > CONFIG.rebalanceBandPct) {
+    // (bare-truth guard: with a sub-$10 policy target a "rebalance" would reduce
+    // the position below HL's order minimum — that's not a trade the venue
+    // accepts, so hold instead.)
+    //
+    // t_c8427d27 — the band is a PERCENTAGE of the sleeve target, so on a small
+    // book ($18.94) 5% is ~$0.95: far below HL's $10 minimum order value. Every
+    // corrective order the keeper emitted was a guaranteed contract revert
+    // (DNCore__BelowMinNotional → exit 2), chronic for days. Plan the order
+    // BEFORE deciding: a correction the venue cannot express is not a
+    // REBALANCE, it is a HOLD with an explanation.
+    const overTarget = currentNotionalUsd > targetNotionalUsd;
+    const gapUsd = Math.abs(currentNotionalUsd - targetNotionalUsd);
+    const plan = planCorrection(gapUsd, pxWire, szDec, CONFIG.slippageBps, overTarget, minOrder6, maxAction6);
+    if (plan.ok) {
+      action = "REBALANCE";
+    } else {
+      action = "HOLD";
+      console.log(
+        `rebalance: drift ${driftPct.toFixed(2)}% exceeds the ${CONFIG.rebalanceBandPct}% band but the $${gapUsd.toFixed(2)} correction is NOT expressible as an order (${plan.reason}) — HOLD, no churn (both legs stay hedged)`
+      );
+      await sendAlertThrottled(
+        `rebalance_infeasible_${String(CONFIG.strategy).toLowerCase()}`,
+        "🟠 DN rebalance blocked — correction below the venue minimum",
+        `${coin}: sleeve is ${overTarget ? "OVER" : "UNDER"} target by $${gapUsd.toFixed(2)} (position $${currentNotionalUsd.toFixed(2)} vs target $${targetNotionalUsd.toFixed(2)}, drift ${driftPct.toFixed(2)}%). The corrective order would be $${(Number(plan.notional6) / 1e6).toFixed(2)} at the IOC limit — below HL's $10 minimum order value, which the contract mirrors as MIN_ORDER_USD6 (revert DNCore__BelowMinNotional). Both legs stay hedged; the keeper HOLDs rather than emit an order the venue rejects, and trims automatically once the slice reaches $10. Options: raise DN_TARGET_USD (policy), or approve a supervised close+reopen. A sub-$10 reduce-only exemption is a CONTRACT change (audit + deploy) — not available to the keeper.`
+      );
+    }
+  }
   console.log(`decision: ${action} (dryRun=${CONFIG.dryRun})`);
 
-  if (CONFIG.dryRun || action === "HOLD" || action === "BRIDGE_FIRST") {
+  if (CONFIG.dryRun || action === "HOLD") {
     console.log("no sends (dry-run or nothing to do)");
     return;
   }
@@ -464,6 +732,20 @@ async function main() {
     // verify, alert. Capital returns to spot → bridge-back handles the rest.
     const sz = (sziLive < 0n ? -sziLive : sziLive) * 10n ** BigInt(8 - szDec); // lots → 1e8 wire: buy back the exact size
     const limitPx = roundPxWire((pxWire * (10000n + CONFIG.slippageBps)) / 10000n); // BUY → cross above
+    // Pre-flight the full close against the same policy _order enforces
+    // (t_c8427d27): a close below the $10 minimum or above the per-action cap
+    // reverts. Surface that as a named, actionable alert instead of a bare
+    // "execution reverted" from the gas estimator.
+    {
+      const closeNotional6 = (limitPx * sz) / ORDER_NOTIONAL_DIV;
+      if (closeNotional6 < minOrder6 || (maxAction6 > 0n && closeNotional6 > maxAction6)) {
+        await sendAlert(
+          "🟠 DN unwind blocked by order policy",
+          `full close of ${Number(sz) / 1e8} ${coin} = $${(Number(closeNotional6) / 1e6).toFixed(2)} at the IOC limit — outside [$${(Number(minOrder6) / 1e6).toFixed(2)} min order, ${maxAction6 > 0n ? "$" + (Number(maxAction6) / 1e6).toFixed(2) : "no"} per-action cap]. NOT sending (the contract would revert). Needs an owner decision (chunking / cap change).`
+        );
+        process.exit(4);
+      }
+    }
     console.log(`unwinding short: sz=${sz} @ IOC ${limitPx} (funding ${apr.toFixed(2)}% < ${CONFIG.unwindAprThreshold}%)`);
     const tx = await strategy.closeShort(asset, limitPx, sz, CONFIG.tifIoc);
     await tx.wait();
@@ -545,10 +827,20 @@ async function main() {
     // means over-sized from price moves, i.e. BUY back the excess).
     if (action === "REBALANCE" && currentNotionalUsd > targetNotionalUsd) {
       const reduceUsd = currentNotionalUsd - targetNotionalUsd;
-      const szFloat = reduceUsd / pxHuman;
-      const factor = 10 ** szDec;
-      const sz = BigInt(Math.floor(szFloat * factor)) * 10n ** 8n / BigInt(factor);
-      const limitPx = roundPxWire((pxWire * (10000n + CONFIG.slippageBps)) / 10000n); // BUY → cross above
+      // Venue-plan the order (t_c8427d27): the same math DNCoreBase._order
+      // enforces, so a slice the contract would reject can never reach the wire
+      // (this is where the chronic "execution reverted" came from).
+      const plan = planCorrection(reduceUsd, pxWire, szDec, CONFIG.slippageBps, true, minOrder6, maxAction6);
+      if (!plan.ok) {
+        console.log(`rebalance reduce NOT expressible as an order (${plan.reason}) — HOLD, nothing sent`);
+        await sendAlertThrottled(
+          `rebalance_infeasible_${String(CONFIG.strategy).toLowerCase()}`,
+          "🟠 DN rebalance blocked — correction below the venue minimum",
+          `${coin}: a $${reduceUsd.toFixed(2)} reduce is not a legal order (${plan.reason}). HOLD; both legs stay hedged.`
+        );
+        return;
+      }
+      const { sz, limitPx } = plan;
       console.log(`reducing short by ${reduceUsd.toFixed(2)} USD: sz=${sz} @ IOC ${limitPx}`);
       const tx = await strategy.closeShort(asset, limitPx, sz, CONFIG.tifIoc);
       await tx.wait();
@@ -567,15 +859,38 @@ async function main() {
     const addNotionalUsd = action === "REBALANCE"
       ? Math.max(0, targetNotionalUsd - currentNotionalUsd)
       : targetNotionalUsd;
+    // t_c8427d27: plan the ORDER before moving any money. The old flow bridged
+    // and class-transferred margin first and only then discovered the order was
+    // below the venue's minimum order value — aborting (exit 2) with the
+    // sleeve's capital parked on the perp side and no hedge bought (observed
+    // live: a $9.83 open reverted after the margin move). A plan the contract
+    // would reject stops here, before the first transfer.
+    const plan = planCorrection(addNotionalUsd, pxWire, szDec, CONFIG.slippageBps, false, minOrder6, maxAction6);
+    if (!plan.ok) {
+      console.log(`open/add NOT expressible as an order (${plan.reason}) — no money moved, HOLD`);
+      await sendAlertThrottled(
+        `rebalance_infeasible_${String(CONFIG.strategy).toLowerCase()}`,
+        "🟠 DN open/add blocked — order below the venue minimum",
+        `${coin}: a $${addNotionalUsd.toFixed(2)} ${action === "OPEN" ? "open" : "add"} is not a legal order (${plan.reason}). Nothing bridged, nothing moved; HOLD.`
+      );
+      return;
+    }
     // Hedge cash budget (2026-09-29): the spot buy draws the strategy's Core
     // SPOT USDC; the short needs PERP margin. LEVEL the two accounts so BOTH
     // legs are provably funded before any order: bridge the shortfall (if
     // any), then set perp := margin need and leave EVERYTHING ELSE in spot
     // for the hedge buy. (The old flow bridged margin only and class-moved it
     // all to perp, leaving the hedge unfunded — observed live.)
-    const hedgeNeed6 = (await strategy.spotPairIndex()) !== 0n
+    let hedgeNeed6 = (await strategy.spotPairIndex()) !== 0n
       ? BigInt(Math.floor(targetNotionalUsd * 1.01 * 1e6))
       : 0n;
+    // 2026-10-03 — credit the hedge ALREADY on Core: a rebalance GROWS an
+    // existing delta-neutral position, so the spot HYPE held covers the first
+    // slice of the new hedge. Demanding the full hedge in fresh cash made every
+    // post-allocation rebalance look under-funded ("need $31.17 … have
+    // $2.00+$0.37+$19.48") and blocked the sleeve at exit 4 even though the
+    // money was there — the hedge was held as HYPE, not cash.
+    if (hedgeNeed6 > hedgeVal6) hedgeNeed6 = hedgeNeed6 - hedgeVal6; else hedgeNeed6 = 0n;
     const needMargin6 = BigInt(Math.floor(targetNotionalUsd * 1e6)) * CONFIG.marginUtilBps / 10000n;
     {
       const underlyingAddr = await strategy.underlying();
@@ -583,13 +898,17 @@ async function main() {
       const bal = await erc.balanceOf(CONFIG.strategy);
       const scale = await strategy.coreScale();
       const needTotal6 = needMargin6 + hedgeNeed6;
-      const shortfall6 = needTotal6 > equityLive6 ? needTotal6 - equityLive6 : 0n;
+      // Core SPOT cash funds both legs (the hedge buys from spot; the margin
+      // levels spot→perp). The 2026-10-02 block compared the need against perp
+      // equity ALONE and kept a fully-funded sleeve permanently "under-funded"
+      // (exit 4 + alert spam every 6h) — equityWithSpot6 is the honest basis.
+      const shortfall6 = needTotal6 > equityWithSpot6 ? needTotal6 - equityWithSpot6 : 0n;
       if (shortfall6 > 0n) {
         const needBridge = shortfall6 * scale;
         if (bal < needBridge) {
           await sendAlert(
             "🟠 DN won't open — sleeve under-funded for both legs",
-            `need $${(Number(needTotal6) / 1e6).toFixed(2)} on Core (margin+hedge) against $${(Number(equityLive6) / 1e6).toFixed(2)} up + $${(Number(bal) / Number(scale) / 1e6).toFixed(2)} idle — a half-funded open would leave a naked short. NOT opening; fund or resize.`
+            `need $${(Number(needTotal6) / 1e6).toFixed(2)} on Core (margin+hedge) against $${(Number(equityLive6) / 1e6).toFixed(2)} perp + $${(Number(spotUsdc6) / 1e6).toFixed(2)} spot cash + $${(Number(bal) / Number(scale) / 1e6).toFixed(2)} idle — a half-funded open would leave a naked short. NOT opening; fund or resize.`
           );
           process.exit(4);
         }
@@ -601,6 +920,16 @@ async function main() {
       }
       // Level the perp side to exactly the margin need — excess walks to spot
       // where the hedge buy can draw it; a deficit pulls back from spot.
+      //
+      // t_c8427d27 boundary: `accountValue` includes the OPEN short's unrealized
+      // PnL, which moves with the mark between the leveling transfer and this
+      // re-read — the sleeve was blocked at exit 4 five times on sub-cent
+      // residuals ("perp equity $5.11 < need $5.11"). The policy need already
+      // carries ~2x HL's actual initial-margin requirement (marginUtilBps vs the
+      // asset's max leverage), so a residual inside this tolerance cannot cause
+      // a venue rejection. Pad the pull by the tolerance so the normal case
+      // lands above `need`, and accept a residual inside it.
+      const marginTolerance6 = needMargin6 / 100n > 50000n ? needMargin6 / 100n : 50000n; // ≥ $0.05 or 1% of need
       let msum = await strategy.marginSummary();
       if (msum.accountValue > needMargin6) {
         const excess6 = msum.accountValue - needMargin6;
@@ -610,36 +939,35 @@ async function main() {
         await new Promise((r) => setTimeout(r, 8000));
         msum = await strategy.marginSummary();
       } else if (msum.accountValue < needMargin6) {
-        const pull6 = needMargin6 - msum.accountValue;
-        console.log(`class-transfer spot→perp (margin): ${pull6} (6dp)`);
+        const pull6 = needMargin6 - msum.accountValue + marginTolerance6; // pad: the re-read can undershoot on mark drift
+        console.log(`class-transfer spot→perp (margin): ${pull6} (6dp, need ${needMargin6 - msum.accountValue} + $${(Number(marginTolerance6) / 1e6).toFixed(2)} pad)`);
         const mtx = await strategy.moveUsdcToPerp(pull6);
         await mtx.wait();
         await new Promise((r) => setTimeout(r, 8000));
         msum = await strategy.marginSummary();
       }
-      if (msum.accountValue < needMargin6) {
+      if (msum.accountValue + marginTolerance6 < needMargin6) {
+        const residual6 = needMargin6 - msum.accountValue;
         await sendAlert(
           "🟠 DN margin still short after bridge + class-transfer",
-          `perp equity $${(Number(msum.accountValue) / 1e6).toFixed(2)} < need $${(Number(needMargin6) / 1e6).toFixed(2)} — fund more or resize; NOT opening (would reject).`
+          `perp equity $${(Number(msum.accountValue) / 1e6).toFixed(2)} < need $${(Number(needMargin6) / 1e6).toFixed(2)} by $${(Number(residual6) / 1e6).toFixed(2)} — beyond the $${(Number(marginTolerance6) / 1e6).toFixed(2)} mark-drift tolerance. Fund more or resize; NOT opening (would reject).`
         );
         process.exit(4);
       }
+      if (msum.accountValue < needMargin6) {
+        console.log(`perp $${(Number(msum.accountValue) / 1e6).toFixed(2)} is $${(Number(needMargin6 - msum.accountValue) / 1e6).toFixed(2)} under need $${(Number(needMargin6) / 1e6).toFixed(2)} — within the $${(Number(marginTolerance6) / 1e6).toFixed(2)} tolerance (mark-to-market drift on the open leg); proceeding`);
+      }
       console.log(`perp leveled to $${(Number(msum.accountValue) / 1e6).toFixed(2)} (need $${(Number(needMargin6) / 1e6).toFixed(2)}); hedge cash stays in spot`);
     }
-    const szFloat = addNotionalUsd / pxHuman;
-    const factor = 10 ** szDec;
-    const sz = BigInt(Math.floor(szFloat * factor)) * 10n ** 8n / BigInt(factor);
-    const limitPx = roundPxWire((pxWire * (10000n - CONFIG.slippageBps)) / 10000n); // SELL → cross below
-    if (sz === 0n) {
-      console.log(`rebalance add-size rounds below one lot ($${addNotionalUsd.toFixed(2)}) — within granularity, no order`);
-    } else {
-      console.log(`opening short: sz=${sz} @ IOC ${limitPx}`);
-      const tx = await strategy.openShort(asset, limitPx, sz, CONFIG.tifIoc);
-      await tx.wait();
-      await new Promise((r) => setTimeout(r, 8000));
-    }
+    // plan (venue-planned above): sz/limitPx are exactly the wire fields
+    // DNCoreBase._order will accept — plan.ok guarantees sz > 0.
+    const { sz, limitPx } = plan;
+    console.log(`opening short: sz=${sz} @ IOC ${limitPx}`);
+    const tx = await strategy.openShort(asset, limitPx, sz, CONFIG.tifIoc);
+    await tx.wait();
+    await new Promise((r) => setTimeout(r, 8000));
     const after = await strategy.position();
-    if (sz > 0n && after.szi === 0n) {
+    if (after.szi === 0n) {
       console.error("MISMATCH: order not visible after delay — investigate (drop?)");
       await sendAlert("🔴 DN order MISMATCH", `order not visible after delay — possible silent drop. asset=${asset} Investigate immediately.`);
       process.exit(3);
@@ -662,12 +990,20 @@ async function main() {
       if (hedgeSz1e8 < shortSz1e8) {
         const gap1e8 = shortSz1e8 - hedgeSz1e8;
         const gapUsd = (Number(gap1e8) * Number(pxRaw) / pxDiv) / 1e6;
+        const logPx = Math.log10(pxDiv);
+        const szDecS = Number.isFinite(logPx) ? 10 - Math.round(logPx) : 2; // pxScale = 10^(10-szDec)
+        const step = szDecS >= 0 && szDecS <= 8 ? 10n ** BigInt(8 - szDecS) : 1n;
+        const oneLotUsd = (Number(step) * Number(pxRaw) / pxDiv) / 1e6;
         if (gapUsd >= 10.07) {
-          const szDecS = 10 - Math.round(Math.log10(pxDiv)); // pxScale = 10^(10-szDec)
-          const step = 10n ** BigInt(8 - szDecS);
-          const szS = (gap1e8 / step) * step;
+          // A1 fix (security review t_3a89fe76): the HL spot fee is charged in
+          // the BASE asset, so an exact-size order always under-fills by the fee
+          // and leaves an un-closeable sub-$10 residual. Size the request to
+          // cover the gap INCLUDING the fee, then round UP to a lot step — a
+          // tiny net-LONG is the safe side for a funding sleeve.
+          const target1e8 = (gap1e8 * (10000n + CONFIG.spotFeeBps)) / 10000n;
+          const szS = ((target1e8 + step - 1n) / step) * step;
           const buyPx = roundPxWire((pxRaw * 100n * (10000n + CONFIG.slippageBps)) / 10000n); // spot raw@1e6 → wire×100; BUY crosses above
-          console.log(`buying spot hedge gap: ${Number(szS) / 1e8} ${coin} @ IOC ${buyPx}`);
+          console.log(`buying spot hedge gap: ${Number(szS) / 1e8} ${coin} @ IOC ${buyPx} (gap ${Number(gap1e8) / 1e8} + ${Number(CONFIG.spotFeeBps) / 100}% base-asset fee, rounded up to one lot)`);
           const stx = await strategy.openSpotBuy(buyPx, szS, CONFIG.tifIoc);
           await stx.wait();
           await new Promise((r) => setTimeout(r, 8000));
@@ -676,18 +1012,21 @@ async function main() {
           if (hsAfter < shortSz1e8) {
             await sendAlert("🟠 DN hedge still short after buy", `hedge ${hsAfter} < short ${shortSz1e8} (1e8 units) — check spot fills.`);
           }
-        } else if (gapUsd > 1.0) {
+        } else if (gapUsd > oneLotUsd) {
+          // A1: surface any residual ABOVE one lot — not a hard $1.00, which let
+          // a $0.85 (7.1%) net-short read as "within granularity". Below HL's
+          // $10 spot order min it is un-closeable by an order, so it needs eyes.
           await sendAlert(
             "🟠 DN hedge gap — spot leg under-funded",
-            `short ${Number(shortSz1e8) / 1e8} vs spot ${Number(hedgeSz1e8) / 1e8} ${coin} (gap $${gapUsd.toFixed(2)} — below HL's $10 spot order min). Fund the strategy's Core spot (transfer ${coin} in) before claiming delta-neutral.`
+            `short ${Number(shortSz1e8) / 1e8} vs spot ${Number(hedgeSz1e8) / 1e8} ${coin} (gap $${gapUsd.toFixed(2)} > one lot $${oneLotUsd.toFixed(2)}; below HL's $10 spot order min → un-closeable by an order). Fund the strategy's Core spot (transfer ${coin} in) before claiming even approximately delta-neutral.`
           );
         } else {
-          // Sub-step gaps are order-granularity noise: spot sizes round to
-          // 0.01 HYPE ≈ $1 at current px — you cannot trade closer than one step.
-          console.log(`hedge gap $${gapUsd.toFixed(2)} ≤ one order step ($1) — within granularity ✓`);
+          // Sub-one-lot gaps are order-granularity noise: spot sizes round to
+          // one lot (HYPE 0.01 ≈ $0.84 at $84) — you cannot trade closer.
+          console.log(`hedge gap $${gapUsd.toFixed(2)} ≤ one lot ($${oneLotUsd.toFixed(2)}) — approximately delta-neutral ✓ (≤1-lot residual)`);
         }
       } else {
-        console.log(`hedge covers the short (${Number(hedgeSz1e8) / 1e8} >= ${Number(shortSz1e8) / 1e8} ${coin}) — delta-neutral ✓`);
+        console.log(`hedge covers the short (${Number(hedgeSz1e8) / 1e8} >= ${Number(shortSz1e8) / 1e8} ${coin}) — approximately delta-neutral ✓ (≤1-lot residual)`);
       }
     }
   }

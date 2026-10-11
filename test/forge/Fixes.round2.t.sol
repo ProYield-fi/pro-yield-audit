@@ -25,7 +25,8 @@ import {MockUSDC} from "../../contracts/mocks/MockUSDC.sol";
 import {
     MockCoreUserExists,
     MockMarginSummary,
-    MockPosition2
+    MockPosition2,
+    MockSpotBalance
 } from "../../contracts/mocks/MockPrecompiles.sol";
 import {MockCoreWriter, MockCoreDepositWallet} from "../../contracts/mocks/MockCoreWriter.sol";
 
@@ -42,6 +43,7 @@ contract Round2SplitFixTest is Test {
     address constant P_810 = 0x0000000000000000000000000000000000000810;
     address constant P_813 = 0x0000000000000000000000000000000000000813;
     address constant P_80F = 0x000000000000000000000000000000000000080F;
+    address constant P_801 = 0x0000000000000000000000000000000000000801; // SPOT_BALANCE
     // chainid 31337 != 998 -> HLConstants picks the MAINNET deposit wallet
     address constant DEPOSIT_WALLET = 0x6B9E773128f453f5c2C60935Ee2DE2CBc5390A24;
 
@@ -58,6 +60,11 @@ contract Round2SplitFixTest is Test {
         MockPosition2 pos = new MockPosition2();
         vm.etch(P_813, address(pos).code);
 
+        // 0x801 SPOT_BALANCE must be etched: totalAssets() and bridgeBackToEvm()
+        // read Core spot USDC through it (A3 FIX). The pre-A3 suite never touched
+        // 0x801, so a staticcall returned empty data → abi.decode reverted.
+        vm.etch(P_801, address(new MockSpotBalance()).code);
+
         MockCoreDepositWallet wal = new MockCoreDepositWallet();
         vm.etch(DEPOSIT_WALLET, address(wal).code);
         MockCoreDepositWallet(DEPOSIT_WALLET).setToken(address(usdc));
@@ -72,22 +79,24 @@ contract Round2SplitFixTest is Test {
         usdc.mint(address(strat), 500 * U);
         vm.prank(keeper);
         strat.bridgeUsdcToCore(500 * U);
-        // Core account: equity 505 = principal 500 + 5 profit
-        MockMarginSummary(P_80F).set(505_000_000, 0, 0, 0);
+        // Core account: perp margin = principal 500; Core spot USDC = the $5
+        // profit earned (the leg the outflow is sourced from — A3 FIX 1).
+        MockMarginSummary(P_80F).set(500_000_000, 0, 0, 0);
+        MockSpotBalance(P_801).setToken(0, 500_000_000, 0, 0); // $5 USDC (1e8 spot wei)
         strat.syncCore();
     }
 
-    /// @dev The keeper's exact BRIDGE_PROFIT amount (equity - principal) must
+    /// @dev The keeper's exact BRIDGE_PROFIT amount (allLegs - principal) must
     /// realize profit AND leave the principal (hedge margin) on Core.
     function test_fix_keeperProfitOnlyBridge_realizesAndSweeps() public {
         assertEq(strat.corePrincipal6(), 500_000_000, "principal before");
-        assertEq(strat.coreEquity6(), 505_000_000, "equity before");
+        assertEq(strat.coreEquity6(), 500_000_000, "perp equity before");
 
         vm.prank(keeper);
         strat.bridgeBackToEvm(5_000_000); // dn_keeper BRIDGE_PROFIT amount
 
         assertEq(strat.corePrincipal6(), 500_000_000, "FIX: principal untouched by profit skim");
-        assertEq(strat.coreEquity6(), 500_000_000, "equity reduced by exactly the skim");
+        assertEq(strat.coreEquity6(), 500_000_000, "A3 FIX 2: perp leg NOT debited");
         assertEq(strat.profitRealized(), 5 * U, "FIX: profit realized");
         assertEq(strat.harvestableProfit(), 5 * U, "harvestable");
 
@@ -101,8 +110,14 @@ contract Round2SplitFixTest is Test {
         assertEq(usdc.balanceOf(dnVault), 5 * U, "FIX: vault received the profit");
     }
 
-    /// @dev Full-amount drain (end of life) keeps its old, correct behavior.
+    /// @dev Full-amount drain (end of life): the keeper first class-transfers the
+    /// perp margin to spot (`moveUsdcToSpot`), so the whole balance is sourceable
+    /// from Core spot USDC. Keeps its old, correct profit/principal split.
     function test_fix_fullAmountBridge_unchanged() public {
+        // Simulate the keeper's staged moveUsdcToSpot(500): perp margin → spot.
+        MockMarginSummary(P_80F).set(0, 0, 0, 0);
+        MockSpotBalance(P_801).setToken(0, 50_500_000_000, 0, 0); // $505 USDC
+        strat.syncCore();
         usdc.mint(address(strat), 505 * U);
         vm.prank(keeper);
         strat.bridgeBackToEvm(505_000_000);
@@ -125,11 +140,11 @@ contract Round2SplitFixTest is Test {
         assertEq(strat.coreEquity6(), 490_000_000, "equity shows the loss");
 
         vm.prank(keeper);
-        strat.bridgeBackToEvm(5_000_000);
+        strat.bridgeBackToEvm(5_000_000); // <= Core spot $5
 
         assertEq(strat.profitRealized(), 0, "no profit in a loss");
         assertEq(strat.corePrincipal6(), 495_000_000, "bridge reduces principal only");
-        assertEq(strat.coreEquity6(), 485_000_000, "equity consistent");
+        assertEq(strat.coreEquity6(), 490_000_000, "A3 FIX 2: perp leg unchanged");
     }
 }
 

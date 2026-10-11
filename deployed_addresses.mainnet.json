@@ -12,8 +12,8 @@
  "fee_distributor": "0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9",
  "pro_yield_vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
  "caps": {
-  "tvl_cap_usdc": "500.0",
-  "per_user_cap_usdc": "500.0"
+  "tvl_cap_usdc": "10000.0",
+  "per_user_cap_usdc": "1000.0"
  },
  "fees": {
   "performance_fee_bps": 1000,
@@ -25,6 +25,40 @@
   "Deployed 2026-09-25 carrying the round-2 audit fixes (profit-first DN bridge split; vault loss accounting) — supersedes the 2026-09-24 r0 set (vault 0xadaE15e2…, FD 0xAa6794…), archived in deployed_addresses.mainnet.r0-09024.json; r0 held 0 TVL.",
   "Ownership (vault + FeeDistributor) transferred to the treasury Safe 2026-09-25 (2-of-3; user's phone is the backup owner).",
   "team E2E: deposit → shares → withdraw via scripts/customer_deposit.js / customer_withdraw.js patterns."
+ ],
+ "_accepted_risks": [
+  {
+   "id": "F-1",
+   "severity": "HIGH (accepted, time-boxed)",
+   "contracts": [
+    "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b (pt_sleeve_strategy, registered+ACTIVE)",
+    "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25 (pt_sleeve_eth_strategy, registered+ACTIVE)"
+   ],
+   "what": "Pre-remediation PTSleeveStrategy.completeInbound books retFace6 but does NOT consume inFlight6 (zeroing it is a separate keeper ackArrival). A forgotten/failed ack leaves a returned inbound counted TWICE (idle cash AND still-'in-flight') -> totalAssets() reports up to 2x the real money (false-HIGH book that masks a shortfall). R-1 (un-swept realized yield bridgeable back to the venue) is also unfixed live. Source: docs/PT_SLEEVE_REMEDIATION_2026-10-05.md (F-1 HIGH, 'remains LIVE until redeployed'); bytecode sweep t_edbb5fb7.",
+   "loss_bound_2026-10-10": "Per-lane overstatement = the un-acked inbound amount, bounded by that lane's outstanding sent face; reported totalAssets() can reach up to 2x real for that lane. Measured live 2026-10-10 (t_c6e22ed9): PT-Arb 0x2D3E5bf1 = $0 (lane flat, fully unwound 2026-10-09; inFlight6=0, arbValue6=0, totalAssets=0); PT-ETH 0xA96D0BB2 = up to $18.953737 (sent face; arbValue6 $18.959029, inFlight6=0 -> no active phantom) -> vault book $126.269032 could be overstated by up to ~$18.95 (+15%) in the worst case. NOT a direct money loss: it is a book overstatement realizable only by overpaying a withdrawing depositor.",
+   "compensating_controls": "scripts/pt_phantom_check.js (Check A exact-phantom: inFlight6>0 AND sentFace6-retFace6==0) runs every 10 min via vault_watch_mainnet.js; alert remedy = keeper ackArrival (a bookkeeping ack, NOT a money movement). No active phantom on either lane 2026-10-10 (inFlight6=0 both).",
+   "gate": "NO NEW TVL into 0x2D3E5bf1 / 0xA96D0BB2 (no keeper deployToArb/pushIdle into them) until the remediated pair is registered. Both old strategies remain registered+ACTIVE, so vault.allocate() (owner/Safe-only) would split new deposits into them -> enforce by not allocating to the PT lanes (or setStrategyActive(false)) until the remediated pair is registered.",
+   "code_gate_2026-10-10": "ENFORCED IN CODE (kanban t_48438e79). scripts/pt_strategy_gate.js is the single source: the pre-remediation set {0x2D3E5bf1, 0xA96D0BB2} is hard-fail and only the remediated allowlist {0xd7075C9B, 0x9238320C} may ever be activated. deposit_chain_auto.cjs refuses the whole chain (exit 1) while either old lane is registered+ACTIVE and only activates an allowlisted+registered PT; pt_keeper_core.js refuses deployToArb (funding) into a pre-remediation lane (unwind actions still served); pt_loop.js STAGE=seed/deploy assert-not-pre-remediation; susd3_first_cycle.sh refuses (exit 3) because its active-set restore would re-activate the old lanes. Verified live 2026-10-10 (both old active=true) -> deposit chain REFUSING/exit 1, susd3 DRY REFUSED/exit 3. deposit-chain.timer stays disabled.",
+   "resolution": "Register the remediated pair (Arb 0xd7075C9BD95649b3d6831182bea2986552097A2f / ETH 0x9238320Cc802863c7c1d78D1aaA6cbe0F7975092; deployed 2026-10-05 with the F-1/F-5/yield-split + R-1 source) at the per-lane unwind boundary: Arb already unwound 2026-10-09 (lane flat, re-point unblocked); ETH matures ~2026-11-05. Registration is a vault-owner (Safe) action. SHORT-TERM CONTAINMENT EXECUTED 2026-10-10 — both old lanes are now strategyActive=false (see onchain_lock_2026-10-10), so vault.allocate() can no longer reach them.",
+   "onchain_lock_2026-10-10": {
+    "action": "setStrategyActive(<old PT strategy>, false) on both pre-remediation lanes, via the treasury Safe (vault owner); one Safe tx per lane (NOT batched)",
+    "owner_go": "verbatim, 2026-10-10: \"do the on chain lock.\"",
+    "vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+    "chain_id": 999,
+    "safe": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+    "selector": "0xb0f42a1d (setStrategyActive(address,bool))",
+    "txs": [
+     {"strategy": "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b", "label": "PT-Arb (pre-remediation)", "safe_tx": "0x24d36b966670c905585dfccef4270e7033d09e1f7186ac0715852ca1400851a1", "block": 48210915, "safe_nonce": 50, "gas": 64952},
+     {"strategy": "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25", "label": "PT-ETH (pre-remediation)", "safe_tx": "0xb7c7534da6c1e9b4f55f6dd20c1f96079dbc8fb0f0742bc4292c0b02148f9ae9", "block": 48210929, "safe_nonce": 51, "gas": 64940}
+    ],
+    "readback": "strategyActive == false for both (cast call at block >48210929); no other on-chain state changed (owner, tvlCap/perUserCap, depositsPaused, and the DN/Morpho/HL-Earn/sUSD3 flags all unchanged; Safe nonce 50->52)",
+    "emits_event": false,
+    "emits_event_note": "The live Book #1 vault is the pre-F-5 build: its runtime bytecode carries the setStrategyActive selector (0xb0f42a1d) but NOT the StrategyActiveSet topic (0xe3101062...). The flag flip is therefore SILENT on-chain (receipt logs carry only the Safe's ExecutionSuccess) — observe via strategyActive() reads, not event logs.",
+    "keeper_safety": "verified from source: the return path onStrategyReturn requires only strategies[msg.sender], not strategyActive -> the ~2026-11-05 PT-ETH lane push-return is not blocked; allocate()/_recallShortfall()/harvest() skip inactive (intent). No keeper unwind script reads strategyActive.",
+    "executed_by": "kanban t_f8d19d9d (proyield-ops), 2026-10-10"
+   },
+   "recorded_by": "kanban t_c6e22ed9 (proyield-ops), 2026-10-10; on-chain lock executed by kanban t_f8d19d9d (proyield-ops), 2026-10-10"
+  }
  ],
  "dn_core_strategy": "0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4",
  "dn_core_strategy_meta": {
@@ -53,5 +87,95 @@
  "pt_sleeve_strategy_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
  "pt_sleeve_strategy_keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
  "pt_sleeve_executor": "0xA2e535970dc1492f77843E26F25Ab314735F4dF5",
- "pt_sleeve_note": "PT fixed-rate sleeve (R2): CCTP V2 <-> Arbitrum executor -> Pendle PT. See docs/PT_SLEEVE_DESIGN.md"
+ "pt_sleeve_note": "PT fixed-rate sleeve (R2): CCTP V2 <-> Arbitrum executor -> Pendle PT. See docs/PT_SLEEVE_DESIGN.md",
+ "pt_sleeve_eth_strategy": "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25",
+ "pt_sleeve_eth_strategy_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+ "pt_sleeve_eth_strategy_keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "pt_sleeve_eth_executor": "0xadaE15e23b0007de2A85b1F3874332762Bc23bb0",
+ "pt_sleeve_eth_note": "PT fixed-rate sleeve ETH lane: CCTP V2 <-> Ethereum executor -> Pendle PT. Same strategy source as Arb lane; destDomain=0.",
+ "pt_sleeve_eth_strategy_dormant_2026-10-05": {"address": "0x9238320Cc802863c7c1d78D1aaA6cbe0F7975092", "eth_executor": "0xC0e4a357B21b1D65586Af208cf479BbD235d1809", "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB", "keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D", "status": "DORMANT — remediated PTSleeveStrategy (F-1/F-5/yield-split + R-1 @ main 00710d77). NOT registered; keeper keeps serving the OLD live pair (0xA96D0BB2 / 0xadaE15e2) until the old ETH lane unwinds (~2026-11-05), then Safe registration re-points the lane. Hot-fix 2026-10-05: keys restored after the deploy script overwrote them. F-1 (HIGH) stays LIVE on the OLD lane this serves until the remediated pair is registered — see _accepted_risks[F-1] for the loss bound + the no-new-TVL gate.", "deployed_utc": "2026-10-05"},
+ "hlearn_strategy": "0xA2e535970dc1492f77843E26F25Ab314735F4dF5",
+ "hlearn_strategy_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+ "hlearn_strategy_keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "hlearn_strategy_note": "HL Earn idle-cash sleeve (CoreWriter action 15). Final-build testnet smoke GREEN 2026-10-03 (0x8F8D1cb8…1C25: supply/withdraw verified via 0x811). Kink mode: docs/HLEARN_UTIL_KINK_TRIGGER.md — keeper HE_KINK=1, NOT scheduled until one watched proof cycle.",
+ "susd3_strategy": {
+  "address": "0x7dc1874FFfCb0481b68501eb2f28c17d18C616DB",
+  "usdc": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+  "eth_executor": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+  "eth_executor_return": "0x7dc1874FFfCb0481b68501eb2f28c17d18C616DB",
+  "vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+  "return_hook": false,
+  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+  "keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "deployed_utc": "2026-10-05T17:50:19.133Z",
+  "status": "dormant — venueCleared=false, NOT registered with vault; open only after owner GO (setVenueCleared + addStrategy). setVault + setKeeper wired at deploy (F-3a). return-hook: ABSENT — F-5 principal-return accounting stays OPEN on this legacy vault (pushIdle is backward-safe).",
+  "per_name_cap_bps": 1500,
+  "headroom_bps": 2000
+ },
+ "last_deploy_utc": "2026-10-05T17:50:19.133Z",
+ "hlearn_alwayson_strategy": "0x1C770315D159b52a7fA892878B1F33B1A61618Bf",
+ "hlearn_alwayson_strategy_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+ "hlearn_alwayson_strategy_keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "hlearn_alwayson_strategy_note": "KinkWrapper ENGINE instance — always-on HL Earn bucket for the fixed/floating wrapper (docs/KINK_WRAPPER_DESIGN.md, Option B approved 2026-10-03). NOT added to the vault (wrapper owns it). Keeper runs STANDARD mode (always-on, no kink gate). HYPE drip TODO before first bridge-back.",
+ "pt_sleeve_strategy_dormant_2026-10-05": {
+  "address": "0xd7075C9BD95649b3d6831182bea2986552097A2f",
+  "arb_executor": "0xfB6d589f2047b52eAc82D826D71d9B4b41961546",
+  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+  "keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "status": "DORMANT — remediated PTSleeveStrategy (F-1/F-5/yield-split + R-1 deployToArb cap @ main 00710d77). NOT registered; keeper keeps serving the OLD live pair (0x2D3E5bf1 / 0xA2e5359) until the ~Oct 15 unwind completes, then Safe registration (addStrategy/activate + confirmStrategyReturn on the fresh executor pre-activity) re-points the lane. F-1 (HIGH) stays LIVE on the OLD lane this serves until the remediated pair is registered — see _accepted_risks[F-1] for the loss bound + the no-new-TVL gate.",
+  "deployed_utc": "2026-10-05"
+ },
+ "pt_v1_quarantined_2026-10-10": {
+  "address": "0x3AE855B65A021397f7a3ca838acc8E4c82cF815f",
+  "chain_id": 999,
+  "chain": "hyperevm-mainnet",
+  "role": "pt_sleeve_strategy v1 (legacy PTSleeveStrategy) — registered, INACTIVE",
+  "strategyList_index": 2,
+  "registered": true,
+  "active": false,
+  "name": "PendlePT",
+  "total_assets_usdc6": "0",
+  "classification": "PTSleeveStrategy OLD build (runtime 7,699 B; ipfs 1220c1b8c69feeea9c8189e69f174d2419eacbc14b0369509506336adbfc5dd03071) — byte-identical to the ACTIVE pt_sleeve_strategy 0x2D3E5bf1 (strategyList index 3)",
+  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+  "keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "v1_archive_key": "pt_sleeve_strategy (deployed_addresses.mainnet.v1-archive.json)",
+  "status": "REGISTERED + INACTIVE (quarantined 2026-10-10): still in the live vault strategyList but strategyActive=false; totalAssets()=0. The vault's `pt_sleeve_strategy` key names the ACTIVE index-3 address. Reconciled onto the manifest 2026-10-10 (t_ed8b04aa) — read-only record fix; no on-chain change. De-registration would be a vault-owner (Safe) action and was NOT taken.",
+  "verified_utc": "2026-10-10"
+ },
+ "susd3_registered_2026-09-30": {
+  "address": "0x9978e8745cdb0d3e5B970aC36C38575eC70D612A",
+  "chain_id": 999,
+  "chain": "hyperevm-mainnet",
+  "role": "susd3_strategy v1 (legacy SUSD3Strategy) — registered, ACTIVE",
+  "strategyList_index": 6,
+  "registered": true,
+  "active": true,
+  "name": "SUSD3",
+  "total_assets_usdc6": "0",
+  "classification": "SUSD3Strategy OLD build (runtime 7,939 B; ipfs 12208ce737c32d819ca5c2331817f5337d161a851bde5fc8069a7b2a4e1a51c37eb6) — the legacy sUSD3 sleeve, superseded by the DORMANT 0x7dc1874F…616DB named by the `susd3_strategy` key (venueCleared=false, NOT registered)",
+  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+  "keeper": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "eth_executor_legacy": "0x3ccc212636daa90d531615899db4e286663349de",
+  "status": "REGISTERED + ACTIVE (registered 2026-09-30; superseded 2026-10-04 but never de-registered): strategyActive=true in the live vault strategyList, totalAssets()=0. The vault's `susd3_strategy` key names the DORMANT replacement 0x7dc1874F…616DB. Reconciled onto the manifest 2026-10-10 (t_ed8b04aa) — read-only record fix; no on-chain change. De-registration would be a vault-owner (Safe) action and was NOT taken.",
+  "verified_utc": "2026-10-10"
+ },
+ "strategyList_reconciled": {
+  "vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+  "chain_id": 999,
+  "chain": "hyperevm-mainnet",
+  "rpc": "https://rpc.hyperliquid.xyz/evm",
+  "read_utc": "2026-10-10",
+  "block": 48185851,
+  "registered_count": 7,
+  "note": "Live vault.strategyList enumeration reconciled against this manifest on 2026-10-10 (kanban t_ed8b04aa; finding t_edbb5fb7). All 7 registered strategies now have a manifest key (pre-fix the manifest named only 5 — indices 2 and 6 were absent, and index 6 was ACTIVE). The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel — latched alert when a registered strategy is unmanifested).",
+  "entries": [
+   {"index": 0, "address": "0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4", "active": true, "manifest_key": "dn_core_strategy", "classification": "DNCoreStrategy (dn-boost-parity build)"},
+   {"index": 1, "address": "0xBF4C5e339D63EEB393DA2797679879a0a5Af2D53", "active": true, "manifest_key": "morpho_strategy", "classification": "MorphoStrategy"},
+   {"index": 2, "address": "0x3AE855B65A021397f7a3ca838acc8E4c82cF815f", "active": false, "manifest_key": "pt_v1_quarantined_2026-10-10", "classification": "PTSleeveStrategy OLD (v1)"},
+   {"index": 3, "address": "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b", "active": true, "manifest_key": "pt_sleeve_strategy", "classification": "PTSleeveStrategy OLD (v1)"},
+   {"index": 4, "address": "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25", "active": true, "manifest_key": "pt_sleeve_eth_strategy", "classification": "PTSleeveEthStrategy OLD (v1)"},
+   {"index": 5, "address": "0xA2e535970dc1492f77843E26F25Ab314735F4dF5", "active": true, "manifest_key": "hlearn_strategy", "classification": "HLEarnStrategy"},
+   {"index": 6, "address": "0x9978e8745cdb0d3e5B970aC36C38575eC70D612A", "active": true, "manifest_key": "susd3_registered_2026-09-30", "classification": "SUSD3Strategy OLD (v1)"}
+  ]
+ }
 }

@@ -15,12 +15,17 @@ const hre = require("hardhat");
 const { ethers } = require("ethers");
 const fs = require("fs");
 const path = require("path");
+const { assessEndpoint } = require("./he_pin");
 
 const RPC = process.env.HYPEREVM_MAINNET_RPC || "https://rpc.hyperliquid.xyz/evm";
 const FIXTURE = path.join(__dirname, "..", "test", "fixtures", "hyperevm_reads.json");
 const coder = ethers.AbiCoder.defaultAbiCoder();
 const NONEXISTENT = "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D"; // deployer — no Core account
 const EXISTING = "0xfefefefefefefefefefefefefefefefefefefefe";    // assistance fund
+// Book-#1 vault (public mainnet constant) — only used as the pre-deployment
+// sentinel target for the block-pin capability check below (t_bb11f1bc).
+const PIN_PROBE_VAULT = "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1";
+const ALLOW_UNPINNED = process.env.ALLOW_UNPINNED_CAPTURE === "1";
 
 const P = {
   position2: "0x0000000000000000000000000000000000000813",
@@ -41,6 +46,21 @@ async function main() {
   const block = await provider.getBlockNumber();
   console.log(`capturing from ${RPC} (chainId ${net.chainId}, block ${block})`);
 
+  // t_bb11f1bc: a fixture must not claim a `block` pin unless the endpoint
+  // honours the tag. Three of four HyperEVM public endpoints silently return
+  // LATEST state for a historical eth_call — that would make `block` a lie.
+  const pin = await assessEndpoint(provider, PIN_PROBE_VAULT);
+  const pinned = pin.honoured;
+  if (!pinned && !ALLOW_UNPINNED) {
+    console.error(
+      `REFUSING to capture: ${RPC} ${pin.reason}\n` +
+        `  Use an archive endpoint (HYPEREVM_MAINNET_RPC=https://hyperliquid.drpc.org)\n` +
+        `  or set ALLOW_UNPINNED_CAPTURE=1 to record an explicitly unpinned fixture (pinned:false).`
+    );
+    process.exit(2);
+  }
+  if (!pinned) console.warn(`WARNING: ${RPC} ${pin.reason} — fixture will be marked pinned:false`);
+
   // Local verifier (scratch anvil only — NEVER deploy to the persistent chain).
   const V = await hre.ethers.getContractFactory("DecodeVerifier");
   const verifier = await V.deploy();
@@ -50,7 +70,7 @@ async function main() {
   async function read(name, to, data, decode) {
     const e = { name, to, data, block };
     try {
-      const ret = await provider.call({ to, data }, block); // pinned to capture block
+      const ret = await provider.call({ to, data, blockTag: block }); // pinned (tag inside tx — ethers v6 ignores a 2nd arg; t_bb11f1bc)
       e.ret = ret;
       if (decode) e.expected = await decode(ret);
     } catch (err) {
@@ -94,7 +114,19 @@ async function main() {
   fs.mkdirSync(path.dirname(FIXTURE), { recursive: true });
   fs.writeFileSync(
     FIXTURE,
-    JSON.stringify({ source: RPC, chainId: Number(net.chainId), blockNumber: block, capturedAt: new Date().toISOString(), reads: entries }, null, 1),
+    JSON.stringify(
+      {
+        source: RPC,
+        chainId: Number(net.chainId),
+        blockNumber: block,
+        pinned, // t_bb11f1bc: whether `blockNumber` is a REAL pin on this endpoint
+        pin_check: { mode: pin.mode, reason: pin.reason },
+        capturedAt: new Date().toISOString(),
+        reads: entries,
+      },
+      null,
+      1
+    ),
   );
   console.log(`\nwrote ${entries.length} reads → ${FIXTURE}`);
 }

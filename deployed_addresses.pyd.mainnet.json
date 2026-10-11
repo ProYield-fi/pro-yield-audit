@@ -1,0 +1,34 @@
+{
+  "chainId": 999,
+  "network": "hyperevm-mainnet",
+  "deployedBy": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "timestamp": "2026-09-30T12:41:35.154Z",
+  "contracts": {
+    "pydToken": "0xbF38e441166f44cfc05205B21168a01b8a1ABf4F",
+    "pydStaking": "0x3211e1C5443B1d178b76B4f0AF1cEf37741DbBb7",
+    "pydFunder": "0x1af2Cc1045584069fA34b0121D4020d28104dd1e",
+    "pydFeeDiscount": "0x2B591845a250258d40B468372F432f7fda7cBE88",
+    "feeDistributor": "0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9",
+    "vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+    "treasurySafe": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB"
+  },
+  "supplyWholeTokens": "100000000",
+  "wiring": {
+    "stakingOwner": "0x1af2Cc1045584069fA34b0121D4020d28104dd1e",
+    "funderOwner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+    "discountOwner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+    "funderPaused": true,
+    "funderSwapper": null
+  },
+  "txHashes": {
+    "pydToken": "0x79afd4e4b11c8b1c2d0c35ae8adc42304708703946de77971fa1a6bc4d025a14",
+    "pydStaking": "0x868473a1370c8a656a4f20281988e45996ec2fc3198afd54909df7aa739df23d",
+    "pydFunder": "0x248b8e4cef143624b41c7620f30d5d6926a9d6272fe010d072c9c41c258c8180",
+    "pydFeeDiscount": "0x780589354e12f11d012cf6f9a0adc9f2ddbf68e85395c74ef952251426cadd91",
+    "stakingOwnershipToFunder": "0x0c633fa65913dc1fbaf1b882555ae8c45e25b6c151fed3e6ab814418fafcc5bd",
+    "funderPaused": "0xa00e9a80f4c824d9857468d5a66380c3fa3c451990e8cf9f6a12e9991daa8a8e",
+    "tokenToTreasury": "0xe7061235144a44fa988dcbeb36206fd7ed00e4900f97b1bea2fa4bbf9b0570de",
+    "funderOwnershipToSafe": "0x60a9c814ff8317cd3fc8259e422e7212551dc6a49f722d877ec113d0e20ec385",
+    "discountOwnershipToSafe": "0xee773d9508a660c0e4faf4cfbd33654be5be8a8dcd17f406387196a1c2404567"
+  }
+}

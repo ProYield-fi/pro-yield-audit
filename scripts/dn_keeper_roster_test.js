@@ -68,11 +68,15 @@ async function main() {
     dex: "main", name, funding_apr: 11, mean_30d_apr: mean, pos_30d_pct: pos,
     min_30d_apr: min, max_30d_apr: 40, oi_usd: cap * 20, cap_usd: cap, harvest_usd_yr: (cap * mean) / 100, hours: 720,
   });
+  // NOTE (t_a2858aef): XMR was dropped from scripts/dn_roster.json on 2026-10-04
+  // (Wagyu XMR1 DD failure), so rotationAdvice() ignores it. The strongest
+  // roster alt here is ZEC 12.4%/30d, which clears the default bar
+  // (>=12% and >= current BTC 9.3% + DN_ROTATION_MIN_GAIN_PP 3pp).
   fs.writeFileSync(SNAP_BOARD, JSON.stringify({
     ...baseSnap,
     hyperliquid_funding: { capacity_board: { board: [
       row("BTC", 9.3, 92.9, -14.0, 158e6), row("ETH", 10.1, 95.7, -15.1, 148e6),
-      row("XMR", 47.3, 98.5, -88.7, 4e6), row("ZEC", 12.4, 96.2, -64.5, 38e6),
+      row("ZEC", 12.4, 96.2, -64.5, 38e6),
       row("HYPE", 9.1, 88.8, -39.2, 94e6),
     ] } },
   }));
@@ -187,11 +191,11 @@ async function main() {
   {
     const { sAddr } = await deployCase(0, 142, 197, 100000n, "BTC", 5, 40, 600000n);
     try { fs.unlinkSync(MARKER); } catch { /* fresh */ }
-    console.log("\n── D. rotation advice (board: XMR 47.3% best) ──");
+    console.log("\n── D. rotation advice (board: ZEC 12.4% best roster alt) ──");
     const out = runKeeper(`DN_STRATEGY=${sAddr} DN_FORCE_APR=9.0 SCOUT_SNAPSHOT=${SNAP_BOARD}`);
     report("D: current coin logged", out.includes("rotation: current BTC 9.3%/30d"));
-    report("D: best alts listed", out.includes("XMR 47.3%"));
-    report("D: alert fired", out.includes("DN ROTATION CANDIDATE") && out.includes("→ XMR"));
+    report("D: best alts listed", out.includes("ZEC 12.4%"));
+    report("D: alert fired", out.includes("DN ROTATION CANDIDATE") && out.includes("→ ZEC"));
     const out2 = runKeeper(`DN_STRATEGY=${sAddr} DN_FORCE_APR=9.0 SCOUT_SNAPSHOT=${SNAP_BOARD}`);
     report("D: dedup on second run", out2.includes("already alerted"));
   }

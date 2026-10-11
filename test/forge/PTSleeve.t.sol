@@ -179,7 +179,10 @@ contract PTSleeveStrategyTest is Test {
         vm.prank(address(0xB0B)); // permissionless BY DESIGN
         uint256 got = strat.completeInbound(hex"dead", hex"beef");
         assertEq(got, 105e6, "received measured");
-        assertEq(strat.retFace6(), 105e6, "return flow booked");
+        assertEq(strat.retFace6(), 100e6, "return flow booked: PRINCIPAL only");
+        assertEq(strat.profitRealized6(), 5e6, "the +5 excess is REALIZED YIELD");
+        assertEq(strat.harvestableProfit6(), 5e6, "yield waits for harvest()");
+        assertEq(strat.idlePrincipal6(), 1_000e6, "idle 1,005 - 5 profit");
         assertEq(strat.arbValue6(), 0, "value fully returned, not double-counted");
         assertEq(strat.outstandingFace6(), 0, "nothing outstanding");
         assertEq(strat.totalAssets(), 1_005e6, "gain realized exactly once");
@@ -237,10 +240,16 @@ contract PTSleeveStrategyTest is Test {
     }
 
     function test_pushIdle_returns_to_vault_and_clears_pending() public {
+        // pushIdle now notifies the vault (F-5). A contract-typed external call
+        // to an EOA trips Solidity's uncatchable extcodesize check, so the vault
+        // must be a REAL (if hook-less) contract — exactly like the live one.
+        PTLegacyVault legacyVault = new PTLegacyVault();
+        strat.setVault(address(legacyVault)); // owner == this
+
         vm.startPrank(keeper);
         strat.deployToArb(700e6, 0);
         vm.stopPrank();
-        vm.prank(vaultAddr);
+        vm.prank(address(legacyVault));
         strat.recall(700e6); // pays idle 300, shortfall 400
         assertEq(strat.pendingRecall6(), 400e6);
 
@@ -248,7 +257,7 @@ contract PTSleeveStrategyTest is Test {
         strat.completeInbound(hex"", hex""); // unwind landed
         vm.prank(keeper);
         strat.pushIdle(400e6);
-        assertEq(usdc.balanceOf(vaultAddr), 700e6, "vault made whole");
+        assertEq(usdc.balanceOf(address(legacyVault)), 700e6, "vault made whole");
         assertEq(strat.pendingRecall6(), 0, "shortfall cleared");
     }
 
@@ -275,11 +284,16 @@ contract PTSleeveStrategyTest is Test {
         strat.completeInbound(hex"aa", hex"bb");
         assertEq(strat.totalAssets(), 1_004e6, "value moved to idle, no double count");
         assertEq(strat.arbValue6(), 0);
+        assertEq(strat.retFace6(), 100e6, "principal retired (not the +4)");
+        assertEq(strat.profitRealized6(), 4e6, "the +4 is realized YIELD");
 
+        // recall pays PRINCIPAL only; the +4 realized yield has its own door
+        // (the vault's harvest() — it must never pay one withdrawer).
         vm.prank(vaultAddr);
         strat.recall(1_004e6);
-        assertEq(usdc.balanceOf(vaultAddr), 1_004e6, "vault paid, gain included");
-        assertEq(strat.pendingRecall6(), 0);
+        assertEq(usdc.balanceOf(vaultAddr), 1_000e6, "recall capped at principal");
+        assertEq(strat.pendingRecall6(), 4e6, "the un-swept yield is not recallable");
+        assertEq(strat.harvestableProfit6(), 4e6, "yield still waits for harvest()");
     }
 
     // ----------------------------------------------------------------- params
@@ -292,6 +306,91 @@ contract PTSleeveStrategyTest is Test {
         strat.setParams(1000, 10e6);
         assertEq(strat.headroomBps(), 1000);
         assertEq(strat.minBridgeUsd6(), 10e6);
+    }
+
+    // ------------------------------------------------- F-1 + F-5 remediation pins
+
+    /// AUDIT F-1 on PT (the sUSD3 fix ported). A return whose `ackArrival` is
+    /// skipped used to leave the returned cash counted TWICE (idle + still
+    /// "in-flight"), so the sleeve reported up to 2x its real `totalAssets()`.
+    /// `completeInbound` must consume the in-flight slice itself.
+    function test_pt_forgotten_ack_never_double_counts() public {
+        vm.prank(keeper);
+        strat.deployToArb(200e6, 0); // inFlight = 200, NEVER acked
+        assertEq(strat.inFlight6(), 200e6);
+        assertEq(strat.totalAssets(), 1_000e6); // idle 800 + inFlight 200
+
+        cctp.setInbound(200e6, address(strat)); // the full return arrives
+        uint256 got = strat.completeInbound(hex"00", hex"00");
+        assertEq(got, 200e6);
+        assertEq(strat.inFlight6(), 0, "F-1: inbound must clear the in-flight slice");
+        assertEq(strat.totalAssets(), 1_000e6, "F-1: reported assets equal real backing (was 1,200 = 2x)");
+        assertLe(strat.totalAssets(), usdc.balanceOf(address(strat)), "F-1: totalAssets <= real idle");
+    }
+
+    /// AUDIT F-1 belt-and-braces: `syncArbValue` must fail loudly if in-flight
+    /// ever exceeds what is still out (sent - returned), instead of silently
+    /// flooring `arrivedFace` to 0 and masking a phantom. A probe (test-only)
+    /// forces the inconsistent state, because `completeInbound` now consumes
+    /// in-flight so no public path can reach it.
+    function test_pt_sync_arb_value_reverts_on_accounting_invariant() public {
+        PTProbe probe = new PTProbe(address(usdc), address(this), address(cctp), address(cctp), executorAddr, 3);
+        probe.poke(100e6, 0, 150e6); // inFlight 150 > outstanding 100
+        vm.expectRevert(PTSleeveStrategy.PT__AccountingInvariant.selector);
+        probe.syncArbValue(0);
+    }
+
+    /// AUDIT F-5. `pushIdle` must notify the vault so returned PRINCIPAL is
+    /// booked as redeployable accounted cash (never as a phantom arrival). The
+    /// hook-bearing vault here is a minimal recorder.
+    function test_pushIdle_notifies_hook_vault() public {
+        PTHookVault hv = new PTHookVault();
+        strat.setVault(address(hv)); // owner == this
+        vm.prank(keeper);
+        strat.pushIdle(100e6);
+        assertEq(hv.booked(), 100e6, "vault notified with the principal amount");
+    }
+
+    /// AUDIT F-5 (round 2) BACKWARD-SAFE. The LIVE vault is non-upgradeable and
+    /// PREDATES `onStrategyReturn`, so an unconditional hook call would revert,
+    /// roll the transfer back and brick the whole return path. Pin the fallback:
+    /// the principal still returns, the miss is surfaced as an event.
+    function test_pushIdle_backward_safe_on_legacy_vault() public {
+        PTLegacyVault legacy = new PTLegacyVault();
+        strat.setVault(address(legacy)); // owner == this
+        vm.expectEmit(true, true, true, true, address(strat));
+        emit PTSleeveStrategy.ReturnHookUnavailable(address(legacy), 100e6);
+        vm.prank(keeper);
+        strat.pushIdle(100e6);
+        assertEq(usdc.balanceOf(address(legacy)), 100e6, "F-5: principal lands even when the hook is absent");
+    }
+}
+
+/// A legacy vault: a real contract (code present) that does NOT implement
+/// `onStrategyReturn` — mirrors the live non-upgradeable vault so the
+/// backward-safe fallback can be pinned. (An EOA would trip Solidity's
+/// uncatchable `extcodesize` check for a contract-typed external call.)
+contract PTLegacyVault { }
+
+/// A minimal hook-bearing vault recorder (F-5 happy path).
+contract PTHookVault {
+    uint256 public booked;
+    function onStrategyReturn(uint256 amount) external {
+        booked += amount;
+    }
+}
+
+/// Test-only probe: exposes the parent's face counters so the belt-and-braces
+/// `syncArbValue` invariant can be exercised (no public path can violate it).
+contract PTProbe is PTSleeveStrategy {
+    constructor(address u, address o, address tm, address mt, address ex, uint32 d)
+        PTSleeveStrategy(u, o, tm, mt, ex, d)
+    {}
+
+    function poke(uint256 _sent, uint256 _ret, uint256 _inFlight) external {
+        sentFace6 = _sent;
+        retFace6 = _ret;
+        inFlight6 = _inFlight;
     }
 }
 

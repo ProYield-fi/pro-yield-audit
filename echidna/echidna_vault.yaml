@@ -1,0 +1,15 @@
+# Echidna campaign for the vault money path (see echidna_vault.sol header).
+# KEY GOTCHA: the key is `sender:` (singular) and the value MUST be an array —
+# `senders:` is silently ignored and defaults (0x10000…) are used instead,
+# which falsifies the share-sum property with out-of-harness depositors.
+# Addresses must match the U0/U1/U2 constants in the property contract.
+testLimit: 20000
+workers: 1
+corpusDir: /tmp/echidna-corpus-vault
+sender:
+  - "0x1000000000000000000000000000000000000001"
+  - "0x1000000000000000000000000000000000000002"
+  - "0x1000000000000000000000000000000000000003"
+deployer: "0x1000000000000000000000000000000000000000"
+txGasLimit: 80000000
+timeout: 300

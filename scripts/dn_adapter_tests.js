@@ -141,7 +141,7 @@ async function main() {
   want = E.concat(["0x0100000d", coder.encode(
     ["address", "address", "uint32", "uint32", "uint64", "uint64"],
     ["0x2000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000",
-     4294967295, 4294967295, 0, 500_000_000n])]);
+     4294967295, 4294967295, 0, 50_000_000_000n])]);
   report("bridgeBackToEvm bytes (action 13 sendAsset)", (await coreWriterAt.lastAction()).toLowerCase() === want.toLowerCase());
 
   // Staking actions (4/3/5) removed from the deployment surface for the

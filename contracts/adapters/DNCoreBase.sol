@@ -45,7 +45,7 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
     /// @notice HyperCore perp asset index (0 = BTC, 1 = ETH on validator perps).
     uint32 public perpAsset;
     /// @notice Per-action notional cap, USDC 6-dec units.
-    uint256 public maxActionUsd6;
+    uint256 public immutable maxActionUsd6; // set once in ctor (immutable-states)
     bool public paused;
 
     /// @notice Spot hedge config (HIGH-2 fix). `spotPairIndex` = HyperCore spot
@@ -60,6 +60,16 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
 
     /// @notice HL minimum order notional is $10.
     uint256 public constant MIN_ORDER_USD6 = 10e6;
+
+    /// @notice HyperCore denominates every spot balance in 8-decimal "Core wei"
+    /// (1e8 per whole token), while USDC is 6dp on HyperEVM/Core. The action-13
+    /// `sendAsset` `wei` field therefore takes `amount6 * USDC_WEI_PER_UNIT`.
+    /// PAIRED with the read side: `coreSpotUsdc6()` divides the raw spot balance
+    /// by the same factor. Both sides MUST keep ONE unit convention — mismatched
+    /// (security review t_281b833e / card t_3493da9b, A3R-1) the send emitted
+    /// 6dp as Core wei and moved 100x too little, so a Core->EVM outflow dropped
+    /// the ledger by 100x the USDC that actually left Core (principal-as-yield).
+    uint64 internal constant USDC_WEI_PER_UNIT = 100;
 
     /*//////////////////////// Custom errors (EIP-170 size discipline) ////////////////////////*/
     error DNCore__NotKeeper();
@@ -297,6 +307,21 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
         return uint64((uint256(sz) * uint256(px)) / spotPxScale);
     }
 
+    /// @notice Core SPOT USDC cash balance (6dp) — the third leg of the honest
+    /// all-legs Core equity. Read via 0x801 with USDC_TOKEN_INDEX. NOTE: 0x801
+    /// returns every spot balance in the uniform 8-decimal spot "wei" scale, so
+    /// USDC (6dp on HyperCore) needs ÷100. Verified against live HyperEVM
+    /// 2026-10-10: book #2 strategy → raw 65,950,000 → 659,500 (6dp) = $0.6595,
+    /// matching the HL info API `spotClearinghouseState` exactly.
+    /// Safe: 0 on any read failure — accounting must never revert on a hiccup.
+    function coreSpotUsdc6() public view returns (uint64) {
+        (bool ok, bytes memory ret) = HLConstants.SPOT_BALANCE_PRECOMPILE.staticcall(
+            abi.encode(address(this), HLConstants.USDC_TOKEN_INDEX)
+        );
+        if (!ok) return 0;
+        return uint64(uint256(abi.decode(ret, (SpotBalance)).total) / 100); // 1e8 spot wei → 1e6 USDC
+    }
+
     function _coreAccountExists() internal view returns (bool) {
         (bool ok, bytes memory ret) = HLConstants.CORE_USER_EXISTS_PRECOMPILE.staticcall(abi.encode(address(this)));
         if (!ok) revert DNCore__ReadFailed();
@@ -319,6 +344,10 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
 
     /// @dev Shared bridge-out encoding: sendAsset of USDC to the EVM system
     /// address. Requires HYPE on Core for transfer gas or it drops silently.
+    /// `amount6` is USDC 6dp (EVM units); the wire `wei` field is Core wei
+    /// (1e8/USDC), so the emitted value is `amount6 * USDC_WEI_PER_UNIT`.
+    /// Mirrors the read-side `divide by USDC_WEI_PER_UNIT` in `coreSpotUsdc6()`;
+    /// the two MUST stay paired (security review t_281b833e, A3R-1).
     function _sendUsdcToEvm(uint64 amount6) internal {
         _send(
             HLConstants.SEND_ASSET_ACTION,
@@ -328,7 +357,7 @@ abstract contract DNCoreBase is Ownable, ReentrancyGuard {
                 HLConstants.SPOT_DEX,
                 HLConstants.SPOT_DEX,
                 HLConstants.USDC_TOKEN_INDEX,
-                amount6
+                amount6 * USDC_WEI_PER_UNIT
             )
         );
     }

@@ -1,9 +1,19 @@
 {
  "pt_sleeve_executor": "0xA2e535970dc1492f77843E26F25Ab314735F4dF5",
- "pt_sleeve_executor_owner": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+ "pt_sleeve_executor_owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
  "pt_sleeve_executor_ops": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
- "pt_sleeve_strategy_return": "0xb9BdCe11AB18488996c306f539834415c672a7a4",
+ "pt_sleeve_strategy_return": "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b",
  "pt_sleeve_executor_market": "0xa8a0dea40174cfc30fea9e3a77f182ab33f46e25",
  "pt_sleeve_executor_pt": "0xc9d24ad0bb25f34098e226a8c5192dea7bacccae",
- "note": "PT fixed-rate sleeve executor — Arbitrum One. Ops can only buy/sell PT + CCTP-burn back to the HyperEVM strategy."
+ "note": "PT fixed-rate sleeve executor \u2014 Arbitrum One. Ops can only buy/sell PT + CCTP-burn back to the HyperEVM strategy.",
+ "pt_sleeve_executor_dormant_2026-10-05": {
+  "address": "0xfB6d589f2047b52eAc82D826D71d9B4b41961546",
+  "strategy_return": "0xd7075C9BD95649b3d6831182bea2986552097A2f",
+  "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+  "ops": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
+  "market": "0xa8a0dea40174cfc30fea9e3a77f182ab33f46e25",
+  "pt": "0xc9d24ad0bb25f34098e226a8c5192dea7bacccae",
+  "status": "DORMANT \u2014 fresh executor (Arbitrum One), constructed with the predicted HyperEVM strategy address; returnConfirmed=false. Supersedes 0xA2e5359 (activity-locked, bridgeBackCount=2) at the Oct 15 registration boundary. Deployer arb gas: 0.000488 ETH pre-deploy.",
+  "deployed_utc": "2026-10-05"
+ }
 }

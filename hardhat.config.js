@@ -62,6 +62,14 @@ module.exports = {
       chainId: 42161,
       accounts: [deployerKey],
     },
+    ethMainnet: {
+      // Ethereum mainnet (1) — ETH-lane PT sleeve executor home. Same ops EOA
+      // (0xaDD8f267…) as every other chain; guards live in the deploy script
+      // (ETH_OK=1, chain 1, expected-deployer check, manifest checks).
+      url: process.env.ETH_MAINNET_RPC_URL || "https://ethereum-rpc.publicnode.com",
+      chainId: 1,
+      accounts: [deployerKey],
+    },
   },
   paths: {
     contracts: "./contracts",

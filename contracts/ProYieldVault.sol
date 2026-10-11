@@ -186,13 +186,18 @@ contract ProYieldVault is BaseStrategy {
         if (balance == 0) return;
         // Sweep the cash, but write down only the BOOKED part.
         uint256 booked = _totalAssets < balance ? _totalAssets : balance;
-        underlying.safeTransfer(msg.sender, balance);
-        // Keep liabilities in sync: assets leaving the vault must shrink
-        // totalAssets or depositor claims exceed real backing (T-012 follow-up).
-        _totalAssets -= booked;
+        // CEI ORDER (r3 tidy-up): write the books down BEFORE the external
+        // transfer. Interactions-first left a window where a reentering
+        // msg.sender could observe the cash gone while claims still read the
+        // pre-write total. The nonReentrant guard is kept as defense-in-depth,
+        // but ordering — not the guard — is the fix.
+        _totalAssets -= booked; // Keep liabilities in sync: assets leaving the
+        // vault must shrink totalAssets or depositor claims exceed real backing
+        // (T-012 follow-up).
         uint256 accounted = _accountedBalance;
         _accountedBalance = accounted > booked ? accounted - booked : 0;
-        emit EmergencyWithdraw(balance, _totalAssets);
+        emit EmergencyWithdraw(balance, _totalAssets); // event precedes the call
+        underlying.safeTransfer(msg.sender, balance);
     }
 
     event LossReported(uint256 amount);
@@ -399,6 +404,11 @@ contract ProYieldVault is BaseStrategy {
     /// never re-count idle" is now enforced rather than merely asserted.
     event YieldCredited(uint256 amount);
 
+    /// @notice PRINCIPAL returned by a strategy and booked as accounted cash
+    /// WITHOUT raising `_totalAssets` (see `onStrategyReturn`). Distinct from
+    /// `YieldCredited`, which raises the share price.
+    event StrategyReturnBooked(address indexed strategy, uint256 amount);
+
     function creditYield(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "ProYieldVault: zero amount");
         uint256 arrivals = uncreditedArrivals();
@@ -406,6 +416,32 @@ contract ProYieldVault is BaseStrategy {
         _totalAssets += amount;
         _accountedBalance += amount;
         emit YieldCredited(amount);
+    }
+
+    /// @notice AUDIT F-5. Callable ONLY by a registered strategy (the sUSD3
+    /// sleeve calls it from `pushIdle` when it returns capital). Books returned
+    /// PRINCIPAL so the next `allocate()` can redeploy it, while — unlike
+    /// `creditYield` — NEVER raising `_totalAssets`.
+    ///
+    /// Why: `allocate()` ships `_accountedBalance - reserve` and decrements
+    /// `_accountedBalance` when money leaves, but `_totalAssets` stays put (the
+    /// capital is still on the vault's books). A strategy returning that
+    /// principal arrives as a plain transfer, which used to land as an
+    /// `uncreditedArrival`: `allocate()` could not redeploy it and the only
+    /// owner lever, `creditYield`, would double-count it (reproduced: vault
+    /// 1,900 vs 1,000 real). This hook raises only the accounted balance.
+    ///
+    /// Bounded by `uncreditedArrivals()` so it is idempotent and can never book
+    /// phantom value: a strategy cannot conjure accounted cash the vault does
+    /// not physically hold beyond what is already represented.
+    function onStrategyReturn(uint256 amount) external nonReentrant {
+        require(strategies[msg.sender], "ProYieldVault: not a strategy");
+        if (amount == 0) return;
+        uint256 arrivals = uncreditedArrivals();
+        uint256 add = amount > arrivals ? arrivals : amount;
+        if (add == 0) return; // nothing new arrived — never double-book
+        _accountedBalance += add;
+        emit StrategyReturnBooked(msg.sender, add);
     }
 
     function harvestStrategy(address strategy) external onlyOwner nonReentrant {
