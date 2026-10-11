@@ -65,6 +65,12 @@ contract DNCoreBaseHandler is Test {
     bool public strangerMutated;     // 5. stranger landed a state change
     bool public mutatedWhileHedged;  // 6. admin write with szi != 0
     int256 public lastSyncedEquity = type(int256).min; // unset
+    // actionCount at the moment the perp/spot config last changed. The
+    // whitelist check in invariant 2 is config-relative: an order sent before
+    // the latest config change belongs to the PREVIOUS config, so the check
+    // must skip exactly those orders (the handler deliberately fuzzes
+    // setPerpAsset/setSpotConfig).
+    uint256 public configChangedAtCount;
 
     address constant P_801 = 0x0000000000000000000000000000000000000801;
     address constant P_808 = 0x0000000000000000000000000000000000000808;
@@ -162,6 +168,7 @@ contract DNCoreBaseHandler is Test {
         try strat.setPerpAsset(asset) {
             if (a != actors[0]) strangerMutated = true;
             if (strat.position().szi != 0) mutatedWhileHedged = true;
+            configChangedAtCount = MockCoreWriter(CORE_WRITER).actionCount();
         } catch {}
     }
 
@@ -171,6 +178,7 @@ contract DNCoreBaseHandler is Test {
         try strat.setSpotConfig(pair, token, scale) {
             if (a != actors[0]) strangerMutated = true;
             if (strat.position().szi != 0) mutatedWhileHedged = true;
+            configChangedAtCount = MockCoreWriter(CORE_WRITER).actionCount();
         } catch {}
     }
 
@@ -250,7 +258,12 @@ contract DNCoreBaseInvariants is Test {
                 abi.decode(_payload(a), (uint32, bool, uint64, uint64, bool, uint8, uint128));
             isBuy; reduceOnly; cloid; // decoded for completeness; invariants below
             assertTrue(tif == 1 || tif == 2 || tif == 3, "TIF wellformed");
-            assertTrue(asset == strat.perpAsset() || asset == strat.spotAsset(), "asset whitelisted");
+            // Whitelist check is config-relative: skip when the config changed
+            // after this action was sent — the asset then belongs to the
+            // previous config by design. TIF/notional checks stay unconditional.
+            if (MockCoreWriter(0x3333333333333333333333333333333333333333).actionCount() > handler.configChangedAtCount()) {
+                assertTrue(asset == strat.perpAsset() || asset == strat.spotAsset(), "asset whitelisted");
+            }
             uint256 notional6 = (uint256(limitPx) * uint256(sz)) / 1e10;
             assertGe(notional6, 10e6, "no sub-$10 order ever sent");
             assertLe(notional6, MAX_ACTION, "no order above the per-action cap");
