@@ -61,7 +61,8 @@ changes silently:
 Reproduce **every** cell of this table with one command from the repo root: `node scripts/ladder_verify.js`
 (exit 0 = every row reconciles; otherwise one FAIL line per disagreeing cell, naming both values). The
 per-cell equivalents are `sha256sum attestations/2026-10-05.json | cut -c1-16` for a `file_sha256` row and
-`jq -r .product.as_of_block_hash attestations/2026-10-06.json | cut -c1-16` for a `block_hash` row;
+`jq -r .product.as_of_block_hash attestations/2026-10-06.json | sed 's/^0x//' | cut -c1-16` for a `block_hash`
+row (the `0x` prefix is stripped — every `evidence_pin` cell is exactly 16 hex characters, no prefix);
 `total_assets ($)` is `jq -r .product.metrics.total_assets_usdc attestations/<date>.json`.
 
 **Corrected cell — 2026-10-06 `total_assets` (card `t_e34d6404`, fixed 2026-10-17).** This row was
