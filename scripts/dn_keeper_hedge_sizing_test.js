@@ -152,8 +152,13 @@ async function main() {
     }
   })();
 
+  // --no-compile: this parent process has necessarily already compiled (it
+  // deploys every mock + the vault/strategy through hardhat artifacts below),
+  // so the child only needs to READ them. Without it each child re-enters the
+  // compile step while this process's 150 ms poller hammers the same anvil —
+  // pure contended startup work on a loaded box (card t_d09a097f, hypothesis 1).
   const child = spawn("npx",
-    ["hardhat", "run", "scripts/dn_keeper.js", "--network", "hyperTestnet"],
+    ["hardhat", "run", "scripts/dn_keeper.js", "--network", "hyperTestnet", "--no-compile"],
     {
       cwd: process.cwd(),
       env: {
@@ -170,7 +175,21 @@ async function main() {
   await poller;
   console.log(out.slice(-1800));
 
-  report("A1: keeper exited 0", rc === 0, `exit ${rc}`);
+  // Classify an environment-level failure so the log cannot be misread as a
+  // keeper-logic regression (card t_d09a097f): HH108 = the JSON-RPC connect was
+  // refused, i.e. the disposable anvil was gone — the suite had already driven
+  // the keeper through a clean mock state up to the send that failed.
+  const rpcLoss = /Cannot connect to the network|HH108|ECONNREFUSED/.test(out);
+  if (rpcLoss && rc !== 0) {
+    console.log("⚠ RPC LOSS — the keeper child lost the disposable anvil mid-send.");
+    console.log("  Environment event (endpoint refused / chain gone), NOT a keeper-logic regression:");
+    console.log("  the mock venue state was clean and the run died only at the next RPC write.");
+    console.log("  run_battery.sh restarts a fresh anvil and retries this suite once (see its ↻ line);");
+    console.log("  a standalone re-run needs a live anvil on the RPC (see this file's header).");
+  }
+
+  report("A1: keeper exited 0", rc === 0,
+    `exit ${rc}${rc !== 0 && rpcLoss ? " — RPC LOSS (env, see ⚠ above)" : ""}`);
   report("A1: hedge-buy branch fired", out.includes("buying spot hedge gap"));
   report("A1: log names the base-asset fee buffer + round-up",
     out.includes("base-asset fee, rounded up to one lot"));

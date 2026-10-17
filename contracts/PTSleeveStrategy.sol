@@ -160,8 +160,25 @@ contract PTSleeveStrategy is BaseStrategy {
         // permanently inflate `_totalAssets` above real backing (INV-1 breach).
         if (amount > idlePrincipal6()) revert PT__ExceedsPrincipalIdle();
         underlying.forceApprove(address(tokenMessenger), amount);
+        // AUDIT F-A (deploy leg): pin `destinationCaller` to the SAME immutable
+        // executor already used as the mint recipient, so only OUR executor can
+        // complete this arrival — and only through its `relayArrival` entry point
+        // (ops, or the 2/3 Safe as the recovery path). Ruling + threat model:
+        // docs/F_A_DEPLOY_LEG_RULING_2026-10-17.md §2/§3.1/§4. Recipient and
+        // permitted completer are one expression, so they can never disagree and
+        // there is no new constructor argument to get wrong.
+        // HARD RULE: never ship this pin without `relayArrival` in the executor
+        // bytecode — the pin alone deadlocks the arrival (§4). The current
+        // deployed executors have no relay and are NOT redeployed by this change;
+        // this pin only ever runs on a fresh pair built with the relay.
         tokenMessenger.depositForBurn(
-            amount, destDomain, bytes32(uint256(uint160(arbExecutor))), address(underlying), bytes32(0), maxFee, 1000
+            amount,
+            destDomain,
+            bytes32(uint256(uint160(arbExecutor))),
+            address(underlying),
+            bytes32(uint256(uint160(arbExecutor))),
+            maxFee,
+            1000
         );
         sentFace6 += amount;
         inFlight6 += amount;

@@ -304,22 +304,32 @@ async function main() {
       address: deployed.pt_sleeve_strategy,
       assets: fmt6(ptAssets),
       apyPct: ptApyPct,
-      note: `fixed-rate sleeve — locked at purchase; rate above is the current entry rate${ptExpiry ? ` · matures ${ptExpiry}` : ""}`,
+      note: ptAssets === 0n
+        ? `fixed-rate sleeve — unwound 2026-10-09; proceeds returned to the vault${ptExpiry ? ` · market ${ptExpiry <= new Date().toISOString().slice(0, 10) ? "matured" : "matures"} ${ptExpiry}` : ""}`
+        : `fixed-rate sleeve — locked at purchase; rate above is the current entry rate${ptExpiry ? ` · ${ptExpiry <= new Date().toISOString().slice(0, 10) ? "matured" : "matures"} ${ptExpiry}` : ""}`,
     });
   }
-  // PT ETH lane (CCTP → Ethereum executor → Pendle PT): holds its allocation
-  // as USDC until the lane's executor flow ships it (the lane is not wired
-  // into pt_keeper's HE/ARB passes yet). Show it honestly rather than hiding
-  // $18.95 of vault money from the deployment card.
+  // PT ETH lane (CCTP → Ethereum executor → Pendle PT): SHIPPED — the lane
+  // holds PT on Ethereum (one buy, maturing 2026-11-05). Entry rate + maturity
+  // from Pendle's public API (chain 1), same treatment as the Arb row above.
   const ptEthAssets = await readStrat(deployed.pt_sleeve_eth_strategy);
   if (ptEthAssets != null && ptEthAssets > 0n) {
+    let ptEthApyPct = null;
+    let ptEthExpiry = null;
+    try {
+      const mk = process.env.PT_ETH_MARKET || "0xaf0349fb9b1ba07d34381870c59b560b31412660";
+      const r = await fetch(`https://api-v2.pendle.finance/core/v1/1/markets/${mk}`);
+      const j = await r.json();
+      if (j && j.impliedApy != null) ptEthApyPct = Number((j.impliedApy * 100).toFixed(2));
+      if (j && j.expiry) ptEthExpiry = String(j.expiry).slice(0, 10);
+    } catch { /* gap */ }
     strategies.push({
       kind: "fixed",
       name: "Fixed-rate sleeve (PT, ETH lane)",
       address: deployed.pt_sleeve_eth_strategy,
       assets: fmt6(ptEthAssets),
-      apyPct: null,
-      note: "ETH lane — allocation held until the executor flow ships it to Pendle",
+      apyPct: ptEthApyPct,
+      note: `ETH lane — locked at purchase; rate above is the current entry rate${ptEthExpiry ? ` · ${ptEthExpiry <= new Date().toISOString().slice(0, 10) ? "matured" : "matures"} ${ptEthExpiry}` : ""}`,
     });
   }
   // HL Earn idle-cash sleeve (CoreWriter action 15): policy-gated — NOT

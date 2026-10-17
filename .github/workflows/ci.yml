@@ -9,6 +9,16 @@ on:
   # silently skipped every main commit that wasn't manually dispatched.)
   push:
     branches: [main]
+    # 2026-10-13 Actions-quota audit: doc- and attestation-only commits cannot
+    # affect contracts, scripts or tests, yet each one ran the full 3-job
+    # battery (~6.3 metered minutes). 35 such runs between Oct 1-13 ≈ 220 min.
+    # Skip only when EVERY changed path is generated evidence or prose; any
+    # push touching contracts/, test/, scripts/ or the build config still runs
+    # the complete gate.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'attestations/**'
   workflow_dispatch:
 
 permissions:
@@ -40,6 +50,22 @@ jobs:
         env:
           # Well-known anvil dev key #9 — PUBLIC, testnet-only, funds nothing real.
           DEPLOYER_PRIVATE_KEY: "0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6"
+
+      - name: Assert committed artifacts match a fresh build
+        # F1 / t_dd131407: the committed artifacts/ tree drift from source and
+        # then local runs lie (stale MockSpotBalance ABI broke 4 dn_* suites).
+        # run_battery.sh just recompiled from scratch (its cache purge), so any
+        # NON-.dbg artifact still differing from git means the committed tree is
+        # stale. .dbg.json are build-debug mappings, gitignored + untracked, so
+        # they never appear here. Costs ~0s (reuses the battery's own compile).
+        run: |
+          stale="$(git status --porcelain -uall -- artifacts/ | grep -v '\.dbg\.json$' || true)"
+          if [ -n "$stale" ]; then
+            echo "::error::Committed hardhat artifacts are stale vs a fresh build — run 'npx hardhat compile --force' and commit artifacts/:"
+            echo "$stale"
+            exit 1
+          fi
+          echo "committed artifacts match a fresh build"
 
   slither:
     name: Slither (baseline-aware)

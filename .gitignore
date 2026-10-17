@@ -28,3 +28,6 @@ artifacts/**/*.dbg.json
 # counted toward the S3b ladder.
 attestations/degraded/
 echidna_corpus_kink/
+
+# kanban worker worktrees — never track
+.worktrees/

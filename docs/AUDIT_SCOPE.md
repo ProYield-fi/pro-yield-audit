@@ -85,6 +85,12 @@ SUSD3 adapter, previously unmapped, is included.
 exception of deploy scripts, whose ownership defaults ARE in scope as an
 attack-surface concern; see audit F-1).
 
+### 1.3 Carry-forward constraints (internal adversarial pass, 2026-10-14)
+
+- Internal AI-assisted adversarial review — **supplement only, never a substitute** for the third-party audit lane: `docs/research/INTERNAL_AI_ADVERSARIAL_REVIEW_2026-10-14.md` (ranked findings, dispositions, failing-Forge-repro evidence).
+- **Do not fund or wire `PYDFeeDiscount` before a v2 carries its remediation** (high-water-mark + stakerList items; externally triaged as F5/F1). Latent today: zero stakers, zero budget, no caller — it activates the moment the rebate engine is funded/wired.
+- **Pin the `DNCoreBase.hedgeTransferOut` destination** (internal IA-1) in the DN revision that ships the F3/F6 fixes.
+
 ## 2. Architecture in one page
 
 ```

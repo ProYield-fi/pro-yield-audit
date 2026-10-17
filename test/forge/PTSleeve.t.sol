@@ -61,11 +61,18 @@ contract PTSleeveStrategyTest is Test {
     function test_deployToArb_burn_args_and_accounting() public {
         vm.prank(keeper);
         strat.deployToArb(100e6, 0);
-        (uint256 amount, uint32 dest, bytes32 recip, address token,, uint256 maxFee, uint32 finality) = cctp.lastBurn();
+        (uint256 amount, uint32 dest, bytes32 recip, address token, bytes32 destCaller, uint256 maxFee, uint32 finality) = cctp.lastBurn();
         assertEq(amount, 100e6, "amount");
         assertEq(dest, 3, "Arbitrum domain");
         assertEq(recip, bytes32(uint256(uint160(executorAddr))), "immutable executor recipient");
         assertEq(token, address(usdc), "burn token");
+        // AUDIT F-A (deploy leg): the permitted completer is the SAME immutable
+        // executor used as the mint recipient, so only OUR executor's
+        // `relayArrival` can complete the arrival (ops, or the 2/3 Safe as the
+        // recovery path). Ruling: docs/F_A_DEPLOY_LEG_RULING_2026-10-17.md
+        // §2/§3.1/§4 — the pin must never ship without `relayArrival` in the
+        // executor bytecode, or the arrival deadlocks.
+        assertEq(destCaller, bytes32(uint256(uint160(executorAddr))), "F-A: deploy leg pinned to the executor");
         assertEq(maxFee, 0, "maxFee");
         assertEq(finality, 1000, "fast transfer");
         assertEq(cctp.burnCount(), 1, "one burn");
@@ -73,6 +80,38 @@ contract PTSleeveStrategyTest is Test {
         assertEq(strat.totalAssets(), 1_000e6, "total unchanged: idle -> inFlight");
         assertEq(strat.inFlight6(), 100e6, "inFlight booked at face");
         assertEq(strat.outstandingFace6(), 100e6, "outstanding");
+    }
+
+    /// AUDIT F-A (deploy leg): after the pin, ONLY the executor can complete the
+    /// outbound arrival. A stranger relaying the (public) message is refused by
+    /// the transmitter, so the free option to time our next market order — and to
+    /// trip the monitor's third-party alert for gas — is gone. The pinned
+    /// completer is the executor's own `relayArrival`; the book still heals from
+    /// the balance (balance-driven `ackArrival`, then an attested re-sync).
+    function test_deploy_leg_arrival_only_via_the_pinned_executor() public {
+        vm.prank(keeper);
+        strat.deployToArb(100e6, 0);
+        assertEq(strat.inFlight6(), 100e6, "in flight before arrival");
+        cctp.setInbound(100e6, executorAddr); // the message THIS burn produced
+
+        vm.prank(address(0xB0B)); // the free-option relay of the old (blank) leg
+        vm.expectRevert("mockcctp: destinationCaller: caller not allowed");
+        cctp.receiveMessage(hex"", hex"");
+
+        vm.prank(executorAddr); // = exec.relayArrival(), the only legal completer
+        assertTrue(cctp.receiveMessage(hex"", hex""));
+        assertEq(usdc.balanceOf(executorAddr), 100e6, "cash landed at OUR executor");
+        assertEq(usdc.balanceOf(address(0xB0B)), 0, "relayer gained nothing");
+
+        vm.prank(keeper);
+        strat.ackArrival(100e6); // balance-driven, no relay needed
+        assertEq(strat.inFlight6(), 0, "in-flight cleared by the ack");
+        assertEq(strat.outstandingFace6(), 100e6, "face still out (deployed at the venue)");
+
+        vm.prank(keeper);
+        strat.syncArbValue(100e6);
+        assertEq(strat.arbValue6(), 100e6, "attested value == real executor holdings");
+        assertEq(strat.totalAssets(), 1_000e6, "no double count");
     }
 
     function test_deployToArb_auth() public {
@@ -175,7 +214,7 @@ contract PTSleeveStrategyTest is Test {
         strat.syncArbValue(105e6);
         vm.stopPrank();
 
-        cctp.setInbound(105e6, address(strat));
+        cctp.setInboundAny(105e6, address(strat));
         vm.prank(address(0xB0B)); // permissionless BY DESIGN
         uint256 got = strat.completeInbound(hex"dead", hex"beef");
         assertEq(got, 105e6, "received measured");
@@ -195,7 +234,7 @@ contract PTSleeveStrategyTest is Test {
         strat.syncArbValue(100e6);
         vm.stopPrank();
 
-        cctp.setInbound(40e6, address(strat));
+        cctp.setInboundAny(40e6, address(strat));
         strat.completeInbound(hex"", hex"");
         assertEq(strat.arbValue6(), 60e6, "reduced by received amount");
         assertEq(strat.outstandingFace6(), 60e6, "rest still out");
@@ -253,7 +292,7 @@ contract PTSleeveStrategyTest is Test {
         strat.recall(700e6); // pays idle 300, shortfall 400
         assertEq(strat.pendingRecall6(), 400e6);
 
-        cctp.setInbound(400e6, address(strat));
+        cctp.setInboundAny(400e6, address(strat));
         strat.completeInbound(hex"", hex""); // unwind landed
         vm.prank(keeper);
         strat.pushIdle(400e6);
@@ -280,7 +319,7 @@ contract PTSleeveStrategyTest is Test {
         vm.stopPrank();
         assertEq(strat.totalAssets(), 1_004e6, "accrual visible");
 
-        cctp.setInbound(104e6, address(strat)); // sold + bridged standard
+        cctp.setInboundAny(104e6, address(strat)); // sold + bridged standard
         strat.completeInbound(hex"aa", hex"bb");
         assertEq(strat.totalAssets(), 1_004e6, "value moved to idle, no double count");
         assertEq(strat.arbValue6(), 0);
@@ -320,7 +359,7 @@ contract PTSleeveStrategyTest is Test {
         assertEq(strat.inFlight6(), 200e6);
         assertEq(strat.totalAssets(), 1_000e6); // idle 800 + inFlight 200
 
-        cctp.setInbound(200e6, address(strat)); // the full return arrives
+        cctp.setInboundAny(200e6, address(strat)); // the full return arrives
         uint256 got = strat.completeInbound(hex"00", hex"00");
         assertEq(got, 200e6);
         assertEq(strat.inFlight6(), 0, "F-1: inbound must clear the in-flight slice");
@@ -420,6 +459,9 @@ contract PTSleeveExecutorTest is Test {
         );
         exec.setMarket(marketAddr, address(pt));
         usdc.mint(address(exec), 1_000e6);
+        // AUDIT F-B: a live pair must be ARMED (owner confirms the return
+        // destination) before the first burn; every test here runs on an armed pair.
+        exec.confirmStrategyReturn(strategyHyperEvm);
     }
 
     function test_buyPT_flows_and_price() public {
@@ -477,11 +519,14 @@ contract PTSleeveExecutorTest is Test {
     function test_bridgeBack_fixed_destination_and_standard_finality() public {
         vm.prank(ops);
         exec.bridgeBack(500e6, 0);
-        (uint256 amount, uint32 dest, bytes32 recip, address token,, uint256 maxFee, uint32 finality) = cctp.lastBurn();
+        (uint256 amount, uint32 dest, bytes32 recip, address token, bytes32 destCaller, uint256 maxFee, uint32 finality) = cctp.lastBurn();
         assertEq(amount, 500e6);
         assertEq(dest, 19, "HyperEVM domain");
         assertEq(recip, bytes32(uint256(uint160(strategyHyperEvm))), "immutable strategy return address");
         assertEq(token, address(usdc));
+        // AUDIT F-A: the return leg pins `destinationCaller` to the strategy, so
+        // ONLY the strategy (via completeInbound) may complete the inbound mint.
+        assertEq(destCaller, bytes32(uint256(uint160(strategyHyperEvm))), "F-A: return leg pinned to the strategy");
         assertEq(maxFee, 0);
         assertEq(finality, 2000, "standard transfer (fee-free today)");
         assertEq(exec.usdcBalance(), 500e6, "USDC burned back");
@@ -494,6 +539,58 @@ contract PTSleeveExecutorTest is Test {
         vm.prank(ops);
         vm.expectRevert("PTE: bad amount");
         exec.bridgeBack(1_001e6, 0);
+    }
+
+    /// AUDIT F-A regression (return leg). The pin is ENFORCED by the CCTP
+    /// message transmitter, not merely recorded in calldata: the `(message,
+    /// attestation)` pair is public, so before the pin an unprivileged observer
+    /// could complete our own arrival first, consume the single-use nonce, and
+    /// permanently prevent the strategy's `completeInbound` (the only writer of
+    /// `retFace6`) from booking that return. Now a foreign caller is rejected by
+    /// the transmitter and the strategy can still complete it — once.
+    function test_return_leg_pin_is_enforced_by_the_transmitter() public {
+        vm.prank(ops);
+        exec.bridgeBack(500e6, 0); // pins destinationCaller = strategyHyperEvm
+        cctp.setInbound(500e6, strategyHyperEvm);
+
+        vm.prank(address(0xB0B)); // the front-runner from the F-A PoC
+        vm.expectRevert("mockcctp: destinationCaller: caller not allowed");
+        cctp.receiveMessage(hex"", hex"");
+
+        vm.prank(strategyHyperEvm); // the pinned caller may complete it — once
+        assertTrue(cctp.receiveMessage(hex"", hex""));
+        assertEq(usdc.balanceOf(strategyHyperEvm), 500e6);
+        vm.prank(strategyHyperEvm);
+        vm.expectRevert("mockcctp: message already used"); // CCTP messages are single-use
+        cctp.receiveMessage(hex"", hex"");
+    }
+
+    /// AUDIT F-A (deploy leg): the relay entry point on the Arb executor. The
+    /// strategy's outbound burn pins `destinationCaller = this executor`, so the
+    /// arrival can only be completed here — by `ops` (keeper) or `owner` (Safe).
+    function test_relayArrival_entry_point_and_recovery_path() public {
+        cctp.setInboundPinnedFor(250e6, address(exec), address(exec));
+        vm.prank(address(0xB0B));
+        vm.expectRevert("PTE: not ops/owner");
+        exec.relayArrival(hex"", hex"");
+
+        vm.prank(ops);
+        uint256 got = exec.relayArrival(hex"", hex"");
+        assertEq(got, 250e6, "relayed amount reported");
+        assertEq(exec.usdcBalance(), 1_250e6, "mint landed in the executor");
+
+        vm.prank(ops);
+        vm.expectRevert("mockcctp: message already used");
+        exec.relayArrival(hex"", hex"");
+
+        cctp.setInboundPinnedFor(100e6, address(exec), address(exec));
+        exec.relayArrival(hex"", hex""); // owner == this == the 2/3 Safe path
+        assertEq(exec.usdcBalance(), 1_350e6, "recovery relay from the owner works");
+
+        cctp.setInboundPinnedFor(50e6, address(0xB0B), address(exec));
+        vm.prank(ops);
+        vm.expectRevert("PTE: nothing minted");
+        exec.relayArrival(hex"", hex"");
     }
 
     function test_config_is_owner_only() public {
@@ -517,24 +614,45 @@ contract PTSleeveExecutorTest is Test {
     // ——— one-time return-address confirm (deploy bootstrap safety net) ———
 
     function test_confirmStrategyReturn_once_then_locked() public {
-        assertEq(exec.strategyReturn(), bytes32(uint256(uint160(strategyHyperEvm))), "constructor value");
-        exec.confirmStrategyReturn(address(0x9999));
-        assertEq(exec.strategyReturn(), bytes32(uint256(uint160(address(0x9999)))), "corrected");
+        // a FRESH pair starts unarmed (the suite's main executor is armed)
+        PTSleeveExecutor fresh = new PTSleeveExecutor(
+            address(usdc), address(router), address(cctp), strategyHyperEvm, ops, address(this),
+            address(usdai), address(curve), 1, 0
+        );
+        assertEq(fresh.strategyReturn(), bytes32(uint256(uint160(strategyHyperEvm))), "constructor value");
+        fresh.confirmStrategyReturn(address(0x9999));
+        assertEq(fresh.strategyReturn(), bytes32(uint256(uint160(address(0x9999)))), "corrected");
         vm.expectRevert("PTE: already confirmed");
-        exec.confirmStrategyReturn(address(0x8888));
+        fresh.confirmStrategyReturn(address(0x8888));
     }
 
     function test_confirmStrategyReturn_too_late_after_activity() public {
+        // (a) venue activity alone closes the one-time correction window
+        PTSleeveExecutor a = new PTSleeveExecutor(
+            address(usdc), address(router), address(cctp), strategyHyperEvm, ops, address(this),
+            address(usdai), address(curve), 1, 0
+        );
+        a.setMarket(marketAddr, address(pt));
+        usdc.mint(address(a), 10e6);
         vm.prank(ops);
-        exec.buyPT(1e6, 0, 0);
-        vm.expectRevert("PTE: too late");
-        exec.confirmStrategyReturn(address(0x9999));
-        // also too late once a return has been burned
-        exec.setMarket(marketAddr, address(pt)); // no-op sanity
+        vm.expectRevert("PTE: return not confirmed"); // F-B: unarmed return leg refuses
+        a.bridgeBack(1e6, 0);
         vm.prank(ops);
-        exec.bridgeBack(1e6, 0);
+        a.buyPT(1e6, 0, 0);
         vm.expectRevert("PTE: too late");
-        exec.confirmStrategyReturn(address(0x9999));
+        a.confirmStrategyReturn(address(0x9999));
+
+        // (b) once a return has actually burned, the window is shut for good
+        PTSleeveExecutor b = new PTSleeveExecutor(
+            address(usdc), address(router), address(cctp), strategyHyperEvm, ops, address(this),
+            address(usdai), address(curve), 1, 0
+        );
+        usdc.mint(address(b), 10e6);
+        b.confirmStrategyReturn(strategyHyperEvm);
+        vm.prank(ops);
+        b.bridgeBack(1e6, 0);
+        vm.expectRevert("PTE: already confirmed");
+        b.confirmStrategyReturn(address(0x9999));
     }
 
     function test_confirmStrategyReturn_owner_only() public {

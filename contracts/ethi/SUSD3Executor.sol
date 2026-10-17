@@ -40,6 +40,13 @@ interface ITokenMessengerV2BurnSusd {
         uint256 maxFee,
         uint32 minFinalityThreshold
     ) external;
+
+    /// @dev AUDIT F-A (deploy leg): derived transmitter — no new constructor arg.
+    function localMessageTransmitter() external view returns (address);
+}
+
+interface IMessageTransmitterV2RecvSusd {
+    function receiveMessage(bytes calldata message, bytes calldata attestation) external returns (bool);
 }
 
 /// @title SUSD3Executor — Ethereum-side executor for the Frontier sUSD3 sleeve.
@@ -79,6 +86,9 @@ contract SUSD3Executor is Ownable, ReentrancyGuard {
     IERC4626Min public immutable susd3; // junior vault (ERC-4626 over USD3)
     ISUSD3Cooldown public immutable cooldownCtl; // = susd3 (typed for clarity)
     ITokenMessengerV2BurnSusd public immutable tokenMessenger;
+    /// @dev AUDIT F-A (deploy leg): the transmitter PAIRED with `tokenMessenger`,
+    /// derived on-chain at construction (never a constructor argument).
+    IMessageTransmitterV2RecvSusd public immutable messageTransmitter;
     uint32 public constant HYPEREVM_DOMAIN = 19;
 
     /// @dev The HyperEVM strategy address (bytes32) that bridgeBack mints to.
@@ -99,10 +109,15 @@ contract SUSD3Executor is Ownable, ReentrancyGuard {
     event CooldownCancelled();
     event Exited(uint256 susd3Shares, uint256 usd3Out, uint256 usdcOut);
     event BridgedBack(uint256 amount, uint256 maxFee);
+    event ArrivalRelayed(uint256 received);
     event StrategyReturnConfirmed(address indexed strategy);
     event Rescued(address indexed token, address indexed to, uint256 amount);
 
     error SUSD3E__NotOps();
+    error SUSD3E__NotOpsOrOwner();
+    error SUSD3E__ReceiveFailed();
+    error SUSD3E__NothingMinted();
+    error SUSD3E__NotConfirmed();
     error SUSD3E__ZeroAddr();
     error SUSD3E__BadAmount();
     error SUSD3E__Slippage();
@@ -111,6 +126,13 @@ contract SUSD3Executor is Ownable, ReentrancyGuard {
 
     modifier onlyOps() {
         if (msg.sender != ops) revert SUSD3E__NotOps();
+        _;
+    }
+
+    /// @dev AUDIT F-A (deploy leg): `ops` = keeper key; `owner` = the 2/3 Safe —
+    /// the permanent recovery path if that key rotates.
+    modifier onlyOpsOrOwner() {
+        if (msg.sender != ops && msg.sender != owner()) revert SUSD3E__NotOpsOrOwner();
         _;
     }
 
@@ -134,6 +156,10 @@ contract SUSD3Executor is Ownable, ReentrancyGuard {
         susd3 = IERC4626Min(_susd3);
         cooldownCtl = ISUSD3Cooldown(_susd3);
         tokenMessenger = ITokenMessengerV2BurnSusd(_tokenMessenger);
+        // AUDIT F-A (deploy leg): derived, never passed in.
+        address _mt = ITokenMessengerV2BurnSusd(_tokenMessenger).localMessageTransmitter();
+        if (_mt == address(0)) revert SUSD3E__ZeroAddr();
+        messageTransmitter = IMessageTransmitterV2RecvSusd(_mt);
         strategyReturn = bytes32(uint256(uint160(_strategyReturn)));
         ops = _ops;
     }
@@ -250,14 +276,55 @@ contract SUSD3Executor is Ownable, ReentrancyGuard {
 
     /// @notice Ops: burn USDC back to the HyperEVM strategy via CCTP
     /// (standard transfer, fee-free today, destination IMMUTABLE).
+    ///
+    /// AUDIT F-A (HIGH): the burn pins `destinationCaller = strategyReturn`
+    /// (was `bytes32(0)` = "any address may complete"). Circle's
+    /// `(message, attestation)` pair is public and CCTP messages are
+    /// single-use, so an unpinned return let an unprivileged observer complete
+    /// the inbound mint first and consume the nonce — after which the
+    /// strategy's `completeInbound` (the ONLY writer of `retFace6`) could never
+    /// book that return. No theft, but the sleeve then reports venue value it
+    /// no longer holds and a later genuine loss of the same size is masked.
+    /// With the caller pinned, ONLY the strategy address can complete, and only
+    /// through `completeInbound` (which calls `MessageTransmitter.receiveMessage`
+    /// itself) — so the keeper needs no change and completion stays
+    /// permissionless at the strategy layer. The pin follows `strategyReturn`,
+    /// the same value the mint recipient uses (so they can never disagree).
+    ///
+    /// AUDIT F-B (companion, HIGH on a rebuild): the return leg is UNUSABLE
+    /// until the owner blesses the destination (`returnConfirmed`). Without the
+    /// gate the first normal unwind closes the one-time correction window
+    /// permanently; with the F-A pin a wrong destination is also uncompletable,
+    /// so run the confirm step (scripts/susd3_confirm_return.js) first.
     function bridgeBack(uint256 amount, uint256 maxFee) external onlyOps nonReentrant {
+        if (!returnConfirmed) revert SUSD3E__NotConfirmed();
         if (amount == 0 || amount > usdc.balanceOf(address(this))) revert SUSD3E__BadAmount();
         usdc.forceApprove(address(tokenMessenger), amount);
         tokenMessenger.depositForBurn(
-            amount, HYPEREVM_DOMAIN, strategyReturn, address(usdc), bytes32(0), maxFee, 2000
+            amount, HYPEREVM_DOMAIN, strategyReturn, address(usdc), strategyReturn, maxFee, 2000
         );
         bridgeBackCount += 1;
         emit BridgedBack(amount, maxFee);
+    }
+
+    /// @notice Ops/Safe: relay a COMPLETED deploy-leg CCTP message into this
+    /// executor. AUDIT F-A (deploy leg) — the strategy's outbound burn pins
+    /// `destinationCaller = THIS executor`, so the relay must live here.
+    /// `MessageTransmitterV2` validates the attestation/domain/nonce and the mint
+    /// recipient is fixed in the message body; a zero delta refuses any message
+    /// that does not pay this contract (not a free relay service).
+    /// ops = keeper EOA; owner = the 2/3 Safe (survives a key rotation).
+    function relayArrival(bytes calldata message, bytes calldata attestation)
+        external
+        onlyOpsOrOwner
+        nonReentrant
+        returns (uint256 received)
+    {
+        uint256 before = usdc.balanceOf(address(this));
+        if (!messageTransmitter.receiveMessage(message, attestation)) revert SUSD3E__ReceiveFailed();
+        received = usdc.balanceOf(address(this)) - before;
+        if (received == 0) revert SUSD3E__NothingMinted();
+        emit ArrivalRelayed(received);
     }
 
     /// @notice Owner (2/3 Safe) rescue hatch — ops can NOT call this.

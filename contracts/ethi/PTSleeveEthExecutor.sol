@@ -44,6 +44,16 @@ interface ITokenMessengerV2BurnEth {
         uint256 maxFee,
         uint32 minFinalityThreshold
     ) external;
+
+    /// @dev AUDIT F-A (deploy leg): the CCTP v2 TokenMessenger publishes its
+    /// paired MessageTransmitter (`BaseTokenMessenger.localMessageTransmitter`),
+    /// so `relayArrival` can reach the receiver WITHOUT a new constructor
+    /// argument — there is no way to pass a wrong or attacker-chosen one.
+    function localMessageTransmitter() external view returns (address);
+}
+
+interface IMessageTransmitterV2RecvEth {
+    function receiveMessage(bytes calldata message, bytes calldata attestation) external returns (bool);
 }
 
 interface ICurvePoolEth {
@@ -89,6 +99,9 @@ contract PTSleeveEthExecutor is Ownable, ReentrancyGuard {
     IERC20 public immutable usdc;
     IPendleRouterMin public immutable router;
     ITokenMessengerV2BurnEth public immutable tokenMessenger;
+    /// @dev AUDIT F-A (deploy leg): the transmitter PAIRED with `tokenMessenger`,
+    /// derived on-chain at construction (never a constructor argument).
+    IMessageTransmitterV2RecvEth public immutable messageTransmitter;
     address public immutable asset; // stable the Pendle SY accepts (apxUSD)
     ICurvePoolEth public immutable curve; // USDC <-> asset hop (Curve stableswap-ng)
     int128 public immutable curveIdxUsdc;
@@ -129,11 +142,20 @@ contract PTSleeveEthExecutor is Ownable, ReentrancyGuard {
     event BoughtPt(uint256 usdcIn, uint256 ptOut);
     event SoldPt(uint256 ptIn, uint256 usdcOut);
     event BridgedBack(uint256 amount, uint256 maxFee);
+    event ArrivalRelayed(uint256 received);
     event StrategyReturnConfirmed(address indexed strategy);
     event Rescued(address indexed token, address indexed to, uint256 amount);
 
     modifier onlyOps() {
         require(msg.sender == ops, "PTE: not ops");
+        _;
+    }
+
+    /// @dev AUDIT F-A (deploy leg): `ops` is the keeper key; `owner` is the 2/3
+    /// treasury Safe, which is the PERMANENT recovery path if that key rotates.
+    /// Recovery must never depend on a human remembering an old key.
+    modifier onlyOpsOrOwner() {
+        require(msg.sender == ops || msg.sender == owner(), "PTE: not ops/owner");
         _;
     }
 
@@ -159,6 +181,10 @@ contract PTSleeveEthExecutor is Ownable, ReentrancyGuard {
         usdc = IERC20(_usdc);
         router = IPendleRouterMin(_router);
         tokenMessenger = ITokenMessengerV2BurnEth(_tokenMessenger);
+        // AUDIT F-A (deploy leg): derived, never passed in.
+        address _mt = ITokenMessengerV2BurnEth(_tokenMessenger).localMessageTransmitter();
+        require(_mt != address(0), "PTE: zero MT");
+        messageTransmitter = IMessageTransmitterV2RecvEth(_mt);
         strategyReturn = bytes32(uint256(uint160(_strategyReturn)));
         ops = _ops;
         asset = _asset;
@@ -302,14 +328,66 @@ contract PTSleeveEthExecutor is Ownable, ReentrancyGuard {
     /// STANDARD transfer (minFinalityThreshold = 2000): fee-free today (verified
     /// via Circle's fee API for Ethereum -> HyperEVM), ~15+ min.
     /// Destination is the IMMUTABLE strategyReturn — ops cannot redirect it.
+    ///
+    /// AUDIT F-A (HIGH): the burn pins `destinationCaller = strategyReturn`
+    /// (was `bytes32(0)` = "any address may complete"). Circle's
+    /// `(message, attestation)` pair is public and CCTP messages are
+    /// single-use, so an unpinned return let an unprivileged observer complete
+    /// the inbound mint first and consume the nonce — after which the
+    /// strategy's `completeInbound` (the ONLY writer of `retFace6`) could never
+    /// book that return. No theft, but the sleeve then reports venue value it
+    /// no longer holds and a later genuine loss of the same size is masked.
+    /// With the caller pinned, ONLY the strategy address can complete, and only
+    /// through `completeInbound` (which calls `MessageTransmitter.receiveMessage`
+    /// itself) — so the keeper needs no change and completion stays
+    /// permissionless at the strategy layer (`completeInbound` is public).
+    /// The pin follows `strategyReturn`, the same value the mint recipient uses,
+    /// so the two can never disagree (including after the one-time
+    /// `confirmStrategyReturn` correction, which is only available before any
+    /// activity — i.e. before any burn can exist to be pinned wrongly).
+    ///
+    /// AUDIT F-B (HIGH, companion): the return leg is UNUSABLE until the owner
+    /// has blessed the destination (`returnConfirmed`). Before this gate the
+    /// FIRST normal unwind burned real USDC to whatever address the deploy
+    /// script predicted, and `confirmStrategyReturn` refuses once
+    /// `bridgeBackCount != 0` — so a wrong prediction was permanently
+    /// unrecoverable. Combined with the F-A pin a wrong destination would also
+    /// make the arrival uncompletable, so the gate is now load-bearing: confirm
+    /// first (scripts/pt_eth_confirm_return.js), then burn.
     function bridgeBack(uint256 amount, uint256 maxFee) external onlyOps nonReentrant {
+        require(returnConfirmed, "PTE: return not confirmed");
         require(amount > 0 && amount <= usdc.balanceOf(address(this)), "PTE: bad amount");
         usdc.forceApprove(address(tokenMessenger), amount);
         tokenMessenger.depositForBurn(
-            amount, HYPEREVM_DOMAIN, strategyReturn, address(usdc), bytes32(0), maxFee, 2000
+            amount, HYPEREVM_DOMAIN, strategyReturn, address(usdc), strategyReturn, maxFee, 2000
         );
         bridgeBackCount += 1;
         emit BridgedBack(amount, maxFee);
+    }
+
+    /// @notice Ops/Safe: relay a COMPLETED deploy-leg CCTP message into this
+    /// executor. AUDIT F-A (deploy leg) — paired with the strategy's outbound
+    /// burn, which now pins `destinationCaller = THIS executor`: only this
+    /// contract may complete that arrival, so the relay has to live here.
+    ///
+    /// No new trust: `MessageTransmitterV2.receiveMessage` is what validates the
+    /// Circle attestation, the destination domain and the single-use nonce, and
+    /// the mint recipient is fixed in the message body — this function can only
+    /// ever deliver an already-valid message, and it refuses any message that
+    /// does not pay THIS contract (`received == 0`), so it is not a free relay
+    /// service for strangers. `ops` = keeper EOA; `owner` = the 2/3 Safe (the
+    /// recovery path that survives a key rotation).
+    function relayArrival(bytes calldata message, bytes calldata attestation)
+        external
+        onlyOpsOrOwner
+        nonReentrant
+        returns (uint256 received)
+    {
+        uint256 before = usdc.balanceOf(address(this));
+        require(messageTransmitter.receiveMessage(message, attestation), "PTE: receive failed");
+        received = usdc.balanceOf(address(this)) - before;
+        require(received > 0, "PTE: nothing minted");
+        emit ArrivalRelayed(received);
     }
 
     /// @notice Owner (2/3 Safe) rescue hatch — e.g. post-expiry PT handling or

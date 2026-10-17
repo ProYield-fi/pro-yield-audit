@@ -74,14 +74,51 @@ contract SUSD3StrategyTest is Test {
         strat.setVenueCleared(true);
         vm.prank(keeper);
         strat.deployToEth(100e18, 1e6);
-        (uint256 amount, uint32 domain, bytes32 recipient, address burnToken,, uint256 maxFee,) = cctp.lastBurn();
+        (uint256 amount, uint32 domain, bytes32 recipient, address burnToken, bytes32 destCaller, uint256 maxFee,) = cctp.lastBurn();
         assertEq(amount, 100e18);
         assertEq(domain, 0); // Ethereum
         assertEq(recipient, bytes32(uint256(uint160(executor))));
         assertEq(burnToken, address(usdc));
+        // AUDIT F-A (deploy leg): permitted completer = the SAME immutable
+        // executor used as the mint recipient, so only its `relayArrival` can
+        // complete the arrival (ops, or the 2/3 Safe as recovery). Ruling:
+        // docs/F_A_DEPLOY_LEG_RULING_2026-10-17.md §2/§3.1/§4 — never ship this
+        // pin without `relayArrival` in the executor bytecode.
+        assertEq(destCaller, bytes32(uint256(uint160(executor))), "F-A: deploy leg pinned to the executor");
         assertEq(maxFee, 1e6);
         assertEq(strat.inFlight6(), 100e18);
         assertEq(strat.totalAssets(), 200e18); // idle -> in-flight, book unchanged
+    }
+
+    /// AUDIT F-A (deploy leg): after the pin, ONLY the executor can complete the
+    /// outbound arrival — a stranger's relay is refused by the transmitter. The
+    /// pinned completer is the executor's `relayArrival`; the book still heals
+    /// from the balance (balance-driven `ackArrival`, then an attested re-sync).
+    function test_deploy_leg_arrival_only_via_the_pinned_executor() public {
+        strat.setVenueCleared(true);
+        vm.prank(keeper);
+        strat.deployToEth(100e18, 1e6);
+        assertEq(strat.inFlight6(), 100e18, "in flight before arrival");
+        cctp.setInbound(100e18, executor); // the message THIS burn produced
+
+        vm.prank(stranger); // the free-option relay of the old (blank) leg
+        vm.expectRevert("mockcctp: destinationCaller: caller not allowed");
+        cctp.receiveMessage(hex"", hex"");
+
+        vm.prank(executor); // = exec.relayArrival(), the only legal completer
+        assertTrue(cctp.receiveMessage(hex"", hex""));
+        assertEq(usdc.balanceOf(executor), 100e18, "cash landed at OUR executor");
+        assertEq(usdc.balanceOf(stranger), 0, "the relayer gained nothing");
+
+        vm.prank(keeper);
+        strat.ackArrival(100e18); // balance-driven: no relay needed
+        assertEq(strat.inFlight6(), 0, "in-flight cleared");
+        assertEq(strat.outstandingFace6(), 100e18, "face still out at the venue");
+
+        vm.prank(keeper);
+        strat.syncEthValue(100e18);
+        assertEq(strat.ethValue6(), 100e18, "attested value == real executor holdings");
+        assertEq(strat.totalAssets(), 200e18, "no double count");
     }
 
     function test_cap_blocks_over_15pct() public {
@@ -168,14 +205,14 @@ contract SUSD3StrategyTest is Test {
         vm.prank(keeper);
         strat.syncEthValue(200e18); // book back to 200 after the ack dip
         // return leg: the executor ships 100 back; the keeper completes inbound
-        cctp.setInbound(100e18, address(strat));
+        cctp.setInboundAny(100e18, address(strat));
         uint256 got = strat.completeInbound(hex"00", hex"00");
         assertEq(got, 100e18);
         assertEq(strat.retFace6(), 100e18);
         assertEq(strat.ethValue6(), 100e18); // the returned face dropped from the attested value
         assertEq(strat.totalAssets(), 200e18); // idle 100 + inFlight 0 + value 100 — no double-count
         // a return-false transmitter cannot be completed
-        cctp.setInbound(50e18, address(strat));
+        cctp.setInboundAny(50e18, address(strat));
         cctp.setInboundFail(true, false);
         vm.expectRevert(SUSD3Strategy.SUSD3__ReceiveFailed.selector);
         strat.completeInbound(hex"00", hex"00");
@@ -192,7 +229,7 @@ contract SUSD3StrategyTest is Test {
         strat.recall(50e18); // vault wants 50; idle is 0
         assertEq(strat.pendingRecall6(), 50e18);
         // the unwind lands back home
-        cctp.setInbound(50e18, address(strat));
+        cctp.setInboundAny(50e18, address(strat));
         strat.completeInbound(hex"00", hex"00");
         vm.prank(keeper);
         strat.pushIdle(50e18); // keeper pays the pending recall
@@ -206,7 +243,7 @@ contract SUSD3StrategyTest is Test {
         strat.deployToEth(100e18, 0);
         strat.setVenueCleared(false); // incident re-lock
         // money-out is NEVER gated: inbound completion + push to vault still work
-        cctp.setInbound(100e18, address(strat));
+        cctp.setInboundAny(100e18, address(strat));
         strat.completeInbound(hex"00", hex"00");
         vm.prank(keeper);
         strat.pushIdle(100e18);
@@ -246,7 +283,7 @@ contract SUSD3StrategyTest is Test {
         assertEq(strat.outstandingFace6(), 100e18); // sent - returned
         assertEq(strat.name(), "SUSD3"); // the feed/monitor label
         // a second ship + return flips outstanding to the residual
-        cctp.setInbound(40e18, address(strat));
+        cctp.setInboundAny(40e18, address(strat));
         strat.completeInbound(hex"00", hex"00");
         assertEq(strat.outstandingFace6(), 60e18);
     }
@@ -264,7 +301,7 @@ contract SUSD3StrategyTest is Test {
         assertEq(strat.inFlight6(), 200e18);
         assertEq(strat.totalAssets(), 200e18); // idle 0 + inFlight 200 + value 0
 
-        cctp.setInbound(200e18, address(strat)); // the full return arrives
+        cctp.setInboundAny(200e18, address(strat)); // the full return arrives
         uint256 got = strat.completeInbound(hex"00", hex"00");
         assertEq(got, 200e18);
         assertEq(strat.inFlight6(), 0, "F-1: inbound must clear the in-flight slice");
@@ -285,7 +322,7 @@ contract SUSD3StrategyTest is Test {
         vm.prank(keeper);
         strat.deployToEth(100e18, 0); // sent = 100
         // a 150 mint lands (100 back + 50 gift)
-        cctp.setInbound(150e18, address(strat));
+        cctp.setInboundAny(150e18, address(strat));
         uint256 got = strat.completeInbound(hex"00", hex"00");
         assertEq(got, 150e18);
         assertEq(strat.retFace6(), 100e18, "F-6: retFace books PRINCIPAL only");
@@ -497,7 +534,7 @@ contract SUSD3AttributionTest is Test {
         strat.ackArrival(P);
         strat.syncEthValue(P + delta);
         vm.stopPrank();
-        cctp.setInbound(P + delta, address(strat));
+        cctp.setInboundAny(P + delta, address(strat));
         strat.completeInbound(hex"", hex"");
     }
 
@@ -530,7 +567,7 @@ contract SUSD3AttributionTest is Test {
         strat.syncEthValue(P + DLT);
         vm.stopPrank();
 
-        cctp.setInbound(P + DLT, address(strat));
+        cctp.setInboundAny(P + DLT, address(strat));
         strat.completeInbound(hex"", hex"");
 
         assertEq(strat.profitRealized6(), DLT, "the excess is realized yield");
@@ -545,7 +582,7 @@ contract SUSD3AttributionTest is Test {
     function test_partial_unwind_defers_yield() public {
         _ship();
         uint256 before = usdc.balanceOf(address(strat)); // 0
-        cctp.setInbound(P - 100e18, address(strat)); // return < outstanding
+        cctp.setInboundAny(P - 100e18, address(strat)); // return < outstanding
         strat.completeInbound(hex"", hex"");
 
         assertEq(strat.profitRealized6(), 0, "conservative: yield deferred, not invented");
@@ -622,7 +659,7 @@ contract SUSD3AttributionTest is Test {
         _assertInv1("shipped");
         assertEq(strat.inFlight6(), P, "unacked in flight");
 
-        cctp.setInbound(P + DLT, address(strat));
+        cctp.setInboundAny(P + DLT, address(strat));
         strat.completeInbound(hex"", hex"");
         _assertInv1("returned");
         assertEq(strat.inFlight6(), 0, "F-1: completion consumed the in-flight slice");
@@ -657,7 +694,7 @@ contract SUSD3AttributionTest is Test {
         strat.syncEthValue(P + DLT);
         vm.stopPrank();
         _assertInv1("s3 sync up (mark uncredited)");
-        cctp.setInbound(P + DLT, address(strat));
+        cctp.setInboundAny(P + DLT, address(strat));
         strat.completeInbound(hex"", hex"");
         _assertInv1("s4 return");
         vm.prank(keeper);
@@ -673,7 +710,7 @@ contract SUSD3AttributionTest is Test {
     function test_donation_mint_is_yield_not_principal() public {
         _ship();
         // a full principal return PLUS a 50 gift (donation) lands
-        cctp.setInbound(P + 50e18, address(strat));
+        cctp.setInboundAny(P + 50e18, address(strat));
         strat.completeInbound(hex"", hex"");
 
         assertEq(strat.profitRealized6(), 50e18, "excess books as realized YIELD");
@@ -796,7 +833,7 @@ contract SUSD3R1CapTest is Test {
         strat.ackArrival(P);
         strat.syncEthValue(P + DLT);
         vm.stopPrank();
-        cctp.setInbound(P + DLT, address(strat));
+        cctp.setInboundAny(P + DLT, address(strat));
         strat.completeInbound(hex"", hex"");
 
         uint256 bal = usdc.balanceOf(address(strat)); // P + DLT = 270
@@ -825,7 +862,7 @@ contract SUSD3R1CapTest is Test {
         strat.ackArrival(P);
         strat.syncEthValue(P);
         vm.stopPrank();
-        cctp.setInbound(P - DLT, address(strat));
+        cctp.setInboundAny(P - DLT, address(strat));
         strat.completeInbound(hex"", hex"");
         vm.prank(keeper);
         strat.syncEthValue(0);
@@ -866,6 +903,10 @@ contract SUSD3ExecutorTest is Test {
         exec = new SUSD3Executor(address(usdc), address(usd3), address(susd3), address(cctp), strategyOnHyperEvm, ops, safe);
         usdc.mint(address(this), 1_000e18);
         usdc.transfer(address(exec), 1_000e18); // funding that "arrived via CCTP"
+        // AUDIT F-B: the return destination must be owner-confirmed before any
+        // burn; these tests run on an armed pair.
+        vm.prank(safe);
+        exec.confirmStrategyReturn(strategyOnHyperEvm);
     }
 
     function test_constructor_shape_guard() public {
@@ -930,9 +971,11 @@ contract SUSD3ExecutorTest is Test {
         // back home via CCTP to the IMMUTABLE strategy address
         vm.prank(ops);
         exec.bridgeBack(1_100e18, 0);
-        (, uint32 domain, bytes32 recipient,,, ,) = cctp.lastBurn();
+        (, uint32 domain, bytes32 recipient,, bytes32 destCaller,,) = cctp.lastBurn();
         assertEq(domain, 19); // HyperEVM
         assertEq(recipient, bytes32(uint256(uint160(strategyOnHyperEvm))));
+        // AUDIT F-A: only the strategy may complete this arrival.
+        assertEq(destCaller, bytes32(uint256(uint160(strategyOnHyperEvm))), "F-A: return leg pinned");
         assertEq(exec.usdcBalance(), 0);
     }
 
@@ -984,8 +1027,10 @@ contract SUSD3ExecutorTest is Test {
         exec.bridgeBack(1e18, 0);
         vm.prank(ops);
         exec.bridgeBack(10e18, 0);
-        (, , bytes32 recipient,,, ,) = cctp.lastBurn();
+        (, , bytes32 recipient,, bytes32 destCaller,,) = cctp.lastBurn();
         assertEq(recipient, bytes32(uint256(uint160(strategyOnHyperEvm))));
+        // AUDIT F-A: destinationCaller pinned to the strategy (was bytes32(0)).
+        assertEq(destCaller, bytes32(uint256(uint160(strategyOnHyperEvm))), "F-A: return leg pinned");
         vm.prank(ops);
         vm.expectRevert(SUSD3Executor.SUSD3E__BadAmount.selector);
         exec.bridgeBack(1_000_000e18, 0); // more than the balance
@@ -994,7 +1039,7 @@ contract SUSD3ExecutorTest is Test {
         vm.expectRevert();
         exec.setOps(stranger);
         vm.prank(safe);
-        vm.expectRevert(SUSD3Executor.SUSD3E__TooLate.selector);
+        vm.expectRevert(SUSD3Executor.SUSD3E__AlreadyConfirmed.selector);
         exec.confirmStrategyReturn(stranger); // activity already happened (bridgeBack)
         // rescue hatch is owner-only and works
         vm.prank(stranger);
@@ -1003,6 +1048,57 @@ contract SUSD3ExecutorTest is Test {
         vm.prank(safe);
         exec.ownerRescue(address(usdc), safe, 5e18);
         assertEq(usdc.balanceOf(safe), 5e18);
+    }
+
+    /// AUDIT F-A regression (return leg): the pin is ENFORCED by the CCTP
+    /// transmitter, not merely recorded. Before the pin, a public
+    /// `(message, attestation)` let anyone complete our arrival first and consume
+    /// the single-use nonce — after which the strategy's `completeInbound` (the
+    /// only writer of `retFace6`) could never book it, permanently.
+    function test_return_leg_pin_is_enforced_by_the_transmitter() public {
+        vm.prank(ops);
+        exec.bridgeBack(10e18, 0); // pins destinationCaller = strategyOnHyperEvm
+        cctp.setInbound(10e18, strategyOnHyperEvm);
+
+        vm.prank(stranger);
+        vm.expectRevert("mockcctp: destinationCaller: caller not allowed");
+        cctp.receiveMessage(hex"", hex"");
+
+        vm.prank(strategyOnHyperEvm); // the pinned caller may complete it — once
+        assertTrue(cctp.receiveMessage(hex"", hex""));
+        assertEq(usdc.balanceOf(strategyOnHyperEvm), 10e18);
+        vm.prank(strategyOnHyperEvm);
+        vm.expectRevert("mockcctp: message already used");
+        cctp.receiveMessage(hex"", hex"");
+    }
+
+    /// AUDIT F-A (deploy leg): the relay entry point on the sUSD3 executor. The
+    /// strategy's outbound burn pins `destinationCaller = this executor`, so the
+    /// arrival can only be completed here — by `ops` (keeper) or `owner` (Safe).
+    function test_relayArrival_entry_point_and_recovery_path() public {
+        cctp.setInboundPinnedFor(250e18, address(exec), address(exec));
+        vm.prank(stranger);
+        vm.expectRevert(SUSD3Executor.SUSD3E__NotOpsOrOwner.selector);
+        exec.relayArrival(hex"", hex"");
+
+        vm.prank(ops);
+        uint256 got = exec.relayArrival(hex"", hex"");
+        assertEq(got, 250e18, "relayed amount reported");
+        assertEq(exec.usdcBalance(), 1_250e18, "mint landed in the executor");
+
+        vm.prank(ops);
+        vm.expectRevert("mockcctp: message already used");
+        exec.relayArrival(hex"", hex"");
+
+        cctp.setInboundPinnedFor(100e18, address(exec), address(exec));
+        vm.prank(safe);
+        exec.relayArrival(hex"", hex""); // the 2/3 Safe recovery path
+        assertEq(exec.usdcBalance(), 1_350e18, "recovery relay from the Safe works");
+
+        cctp.setInboundPinnedFor(50e18, address(stranger), address(exec));
+        vm.prank(ops);
+        vm.expectRevert(SUSD3Executor.SUSD3E__NothingMinted.selector);
+        exec.relayArrival(hex"", hex"");
     }
 
     function test_ops_rotation_and_bootstrap_confirm() public {

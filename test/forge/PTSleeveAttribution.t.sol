@@ -74,7 +74,7 @@ contract PTSleeveAttributionTest is Test {
         strat.ackArrival(P);
         strat.syncArbValue(P + delta);
         vm.stopPrank();
-        cctp.setInbound(P + delta, address(strat));
+        cctp.setInboundAny(P + delta, address(strat));
         strat.completeInbound(hex"", hex"");
     }
 
@@ -107,7 +107,7 @@ contract PTSleeveAttributionTest is Test {
         strat.syncArbValue(P + DLT);
         vm.stopPrank();
 
-        cctp.setInbound(P + DLT, address(strat));
+        cctp.setInboundAny(P + DLT, address(strat));
         strat.completeInbound(hex"", hex"");
 
         assertEq(strat.profitRealized6(), DLT, "the excess is realized yield");
@@ -122,7 +122,7 @@ contract PTSleeveAttributionTest is Test {
     function test_partial_unwind_defers_yield() public {
         _ship();
         uint256 before = usdc.balanceOf(address(strat)); // 0
-        cctp.setInbound(P - 100e6, address(strat)); // return < outstanding
+        cctp.setInboundAny(P - 100e6, address(strat)); // return < outstanding
         strat.completeInbound(hex"", hex"");
 
         assertEq(strat.profitRealized6(), 0, "conservative: yield deferred, not invented");
@@ -199,7 +199,7 @@ contract PTSleeveAttributionTest is Test {
         _assertInv1("shipped");
         assertEq(strat.inFlight6(), P, "unacked in flight");
 
-        cctp.setInbound(P + DLT, address(strat));
+        cctp.setInboundAny(P + DLT, address(strat));
         strat.completeInbound(hex"", hex"");
         _assertInv1("returned");
         assertEq(strat.inFlight6(), 0, "F-1: completion consumed the in-flight slice");
@@ -234,7 +234,7 @@ contract PTSleeveAttributionTest is Test {
         strat.syncArbValue(P + DLT);
         vm.stopPrank();
         _assertInv1("s3 sync up (mark uncredited)");
-        cctp.setInbound(P + DLT, address(strat));
+        cctp.setInboundAny(P + DLT, address(strat));
         strat.completeInbound(hex"", hex"");
         _assertInv1("s4 return");
         vm.prank(keeper);
@@ -250,7 +250,7 @@ contract PTSleeveAttributionTest is Test {
     function test_donation_mint_is_yield_not_principal() public {
         _ship();
         // a full principal return PLUS a 50 gift (donation) lands
-        cctp.setInbound(P + 50e6, address(strat));
+        cctp.setInboundAny(P + 50e6, address(strat));
         strat.completeInbound(hex"", hex"");
 
         assertEq(strat.profitRealized6(), 50e6, "excess books as realized YIELD");
@@ -271,7 +271,7 @@ contract PTSleeveAttributionTest is Test {
 
         vm.prank(keeper);
         eth.deployToArb(P, 0);
-        cctp.setInbound(P + DLT, address(eth));
+        cctp.setInboundAny(P + DLT, address(eth));
         eth.completeInbound(hex"", hex"");
 
         assertEq(eth.destDomain(), 0, "ETH lane");
@@ -343,7 +343,7 @@ contract PTSleeveAttributionTest is Test {
         strat.ackArrival(P);
         strat.syncArbValue(P);
         vm.stopPrank();
-        cctp.setInbound(P - DLT, address(strat));
+        cctp.setInboundAny(P - DLT, address(strat));
         strat.completeInbound(hex"", hex"");
         vm.prank(keeper);
         strat.syncArbValue(0);

@@ -269,6 +269,41 @@ async function main() {
   report("C: no 'margin still short' block", !C.out.includes("margin still short after bridge"));
   report("C: short was opened after the tolerated residual", C.out.includes("opening short:"));
 
+  // ── D. padded pull would exceed spot cash → clamp, level to exact need, OPEN goes ──
+  console.log("\n── D. margin leveling clamped to Core spot cash ──");
+  await (await positionAt.set(0n, 0n, 0, 10, false)).wait(); // flat → OPEN
+  // Equity exactly $1.00 under need ($3.8827): the boost-book wedge — spot cash
+  // equals the raw shortfall, so shortfall + $0.05 pad > spot (pad > spot).
+  await (await marginAt.set(2882700n, 0n, 0n, 2882700n)).wait();
+  const cwBeforeD = await cw.actionCount();
+  let pollingD = true;
+  const pollerD = (async () => {
+    let marginSet = false, posSet = false;
+    while (pollingD) {
+      try {
+        const delta = (await cw.actionCount()) - cwBeforeD;
+        if (!marginSet && delta >= 1n) {   // bridge landed → spot holds the shortfall
+          await (await marginAt.connect(user1).set(3881700n, 0n, 0n, 3881700n)).wait();
+          marginSet = true;
+        }
+        if (!posSet && delta >= 2n) {      // leveling class-transfer landed
+          await (await positionAt.connect(user1).set(-35n, 0n, 0, 10, false)).wait();
+          posSet = true;
+        }
+      } catch { /* transient read — retry next tick */ }
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  })();
+  const D = await runKeeper();
+  pollingD = false;
+  await pollerD;
+  console.log(D.out.slice(-1800));
+
+  report("D: keeper exits 0", D.rc === 0, `exit ${D.rc}`);
+  report("D: leveling pull clamped to spot cash", D.out.includes("clamped to spot"));
+  report("D: no 'margin still short' block", !D.out.includes("margin still short after bridge"));
+  report("D: short was opened", D.out.includes("opening short:"));
+
   console.log(`\n══════ ${pass} passed, ${fail} failed ══════`);
   process.exit(fail ? 1 : 0);
 }

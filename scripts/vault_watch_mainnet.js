@@ -87,7 +87,7 @@ async function main() {
   //   WATCH_ALERT_TEST=1 RUN=1 npx hardhat run scripts/vault_watch_mainnet.js --network hyperMainnet
   if (process.env.WATCH_ALERT_TEST === "1") {
     const r = await notify(
-      "ProYield vault watch — alert-path test\n" +
+      "Pro Yield vault watch — alert-path test\n" +
       "Escaping check: 2 < 3 && totalAssets() - (idle + realBacking) > $1 — status returned.",
     );
     console.log(`alert-path test: ${JSON.stringify(r)}`);
@@ -213,8 +213,9 @@ async function main() {
   }
 
   // ── PT-phantom watchdog (kanban t_bc5c7ff8) ───────────────────────────────
-  // Independent of the deposit/event diff — runs every tick (10 min). PT is
-  // FUNDED and PT-Arb matures ~Oct 15, and PTSleeveStrategy.completeInbound
+  // Independent of the deposit/event diff — runs every tick (10 min). PT-ETH is
+  // FUNDED and matures ~2026-11-05 (the PT-Arb lane CLOSED 2026-10-09, totalAssets
+  // 0, proceeds returned), and PTSleeveStrategy.completeInbound
   // does not consume inFlight6 (full fix = owner-gated redeploy t_698f42c2),
   // so a skipped keeper ackArrival double-counts the return and inflates the
   // sleeve's totalAssets(). See scripts/pt_phantom_check.js for the two checks.
@@ -368,7 +369,7 @@ async function main() {
   }
 
   if (alerts.length) {
-    await notify(`ProYield vault watch — ${new Date().toISOString()}\n\n${alerts.join("\n\n")}`);
+    await notify(`Pro Yield vault watch — ${new Date().toISOString()}\n\n${alerts.join("\n\n")}`);
   } else {
     console.log(`no change (block ${block}, TVL ${hre.ethers.formatUnits(totalAssets, 6)})`);
   }

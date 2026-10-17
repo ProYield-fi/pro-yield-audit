@@ -145,10 +145,12 @@ async function sendAlert(title, body) {
 
 /// Alert at most once per `windowMs` per key (marker in the DN state dir).
 /// A standing condition (e.g. an un-trimmable drift) must be visible in EVERY
-/// run's log but must not page the operator every 6h. Test runs
-/// (DN_SILENCE_TELEGRAM=1) never write the marker — a battery run must not
-/// suppress the next live alert.
-async function sendAlertThrottled(key, title, body, windowMs = 24 * 3600 * 1000) {
+/// run's log but must not page the operator every 6h — window raised to 72h
+/// (2026-10-13, Telegram diet): the below-venue-min blocked state is known and
+/// the keeper holds correctly; the morning brief carries the standing line.
+/// Test runs (DN_SILENCE_TELEGRAM=1) never write the marker — a battery run
+/// must not suppress the next live alert.
+async function sendAlertThrottled(key, title, body, windowMs = 72 * 3600 * 1000) {
   const dir = process.env.DN_STATE_DIR || path.join(__dirname, "..", "cache");
   const mark = path.join(dir, `dn_alert_${key}.json`);
   const silenced = process.env.DN_SILENCE_TELEGRAM === "1";
@@ -939,12 +941,24 @@ async function main() {
         await new Promise((r) => setTimeout(r, 8000));
         msum = await strategy.marginSummary();
       } else if (msum.accountValue < needMargin6) {
-        const pull6 = needMargin6 - msum.accountValue + marginTolerance6; // pad: the re-read can undershoot on mark drift
-        console.log(`class-transfer spot→perp (margin): ${pull6} (6dp, need ${needMargin6 - msum.accountValue} + $${(Number(marginTolerance6) / 1e6).toFixed(2)} pad)`);
-        const mtx = await strategy.moveUsdcToPerp(pull6);
-        await mtx.wait();
-        await new Promise((r) => setTimeout(r, 8000));
-        msum = await strategy.marginSummary();
+        const want6 = needMargin6 - msum.accountValue + marginTolerance6; // pad: the re-read can undershoot on mark drift
+        // 2026-10-16 — clamp the pull to the Core SPOT USDC actually on the account.
+        // HyperCore rejects (silently, all-or-nothing) any USD class-transfer that
+        // exceeds the spot balance, so a padded pull wedges the sleeve forever when
+        // spot cash sits exactly at the raw shortfall (boost book: want $1.90543 vs
+        // spot $1.85543 — the $0.05 pad itself — rejected every 6h cycle, exit 4 +
+        // "margin still short" alert, nothing ever moved). Under-pulling is safe:
+        // the tolerance check below still accepts an exact-need leveling and still
+        // blocks a real shortfall.
+        const spotAvail6 = spotUsdc6 + shortfall6; // spotUsdc6 predates any bridge this cycle
+        const pull6 = want6 > spotAvail6 ? spotAvail6 : want6;
+        console.log(`class-transfer spot→perp (margin): ${pull6} (6dp, need ${needMargin6 - msum.accountValue} + $${(Number(marginTolerance6) / 1e6).toFixed(2)} pad${pull6 < want6 ? `, clamped to spot $${(Number(spotAvail6) / 1e6).toFixed(2)}` : ""})`);
+        if (pull6 > 0n) {
+          const mtx = await strategy.moveUsdcToPerp(pull6);
+          await mtx.wait();
+          await new Promise((r) => setTimeout(r, 8000));
+          msum = await strategy.marginSummary();
+        }
       }
       if (msum.accountValue + marginTolerance6 < needMargin6) {
         const residual6 = needMargin6 - msum.accountValue;

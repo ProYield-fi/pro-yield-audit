@@ -49,6 +49,9 @@ contract PTSleeveEthExecutorTest is Test {
         );
         exec.setMarket(marketAddr, address(pt));
         usdc.mint(address(exec), 1_000e6);
+        // AUDIT F-B: the return destination must be owner-confirmed before any
+        // burn; these tests run on an armed pair.
+        exec.confirmStrategyReturn(strategyHyperEvm);
     }
 
     // ------------------------------------------------------------ guards
@@ -150,11 +153,14 @@ contract PTSleeveEthExecutorTest is Test {
     function test_bridgeBack_fixed_destination_and_standard_finality() public {
         vm.prank(ops);
         exec.bridgeBack(500e6, 0);
-        (uint256 amount, uint32 dest, bytes32 recip, address token,, uint256 maxFee, uint32 finality) = cctp.lastBurn();
+        (uint256 amount, uint32 dest, bytes32 recip, address token, bytes32 destCaller, uint256 maxFee, uint32 finality) = cctp.lastBurn();
         assertEq(amount, 500e6);
         assertEq(dest, 19, "HyperEVM domain");
         assertEq(recip, bytes32(uint256(uint160(strategyHyperEvm))), "immutable strategy return address");
         assertEq(token, address(usdc));
+        // AUDIT F-A: the return leg pins `destinationCaller` to the strategy, so
+        // ONLY the strategy (via completeInbound) may complete the inbound mint.
+        assertEq(destCaller, bytes32(uint256(uint160(strategyHyperEvm))), "F-A: return leg pinned to the strategy");
         assertEq(maxFee, 0);
         assertEq(finality, 2000, "standard transfer (fee-free today)");
         assertEq(exec.usdcBalance(), 500e6, "USDC burned back");
@@ -167,6 +173,59 @@ contract PTSleeveEthExecutorTest is Test {
         vm.prank(ops);
         vm.expectRevert("PTE: bad amount");
         exec.bridgeBack(1_001e6, 0);
+    }
+
+    /// AUDIT F-A regression (return leg): the pin is ENFORCED by the CCTP
+    /// message transmitter, not merely recorded in calldata. A third party can
+    /// no longer complete our own arrival first (which consumed the single-use
+    /// nonce and made the strategy's `completeInbound` — the only writer of
+    /// `retFace6` — permanently unable to book it).
+    function test_return_leg_pin_is_enforced_by_the_transmitter() public {
+        vm.prank(ops);
+        exec.bridgeBack(500e6, 0); // pins destinationCaller = strategyHyperEvm
+        cctp.setInbound(500e6, strategyHyperEvm);
+
+        vm.prank(address(0xB0B)); // the front-runner from the F-A PoC
+        vm.expectRevert("mockcctp: destinationCaller: caller not allowed");
+        cctp.receiveMessage(hex"", hex"");
+
+        vm.prank(strategyHyperEvm); // the pinned caller may complete it — once
+        assertTrue(cctp.receiveMessage(hex"", hex""));
+        assertEq(usdc.balanceOf(strategyHyperEvm), 500e6);
+        vm.prank(strategyHyperEvm);
+        vm.expectRevert("mockcctp: message already used"); // CCTP messages are single-use
+        cctp.receiveMessage(hex"", hex"");
+    }
+
+    /// AUDIT F-A (deploy leg): the copied relay entry point. The strategy's
+    /// outbound burn pins `destinationCaller = this executor`, so the arrival can
+    /// only be completed here — by `ops` (keeper) or by `owner` (the Safe, the
+    /// recovery path that survives a key rotation). Strangers are refused, and a
+    /// message that pays somebody else is refused too (no free relay service).
+    function test_relayArrival_entry_point_and_recovery_path() public {
+        cctp.setInboundPinnedFor(250e6, address(exec), address(exec));
+        vm.prank(address(0xB0B)); // not the pin, and not ops/owner
+        vm.expectRevert("PTE: not ops/owner");
+        exec.relayArrival(hex"", hex"");
+
+        vm.prank(ops); // keeper path
+        uint256 got = exec.relayArrival(hex"", hex"");
+        assertEq(got, 250e6, "relayed amount reported");
+        assertEq(exec.usdcBalance(), 1_250e6, "mint landed in the executor");
+
+        vm.prank(ops); // single-use: a second relay of the same message reverts
+        vm.expectRevert("mockcctp: message already used");
+        exec.relayArrival(hex"", hex"");
+
+        cctp.setInboundPinnedFor(100e6, address(exec), address(exec));
+        exec.relayArrival(hex"", hex""); // owner == this == the 2/3 Safe path
+        assertEq(exec.usdcBalance(), 1_350e6, "recovery relay from the owner works");
+
+        // a message whose mint goes elsewhere is refused: received == 0
+        cctp.setInboundPinnedFor(50e6, address(0xB0B), address(exec));
+        vm.prank(ops);
+        vm.expectRevert("PTE: nothing minted");
+        exec.relayArrival(hex"", hex"");
     }
 
     // ------------------------------------------------------------ config
@@ -207,23 +266,48 @@ contract PTSleeveEthExecutorTest is Test {
     // ——— one-time return-address confirm (deploy bootstrap safety net) ———
 
     function test_confirmStrategyReturn_once_then_locked() public {
-        assertEq(exec.strategyReturn(), bytes32(uint256(uint160(strategyHyperEvm))), "constructor value");
-        exec.confirmStrategyReturn(address(0x9999));
-        assertEq(exec.strategyReturn(), bytes32(uint256(uint160(address(0x9999)))), "corrected");
+        // a FRESH pair starts unarmed (the suite's main executor is armed)
+        PTSleeveEthExecutor fresh = new PTSleeveEthExecutor(
+            address(usdc), address(router), address(cctp), strategyHyperEvm, ops, address(this),
+            address(apx), address(curve), 1, 0
+        );
+        assertEq(fresh.strategyReturn(), bytes32(uint256(uint160(strategyHyperEvm))), "constructor value");
+        fresh.confirmStrategyReturn(address(0x9999));
+        assertEq(fresh.strategyReturn(), bytes32(uint256(uint160(address(0x9999)))), "corrected");
         vm.expectRevert("PTE: already confirmed");
-        exec.confirmStrategyReturn(address(0x8888));
+        fresh.confirmStrategyReturn(address(0x8888));
     }
 
+    /// AUDIT F-B: the window closes on the first real activity AND the return leg
+    /// refuses to burn until it is armed — so a wrong predicted destination can
+    /// never be locked in by a routine unwind.
     function test_confirmStrategyReturn_too_late_after_activity() public {
+        // (a) venue activity alone closes the one-time correction window
+        PTSleeveEthExecutor a = new PTSleeveEthExecutor(
+            address(usdc), address(router), address(cctp), strategyHyperEvm, ops, address(this),
+            address(apx), address(curve), 1, 0
+        );
+        a.setMarket(marketAddr, address(pt));
+        usdc.mint(address(a), 10e6);
         vm.prank(ops);
-        exec.buyPT(1e6, 0, 0);
-        vm.expectRevert("PTE: too late");
-        exec.confirmStrategyReturn(address(0x9999));
-        // also too late once a return has been burned
+        vm.expectRevert("PTE: return not confirmed"); // F-B: unarmed return leg refuses
+        a.bridgeBack(1e6, 0);
         vm.prank(ops);
-        exec.bridgeBack(1e6, 0);
+        a.buyPT(1e6, 0, 0);
         vm.expectRevert("PTE: too late");
-        exec.confirmStrategyReturn(address(0x9999));
+        a.confirmStrategyReturn(address(0x9999));
+
+        // (b) once a return has actually burned, the window is shut for good
+        PTSleeveEthExecutor b = new PTSleeveEthExecutor(
+            address(usdc), address(router), address(cctp), strategyHyperEvm, ops, address(this),
+            address(apx), address(curve), 1, 0
+        );
+        usdc.mint(address(b), 10e6);
+        b.confirmStrategyReturn(strategyHyperEvm);
+        vm.prank(ops);
+        b.bridgeBack(1e6, 0);
+        vm.expectRevert("PTE: already confirmed");
+        b.confirmStrategyReturn(address(0x9999));
     }
 
     function test_confirmStrategyReturn_owner_only() public {
