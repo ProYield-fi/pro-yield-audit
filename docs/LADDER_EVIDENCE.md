@@ -19,33 +19,65 @@ A day counts toward the S3b cap raise **iff all of the following hold:**
    S4/T1 external audit engagement. A missed day (e.g. 2026-10-16) is not a
    clean day so it does not count, but it does **not** reset the count either.
 
-## Per-day manifest (generated 2026-10-05; sha256 truncated to 16 hex)
+## Per-day manifest (one row per published attestation day; every cell reproducible — see the auditor note under the table)
 
-| date | vault | sha256-16 | status | total_assets ($) |
-|---|---|---|---|---|
-| 2026-09-24 | 0xadaE15e23b | 5ed92d60e5b661ef | **SUPERSEDED — not counted** | 0 |
-| 2026-09-25 | 0x8954a73Bb3 | 54d0fd9a32a7be57 | clean | 0 |
-| 2026-09-26 | 0x8954a73Bb3 | f1db93a74652fea1 | clean | 26.39053 |
-| 2026-09-27 | 0x8954a73Bb3 | f332028744801e3b | clean | 26.39053 |
-| 2026-09-28 | 0x8954a73Bb3 | ff0180fe1837e147 | clean | 26.39053 |
-| 2026-09-29 | 0x8954a73Bb3 | 50926a35af2d18ab | clean | 26.39053 |
-| 2026-09-30 | 0x8954a73Bb3 | f5c9114a7502f000 | clean | 51.959014 |
-| 2026-10-01 | 0x8954a73Bb3 | f50b6397d3dce92e | clean | 53.392731 |
-| 2026-10-02 | 0x8954a73Bb3 | 9ad4492fc47d1a6d | clean | 53.395516 |
-| 2026-10-03 | 0x8954a73Bb3 | 42c7cd7a614188b9 | clean | 53.398415 |
-| 2026-10-04 | 0x8954a73Bb3 | b7663d4865c98fc6 | clean | 158.693386 |
-| 2026-10-05 | 0x8954a73Bb3 | 490447de44eb94be | clean | 176.238867 |
-| 2026-10-06 | 0x8954a73Bb3 | ca61b4392d8c76bc | clean | 176.238867 |
-| 2026-10-07 | 0x8954a73Bb3 | 0cea1d9de57c9b9a | clean | 176.251334 |
-| 2026-10-08 | 0x8954a73Bb3 | 8984533bf04ee363 | clean | 176.258375 |
-| 2026-10-09 | 0x8954a73Bb3 | 743817fac4ab10ec | clean | 176.262619 |
-| 2026-10-10 | 0x8954a73Bb3 | 4d9cb8e32dc0c210 | clean | 126.269032 |
-| 2026-10-11 | 0x8954a73Bb3 | dc2c5539f90277b5 | clean | 126.274108 |
-| 2026-10-12 | 0x8954a73Bb3 | e054676770a91424 | clean | 126.278357 |
-| 2026-10-13 | 0x8954a73Bb3 | 3c3dae9fef19370f | clean | 126.282995 |
-| 2026-10-14 | 0x8954a73Bb3 | 3930cc8a274d4231 | clean | 126.287559 |
-| 2026-10-15 | 0x8954a73Bb3 | c749ff1803e7a74f | clean | 123.898535 |
-| 2026-10-17 | 0x8954a73Bb3 | 4d0c6e64c43693f7 | clean | 123.910911 |
+| date | vault | evidence_pin | status | total_assets ($) | pin_kind |
+|---|---|---|---|---|---|
+| 2026-09-24 | 0xadaE15e23b | 5ed92d60e5b661ef | **SUPERSEDED — not counted** | 0 | file_sha256 |
+| 2026-09-25 | 0x8954a73Bb3 | 54d0fd9a32a7be57 | clean | 0 | file_sha256 |
+| 2026-09-26 | 0x8954a73Bb3 | f1db93a74652fea1 | clean | 26.39053 | file_sha256 |
+| 2026-09-27 | 0x8954a73Bb3 | f332028744801e3b | clean | 26.39053 | file_sha256 |
+| 2026-09-28 | 0x8954a73Bb3 | ff0180fe1837e147 | clean | 26.39053 | file_sha256 |
+| 2026-09-29 | 0x8954a73Bb3 | 50926a35af2d18ab | clean | 26.39053 | file_sha256 |
+| 2026-09-30 | 0x8954a73Bb3 | f5c9114a7502f000 | clean | 51.959014 | file_sha256 |
+| 2026-10-01 | 0x8954a73Bb3 | f50b6397d3dce92e | clean | 53.392731 | file_sha256 |
+| 2026-10-02 | 0x8954a73Bb3 | 9ad4492fc47d1a6d | clean | 53.395516 | file_sha256 |
+| 2026-10-03 | 0x8954a73Bb3 | 42c7cd7a614188b9 | clean | 53.398415 | file_sha256 |
+| 2026-10-04 | 0x8954a73Bb3 | b7663d4865c98fc6 | clean | 158.693386 | file_sha256 |
+| 2026-10-05 | 0x8954a73Bb3 | 490447de44eb94be | clean | 176.238867 | file_sha256 |
+| 2026-10-06 | 0x8954a73Bb3 | ca61b4392d8c76bc | clean | 176.241787 | block_hash |
+| 2026-10-07 | 0x8954a73Bb3 | 0cea1d9de57c9b9a | clean | 176.251334 | block_hash |
+| 2026-10-08 | 0x8954a73Bb3 | 8984533bf04ee363 | clean | 176.258375 | block_hash |
+| 2026-10-09 | 0x8954a73Bb3 | 743817fac4ab10ec | clean | 176.262619 | block_hash |
+| 2026-10-10 | 0x8954a73Bb3 | 4d9cb8e32dc0c210 | clean | 126.269032 | block_hash |
+| 2026-10-11 | 0x8954a73Bb3 | dc2c5539f90277b5 | clean | 126.274108 | block_hash |
+| 2026-10-12 | 0x8954a73Bb3 | e054676770a91424 | clean | 126.278357 | block_hash |
+| 2026-10-13 | 0x8954a73Bb3 | 3c3dae9fef19370f | clean | 126.282995 | block_hash |
+| 2026-10-14 | 0x8954a73Bb3 | 3930cc8a274d4231 | clean | 126.287559 | block_hash |
+| 2026-10-15 | 0x8954a73Bb3 | c749ff1803e7a74f | clean | 123.898535 | block_hash |
+| 2026-10-17 | 0x8954a73Bb3 | 4d0c6e64c43693f7 | clean | 123.910911 | block_hash |
+
+**How to read `evidence_pin` (auditor note; card `t_e34d6404`).** The column carries the first 16 hex
+characters of the digest named in that same row's `pin_kind`, so a cell's meaning is explicit and never
+changes silently:
+
+- **`file_sha256`** (2026-09-24 … 2026-10-05) — `sha256(attestations/<date>.json)`, i.e. the published
+  file's own bytes. The generator did not pin a block hash before 2026-10-06.
+- **`block_hash`** (2026-10-06 …) — `product.as_of_block_hash` from that day's JSON: the hash of the
+  HyperEVM block the numbers were read at, truncated to 16 hex. This is **not** a file digest — verify it
+  against the JSON's own `product.as_of_block` / `as_of_block_hash`, or against the chain, never against
+  the file. Block-hash pinning landed 2026-10-06.
+
+Reproduce **every** cell of this table with one command from the repo root: `node scripts/ladder_verify.js`
+(exit 0 = every row reconciles; otherwise one FAIL line per disagreeing cell, naming both values). The
+per-cell equivalents are `sha256sum attestations/2026-10-05.json | cut -c1-16` for a `file_sha256` row and
+`jq -r .product.as_of_block_hash attestations/2026-10-06.json | cut -c1-16` for a `block_hash` row;
+`total_assets ($)` is `jq -r .product.metrics.total_assets_usdc attestations/<date>.json`.
+
+**Corrected cell — 2026-10-06 `total_assets` (card `t_e34d6404`, fixed 2026-10-17).** This row was
+published as `176.238867`, which is the **2026-10-05** value, while carrying 10-06's correct block hash.
+The 2026-10-06 attestation itself has always said `product.metrics.total_assets_usdc = 176.241787`
+(block 47815864), so the row — not the attestation — was wrong, and the cell now equals its own JSON.
+Cause, to the limit the record supports: the 10-06 row was not written by the daily job (the auto-appender
+did not exist on 10-06; it was introduced on 2026-10-07 in commit `92b812ac`, whose diff adds both the
+10-06 and 10-07 rows, and a single run can only append the series tail). Its two cells therefore came from
+different days — pin from `attestations/2026-10-06.json`, TVL equal to the 10-05 series value — which is a
+backfill that read the previous row for the amount; the exact one-off command is not recoverable because
+`~/.hermes/logs/attestation.log` had already rotated past 10-07. The mechanism it exposes was real and is
+now closed: the appender required no cross-check between the row and the day's own JSON. It now reads the
+TVL and pin from `attestations/<date>.json` and **refuses to write** (exit 1) when that JSON disagrees with
+the `series.jsonl` tail, and `scripts/ladder_verify.js` re-checks all 23 rows independently. No other row's
+value changed, and the clean-day count (22/30) is unaffected by this correction.
 
 <!-- ladder:auto:start — written by scripts/ladder_append.js; do not hand-edit -->
 **Clean days on the live vault: 22 (09-25 … 10-17). Next possible completion: 2026-10-25** (last counted row 2026-10-17 + 8 remaining days: 30 − 22 = 8).
@@ -72,8 +104,9 @@ and adjacency is not required. 30th clean day = **2026-10-25** (last counted 202
 `ladder_append.js` already implements exactly this (it counts clean rows and never checks adjacency):
 verified, **no logic change was needed** — only its rendered prose was updated so it stops advertising an
 open question. The pre-gap "Oct 24" figure is **retired**: it was pre-gap arithmetic and is not supported
-by the manifest. The R1 deploy window (Oct 24) is a separate track and is unaffected — the two dates are
-not coupled.
+by the manifest. The R1 deploy window then moved to **2026-10-25** (owner decision 2026-10-17, card `t_77e86b55`):
+R1 and the S3b `setCaps` rung are ONE sitting, run AFTER that morning's 08:10 attestation — so the
+rung is earned at 30/30, not waived.
 **Publication of the miss (owner ruling, same day):** 2026-10-16 is published as a one-line honest note at
 `pyd.fi/attestations/2026-10-16.md` — *"No attestation 2026-10-16 — the ops host was offline 02:09–09:11 EDT."*
 No `.json`, no `series.jsonl`/`series.json` row and no ladder row exists for that date: the machine-readable
