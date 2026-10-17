@@ -955,6 +955,37 @@ contract AaveExecutorTest is Test {
         cctp.receiveMessage(hex"", hex"");
     }
 
+    /// AUDIT F-A (deploy leg): the Aave deploy leg is pinned to THIS executor, so
+    /// the arrival can only be completed through `relayArrival` — by ops, or by the
+    /// 2/3 Safe (the recovery path after a keeper-key rotation; a CCTP message has
+    /// no expiry, so the recovery path must be a contract, not a key). A message
+    /// that pays the executor nothing is refused, not silently consumed.
+    function test_relayArrival_entry_point_and_recovery_path() public {
+        uint256 start = exec.usdcBalance(); // 1_000e18, pre-funded in setUp
+        cctp.setInboundPinnedFor(250e6, address(exec), address(exec));
+        vm.prank(stranger);
+        vm.expectRevert(AaveExecutor.AAVE_E__NotOpsOrOwner.selector);
+        exec.relayArrival(hex"", hex"");
+
+        vm.prank(ops);
+        assertEq(exec.relayArrival(hex"", hex""), 250e6, "relayed amount reported");
+        assertEq(exec.usdcBalance(), start + 250e6, "mint landed in the executor");
+
+        vm.prank(ops);
+        vm.expectRevert("mockcctp: message already used");
+        exec.relayArrival(hex"", hex"");
+
+        cctp.setInboundPinnedFor(100e6, address(exec), address(exec));
+        vm.prank(safe);
+        exec.relayArrival(hex"", hex""); // owner == the 2/3 Safe recovery path
+        assertEq(exec.usdcBalance(), start + 350e6, "recovery relay from the owner works");
+
+        cctp.setInboundPinnedFor(50e6, address(0xB0B), address(exec));
+        vm.prank(ops);
+        vm.expectRevert(AaveExecutor.AAVE_E__NothingMinted.selector);
+        exec.relayArrival(hex"", hex"");
+    }
+
     /// AUDIT F-B regression: `confirmStrategyReturn` still works after a FAILED
     /// bridgeBack attempt (the window is not closed by a revert), but is refused
     /// forever once a real `bridgeBack` has happened.

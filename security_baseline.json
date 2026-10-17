@@ -46,6 +46,10 @@
       "count": 2,
       "reason": "Test mock/fuzz harness (contracts/mocks, contracts/fuzz) \u2014 never deployed to any network; local test harness only."
     },
+    "incorrect-equality:AaveExecutor": {
+      "count": 1,
+      "reason": "Aave lane \u2014 relayArrival's `received == 0` refuses a CCTP message that did not pay this contract; explicit zero-amount guard, not a balance comparison. Added 2026-10-17 (publish triage)."
+    },
     "incorrect-equality:AaveStrategy": {
       "count": 3,
       "reason": "Aave lane \u2014 the three `== 0` guards (pushIdle/completeInbound/_doHarvest) are deliberate zero-checks on exact 6dp amounts, not balance assumptions."
@@ -80,8 +84,8 @@
       "reason": "Intentional zero-guards (_totalShares == 0 in share math, balance == 0 in emergencyWithdraw)."
     },
     "incorrect-equality:SUSD3Executor": {
-      "count": 2,
-      "reason": "Intentional zero-checks: early-return no-ops and input-validation revert guards, not balance comparisons \u2014 same accepted pattern as BaseStrategy/DeltaNeutralStrategy."
+      "count": 3,
+      "reason": "Intentional zero-checks: early-return no-ops and input-validation revert guards, not balance comparisons \u2014 same accepted pattern as BaseStrategy/DeltaNeutralStrategy. 3rd instance 2026-10-17: unwindUsd3's `usd3Amt == 0` explicit zero-amount revert guard."
     },
     "incorrect-equality:SUSD3Strategy": {
       "count": 3,
@@ -128,7 +132,10 @@
       "reason": "Implicit interface conformance (IStrategy/IVaultReturnHook selectors verified by tests) without declared inheritance \u2014 informational only."
     },
     "missing-zero-check:MockAaveSpoke": "Test mock (MockAaveSpoke) \u2014 setHub has no zero-check; harness-only.",
-    "missing-zero-check:MockCctp": "Test mock/fuzz harness (contracts/mocks, contracts/fuzz) \u2014 never deployed to any network; local test harness only.",
+    "missing-zero-check:MockCctp": {
+      "count": 3,
+      "reason": "Test mock/fuzz harness (contracts/mocks, contracts/fuzz) \u2014 never deployed to any network; local test harness only. setInbound/setInboundAny deliberately accept any `to` (including zero) to model a malformed inbound message. 3 instances counted 2026-10-17."
+    },
     "missing-zero-check:MockCoreDepositWallet": "Test mock/fuzz harness (contracts/mocks, contracts/fuzz) \u2014 never deployed to any network; local test harness only.",
     "missing-zero-check:MockEngine": "Test mock/fuzz harness (contracts/mocks, contracts/fuzz) \u2014 never deployed to any network; local test harness only.",
     "missing-zero-check:MockEvilStrategy": "Test mock/fuzz harness (contracts/mocks, contracts/fuzz) \u2014 never deployed to any network; local test harness only.",
@@ -181,23 +188,23 @@
     "pragma:PYDStaking": "Floating pragma ^0.8.28 \u2014 compiled with pinned solc 0.8.28.",
     "pragma:PYDToken": "Floating pragma ^0.8.28 \u2014 compiled with pinned solc 0.8.28.",
     "reentrancy-balance:AaveExecutor": {
-      "count": 2,
-      "reason": "Aave lane \u2014 intentional balance-delta measurement (before \u2026 external call \u2026 balanceOf \u2212 before) under nonReentrant; only self-owned USDC can inflate the delta."
+      "count": 3,
+      "reason": "Aave lane \u2014 intentional balance-delta measurement (before \u2026 external call \u2026 balanceOf \u2212 before) under nonReentrant; only self-owned USDC can inflate the delta. 3rd instance 2026-10-17: exit()'s spoke.redeem delta."
     },
     "reentrancy-balance:AaveStrategy": "Aave lane \u2014 completeInbound measures the CCTP mint by balance delta under nonReentrant; the mint can only land on this contract.",
     "reentrancy-balance:PTSleeveEthExecutor": {
-      "count": 5,
-      "reason": "All entry points are onlyOps + nonReentrant (ops = owner-set keeper EOA; setOps onlyOwner). Executors hold funds only transiently within one call and measure each leg by balance delta; venue targets are owner-set or immutable. Slither cannot model the guard \u2014 same class accepted for SUSD3Strategy (2026-10-05)."
+      "count": 6,
+      "reason": "All entry points are onlyOps + nonReentrant (ops = owner-set keeper EOA; setOps onlyOwner). Executors hold funds only transiently within one call and measure each leg by balance delta; venue targets are owner-set or immutable. Slither cannot model the guard \u2014 same class accepted for SUSD3Strategy (2026-10-05). 6th instance 2026-10-17: relayArrival's CCTP mint delta (destinationCaller pinned to this executor)."
     },
     "reentrancy-balance:PTSleeveExecutor": {
-      "count": 4,
-      "reason": "All entry points are onlyOps + nonReentrant (ops = owner-set keeper EOA; setOps onlyOwner). Executors hold funds only transiently within one call and measure each leg by balance delta; venue targets are owner-set or immutable. Slither cannot model the guard \u2014 same class accepted for SUSD3Strategy (2026-10-05)."
+      "count": 5,
+      "reason": "All entry points are onlyOps + nonReentrant (ops = owner-set keeper EOA; setOps onlyOwner). Executors hold funds only transiently within one call and measure each leg by balance delta; venue targets are owner-set or immutable. Slither cannot model the guard \u2014 same class accepted for SUSD3Strategy (2026-10-05). 5th instance 2026-10-17: buyPT's Curve\u2192Pendle leg delta."
     },
     "reentrancy-balance:PTSleeveStrategy": "completeInbound measures the inbound mint as a balance delta after receiveMessage. The CCTP transmitter mints only to this contract (mintRecipient fixed in our return transfers) and completeInbound is nonReentrant, so the 'stale balance' path is not reachable; the balance read is the intended measurement. Slither rates it High impact but cannot model the guard/recipient. Flagged 2026-10-05 while remediating t_698f42c2.",
     "reentrancy-balance:PYDFunder": "The swap target is an owner-set swapper (trusted config, like the baselined funding source); nonReentrant blocks re-entry into topUp (the only USDC spender); the swap OUTPUT is verified by balance delta (the return value is advisory); the USDC allowance is revoked immediately after the swap. Slither rates reentrancy-balance Low impact; the monitor's blanket reentrancy-family rule over-elevates it. Re-verified 2026-09-20.",
     "reentrancy-balance:SUSD3Executor": {
-      "count": 5,
-      "reason": "All entry points are onlyOps + nonReentrant (ops = owner-set keeper EOA; setOps onlyOwner). Executors hold funds only transiently within one call and measure each leg by balance delta; venue targets are owner-set or immutable. Slither cannot model the guard \u2014 same class accepted for SUSD3Strategy (2026-10-05)."
+      "count": 6,
+      "reason": "All entry points are onlyOps + nonReentrant (ops = owner-set keeper EOA; setOps onlyOwner). Executors hold funds only transiently within one call and measure each leg by balance delta; venue targets are owner-set or immutable. Slither cannot model the guard \u2014 same class accepted for SUSD3Strategy (2026-10-05). 6th instance 2026-10-17: relayArrival's CCTP mint delta (destinationCaller pinned to this executor)."
     },
     "reentrancy-balance:SUSD3Strategy": "completeInbound measures the inbound mint as a balance delta after receiveMessage. The CCTP transmitter mints only to this contract (mintRecipient fixed in our return transfers) and completeInbound is nonReentrant, so the 'stale balance' path is not reachable; the balance read is the intended measurement. Slither rates it High impact but cannot model the guard/recipient. Mirrors PTSleeveStrategy. Flagged 2026-10-05 (kanban t_4e477d28).",
     "reentrancy-benign:AaveExecutor": {
