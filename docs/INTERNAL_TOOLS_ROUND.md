@@ -159,5 +159,5 @@ that the r3 deploy closes.
   reentrancy-class results are the pre-existing triaged set (PTSleeve
   executor balance-delta output verification, trusted-caller loops).
   The r3 deploy itself closes the §4 drift list.
-  Sequence from here: pause drill (owner GO) → 30-day attest clock (10/30,
-  ETA ~Oct 23) → r3 redeploy → S4/T1 audit gate.
+  Sequence from here: pause drill (owner GO) → 30-day counted attest clock
+  (ETA 2026-10-25) → r3 redeploy → S4/T1 audit gate.
