@@ -2,36 +2,43 @@
 
 ## Reporting
 
-- **GitHub**: open an issue with the `audit` label on
-  https://github.com/ProYield-fi/pro-yield-audit (preferred — public, timestamped).
-- **Email**: proyield@pyd.fi for sensitive disclosures.
+Report privately to **team@proyield.fi**. Please do not open a public issue or post details before coordinated disclosure.
 
-Please include: contract/function, reproduction (tx hash or test), impact
-assessment. We acknowledge within 72h and publish fix commits with the
-finding referenced.
+Include:
+
+- contract or component, and chain;
+- the commit, build, or deployed address you tested;
+- a minimal reproduction or proof of concept;
+- impact and preconditions;
+- whether the finding is already public.
+
+## Our commitment
+
+- Acknowledge receipt within **48 hours**.
+- Triage within **7 days**.
+- Keep you updated on the fix and the disclosure date.
+- Credit you by name or handle in the audit log, unless you ask to remain anonymous.
+- Coordinate public disclosure with you. Our default window is **90 days from the ship date of the fix**, or earlier if a fix is live and users are protected.
+
+## Rewards
+
+There is **no active paid bounty program**. The old token-denominated bounty schedule is withdrawn; we do not require a token stake to submit a finding, and we do not promise token or cash payments. We offer named credit and early access to the fix for re-testing. Any future paid program will be announced in writing with clear scope, eligibility, and payment terms.
 
 ## Scope
 
-Contracts in `hypervault/contracts/` (see `docs/AUDIT_SCOPE.md` §1 for the
-table). Off-scope: mocks, scripts (off-chain keepers/tests), HyperCore itself,
-the website frontend.
+In scope:
 
-## Current status
+- mainnet ProYieldVault and FeeDistributor deployments;
+- the PYD token and staking contracts, where deployed;
+- the ProYield web app and API surfaces that handle funds, signatures, or user data.
 
-- **Pre-mainnet.** The audited mainnet deployment is the launch gate; no real
-  funds are at risk before that deploy.
-- Static analysis: 0 critical findings vs the accepted baseline
-  (`security_baseline.json`, each entry justified).
-- Test suites: integration 120/120, strategy 28/28, adapter 26/26,
-  real-chain read verification 15/15, keeper dry-run 8/8.
-- Reentrancy: hardened 2026-09-18 (23 findings fixed) and re-verified after
-  the DN consolidation; `nonReentrant` on every mutating entry point.
-- Honest accounting invariants documented in `docs/AUDIT_SCOPE.md` §3 —
-  principal is never counted as yield; the loss path realizes nothing.
+Out of scope:
 
-## Honest disclosure
+- testnet deployments and paper-trading environments;
+- third-party infrastructure and dependencies (report those upstream);
+- social engineering, phishing, physical attacks, and denial-of-service;
+- issues that require compromised owner keys or a malicious Safe signer.
 
-The product never substitutes estimates for facts: every rate carries its
-source and timestamp, and the transparency page renders empty panels rather
-than projected numbers. If a number on the site and the chain disagree, the
-chain wins.
+## Audit status
+
+External review is in progress on the current vault and fee contracts. We will publish the final scope, commit, and report when the review is complete. Do not treat this page as a claim that the contracts are audited.

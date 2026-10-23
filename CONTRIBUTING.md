@@ -36,14 +36,15 @@ finding. Disclosure timeline: **90 days** (earlier by agreement if fixed).
 
 ## Rewards (community audit program)
 
-- Valid findings earn **recognition first, bounty second**: every acknowledged
-  finding is published here in `AUDIT-LOG.md` with the fix.
-- Monetary bounties are **USDC-backed and paid once the vault is revenue-
-  positive** — we do not promise what we cannot yet fund, and we **never pay in
-  $PYD**.
-- **Vesting**: bounty payouts vest over **14–90 days** depending on severity.
-- **Anti-Sybil**: reward eligibility requires a staked position and passes
-  basic chain analysis. Spam/duplicate reports don't qualify.
+- There is **no active paid bounty program**. The old token-denominated
+  schedule is withdrawn; we do not require a token stake to submit a finding,
+  and we do not promise token or cash payments.
+- Valid findings earn **recognition**: every acknowledged finding is published
+  here in `AUDIT-LOG.md` with the fix, unless the reporter asks to remain
+  anonymous.
+- We offer early, private access to the fix commit for re-testing.
+- Any future paid program will be announced in writing with clear scope,
+  eligibility, and payment terms. Nothing in this repo is an offer of payment.
 
 ## House rules
 
