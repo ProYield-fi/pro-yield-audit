@@ -82,6 +82,17 @@ contract ProYieldVault is BaseStrategy {
         return bal > _accountedBalance ? bal - _accountedBalance : 0;
     }
 
+    /// @notice The vault's CASH ledger: USDC held by this contract that is
+    /// already represented in `totalAssets()` (deposited principal + booked
+    /// profit, minus what left to strategies or depositors). Exposed because
+    /// every consumer used to derive it as `balanceOf − uncreditedArrivals()`,
+    /// which cannot distinguish "the ledger was debited" from "the ledger is
+    /// right" — that is exactly how the F-4 residual write-down stayed
+    /// invisible (audit t_b0874348).
+    function accountedBalance() external view returns (uint256) {
+        return _accountedBalance;
+    }
+
     /// Shares for a given asset amount at the current price (floor).
     function convertToShares(uint256 assets) external view returns (uint256) {
         return _toShares(assets);
@@ -142,22 +153,39 @@ contract ProYieldVault is BaseStrategy {
     }
 
     function deposit(uint256 amount) external override nonReentrant {
+        _deposit(msg.sender, amount);
+    }
+
+    /// @notice Auto-earn / permit sweep deposit: pull `amount` from `user`'s
+    /// signed allowance to this vault and mint shares to `user`. Callable only
+    /// by `user`, `keeper`, or `owner()`, so a third party cannot grief an open
+    /// allowance while the keeper never takes custody of user funds.
+    function depositFor(address user, uint256 amount) external nonReentrant {
+        require(
+            msg.sender == user || msg.sender == keeper || msg.sender == owner(),
+            "ProYieldVault: not keeper"
+        );
+        _deposit(user, amount);
+    }
+
+    function _deposit(address user, uint256 amount) internal {
         require(!depositsPaused, "ProYieldVault: deposits paused");
+        require(user != address(0), "ProYieldVault: zero user");
         require(amount > 0, "ProYieldVault: zero amount");
         if (tvlCap > 0) {
             require(_totalAssets + amount <= tvlCap, "ProYieldVault: TVL cap reached");
         }
         if (perUserCap > 0) {
-            require(_toAssets(shares[msg.sender]) + amount <= perUserCap, "ProYieldVault: per-user cap reached");
+            require(_toAssets(shares[user]) + amount <= perUserCap, "ProYieldVault: per-user cap reached");
         }
         uint256 sh = _toShares(amount); // price-aware mint (4626-style)
         require(sh > 0, "ProYieldVault: zero shares"); // dust guard — no free deposits
-        shares[msg.sender] += sh;
+        shares[user] += sh;
         _totalShares += sh;
         _totalAssets += amount;
         _accountedBalance += amount; // deposited USDC is now represented in the books
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
-        emit Deposit(msg.sender, amount);
+        underlying.safeTransferFrom(user, address(this), amount);
+        emit Deposit(user, amount);
     }
 
     function setPerformanceFee(uint256 fee) external onlyOwner {
@@ -178,9 +206,16 @@ contract ProYieldVault is BaseStrategy {
     ///     raw balance. The old `_totalAssets -= balance` underflowed (Panic
     ///     0x11) and reverted whenever a stray 1-wei donation pushed the balance
     ///     one wei above the books — anyone could brick the emergency lever.
-    ///  3. Only real idle cash moves: uncredited arrivals are left in place
-    ///     rather than swept, so a routed fee awaiting `creditYield` is not
-    ///     confiscated by an emergency exit.
+    ///  3. It sweeps the FULL idle balance — `underlying.balanceOf(this)`,
+    ///     INCLUDING uncredited arrivals. PY-EMERG-01 (yossweh 2026-10-22): this
+    ///     bullet used to claim the opposite ("uncredited arrivals are left in
+    ///     place"), which the code never did — a routed fee awaiting
+    ///     `creditYield` leaves with the rest. That is deliberate: an abandoned
+    ///     vault must not keep orphaned cash (there is no other sweep path), and
+    ///     `EmergencyWithdraw(balance, totalAssets)` discloses the exact amount
+    ///     on-chain. If the owner prefers booked-only (`booked`), that is a
+    ///     behavior change, not a doc change — see
+    ///     docs/EXTERNAL_FINDINGS_2026-10-22_YOSSWEH.md §PY-EMERG-01.
     function emergencyWithdraw() external onlyOwner nonReentrant {
         uint256 balance = underlying.balanceOf(address(this));
         if (balance == 0) return;
@@ -201,6 +236,32 @@ contract ProYieldVault is BaseStrategy {
     }
 
     event LossReported(uint256 amount);
+    /// @notice Cash/valuation SPLIT of a write-down (audit F-4 residual,
+    /// t_b0874348). `fromIdle` is the part of `amount` that was idle CASH and
+    /// physically left the vault; `amount - fromIdle` is a VALUATION loss on
+    /// deployed capital, where no USDC moved at all.
+    ///
+    /// Emitted ALONGSIDE `LossReported(uint256)` rather than replacing it: that
+    /// selector's topic0 is what `scripts/loss_report_core.js` and the 6-hourly
+    /// DN keeper scan for their cumulative-write-down ledger, and
+    /// `test/forge/Fixes.round2.t.sol` asserts it. Changing it would make the
+    /// keeper read a fresh build's losses as zero and propose a DOUBLE
+    /// write-down — the exact failure the ledger scan exists to prevent.
+    event LossValuationSplit(uint256 amount, uint256 fromIdle);
+
+    /// @notice A write-down was CAPPED at the claim total (audit F-4R-2,
+    /// t_27c2410c). Emitted only when the cap binds, i.e. when the reported
+    /// VALUATION portion of the loss exceeded the booked deployed capital and
+    /// the cash ledger would otherwise have been left above `_totalAssets`.
+    /// `accountedAfter == _totalAssets` at emission, and the difference
+    /// (`accountedBefore - accountedAfter`) stays in the vault as REAL,
+    /// unclaimed USDC (`uncreditedArrivals()`) — not as a claim. Absence of this
+    /// event means the reported split was internally consistent. Disclosed
+    /// rather than silent: silent book corrections are a finding class here
+    /// (audit F-5).
+    event LossLedgerCappedToClaims(
+        uint256 amount, uint256 fromIdle, uint256 accountedBefore, uint256 accountedAfter
+    );
 
     /// @notice Write booked liabilities down to match REAL backing after a
     /// strategy/venue loss (round-2 H1). Owner-only (beta owner = treasury
@@ -209,18 +270,93 @@ contract ProYieldVault is BaseStrategy {
     /// (share price falls for everyone) instead of the books carrying phantom
     /// value while withdrawals revert. Without this call a loss is invisible;
     /// with it, claims always reconcile to what actually backs them.
-    function reportLoss(uint256 amount) external onlyOwner {
+    ///
+    /// AUDIT F-4 RESIDUAL (t_b0874348) — why the split exists. This function
+    /// used to debit `_accountedBalance` by the FULL loss, including VALUATION
+    /// losses where no USDC ever left the vault. On the boost book the 10-17
+    /// write-down zeroed the ledger while `balanceOf(vault)` was untouched, so
+    /// `uncreditedArrivals()` then reported 5.000000 of depositor RESERVE as
+    /// creditable yield and `creditYield(5_000_000)` succeeded. The cash ledger
+    /// now moves only by `fromIdle`, the part of the loss that was physically
+    /// idle cash.
+    ///
+    /// `fromIdle = 0` — the 1-arg selector `scripts/loss_calc_core.js` and the
+    /// DN keeper encode, meaning "strategy/valuation loss only" — is
+    /// FAIL-CLOSED when cash really vanishes: with `balanceOf <
+    /// _accountedBalance`, `uncreditedArrivals()` returns 0, so `creditYield`
+    /// can never book a phantom, and `allocate()`'s `deployable <= balance`
+    /// check already refuses to ship cash the vault does not hold. An owner who
+    /// under-states `fromIdle` therefore loses nothing to crediting; the ledger
+    /// simply stays conservative until the split is reported correctly.
+    ///
+    /// AUDIT F-4R-2 (t_27c2410c): the cash ledger is additionally CAPPED at
+    /// `_totalAssets` after the write-down, so it can never describe idle cash
+    /// the remaining claims no longer own (see the code comment + the
+    /// `LossLedgerCappedToClaims` event).
+    function _reportLoss(uint256 amount, uint256 fromIdle) internal {
         require(amount <= _totalAssets, "ProYieldVault: exceeds assets");
+        // REVIEW PATCH (F-4R-1): fromIdle must be EVIDENCED, not asserted. The
+        // only on-chain proof that booked idle cash actually left the vault is
+        // that the balance no longer covers the cash ledger. Bounding it by
+        // _accountedBalance alone let a false split re-create the exact F-4
+        // phantom (reserve reads as an arrival -> creditYield inflates NAV).
+        uint256 bal = underlying.balanceOf(address(this));
+        uint256 cashShortfall = _accountedBalance > bal ? _accountedBalance - bal : 0;
+        require(fromIdle <= amount && fromIdle <= cashShortfall, "ProYieldVault: bad split");
         _totalAssets -= amount;
-        // The lost USDC is gone, so it must stop counting as represented by the
-        // books. Without this the vault would show an arrival that is not there
-        // and `uncreditedArrivals()` would later let a phantom be credited.
-        if (_accountedBalance > amount) {
-            _accountedBalance -= amount;
-        } else {
-            _accountedBalance = 0;
+        _accountedBalance -= fromIdle;
+        // AUDIT F-4R-2 (t_27c2410c): the CASH ledger can never exceed the claim
+        // total. `_totalAssets` = booked idle cash (`_accountedBalance`) +
+        // deployed book value, so a write-down whose VALUATION part exceeds the
+        // deployed book — only reachable when the split is wrong, because a
+        // venue cannot lose more than it holds — drove that identity negative
+        // and left idle cash booked ABOVE every remaining claim. Reachable
+        // state before this cap: deposit 100 (all idle) -> reportLoss(60) gave
+        // totalAssets 40 with the ledger still at 100, and `allocate()` then
+        // shipped 96 (its reserve is 10% of `_totalAssets`), i.e. the vault
+        // deployed cash its own books no longer owned; a claim written down to
+        // 40 could exit and leave the remainder stranded in a strategy with no
+        // claim against it.
+        // Why capping is safe — and NOT a return of the F-4 phantom. The cap
+        // only ever moves the ledger DOWN, and after it `_accountedBalance ==
+        // _totalAssets`, so there are exactly two cases:
+        //  (a) `balanceOf >= _totalAssets` — the vault physically holds more
+        //      idle cash than its claims. The residue therefore IS real,
+        //      unclaimed USDC: it surfaces as `uncreditedArrivals()` and may be
+        //      re-credited (`creditYield`) or swept (`emergencyWithdraw`).
+        //      Crediting it cannot break solvency because
+        //      `totalAssets + arrivals == balanceOf <= backing`; that is
+        //      `invariant_creditable_capacity_is_backed` and echidna's
+        //      `echidna_credit_cannot_exceed_backing`. The F-4 defect was the
+        //      OPPOSITE direction: it created arrivals out of cash that was
+        //      ALREADY counted inside `totalAssets` (live boost book: 5.000000
+        //      of depositor reserve creditable with zero new money in).
+        //  (b) `balanceOf < _totalAssets` — a cash shortfall the books still
+        //      carry (an earlier under-stated split). Then the ledger sits
+        //      ABOVE real cash, `uncreditedArrivals()` returns 0, and NOTHING
+        //      becomes creditable: the write-down stays fail-closed, exactly as
+        //      before this cap. The cap can never manufacture capacity that is
+        //      not backed by physical cash.
+        uint256 accountedBefore = _accountedBalance;
+        if (_accountedBalance > _totalAssets) {
+            _accountedBalance = _totalAssets;
+            emit LossLedgerCappedToClaims(amount, fromIdle, accountedBefore, _accountedBalance);
         }
         emit LossReported(amount);
+        emit LossValuationSplit(amount, fromIdle);
+    }
+
+    /// @notice 1-arg form: strategy/venue VALUATION loss (no cash left the
+    /// vault). Kept selector-compatible with the existing keepers/scripts.
+    function reportLoss(uint256 amount) external onlyOwner {
+        _reportLoss(amount, 0);
+    }
+
+    /// @notice 2-arg form: state how much of the loss was idle CASH that
+    /// actually left the vault (`fromIdle`) and how much was a valuation loss
+    /// on deployed capital (the remainder).
+    function reportLoss(uint256 amount, uint256 fromIdle) external onlyOwner {
+        _reportLoss(amount, fromIdle);
     }
 
     function allocate() external onlyOwner nonReentrant {
@@ -294,6 +430,10 @@ contract ProYieldVault is BaseStrategy {
         shares[msg.sender] -= sh;
         _totalShares -= sh;
         _totalAssets -= amount;
+        // NOTE (F-4 residual, INFO only): this clamp can leave the cash ledger a
+        // rounding residue high (< activeCount × 1 µUSDC per withdrawal, from
+        // _recallShortfall's per-strategy round-up). It is NOT the reportLoss
+        // defect — no creditable arrival is created, so it stays untouched.
         if (_accountedBalance > amount) {
             _accountedBalance -= amount;
         } else {
