@@ -2,9 +2,11 @@
 
 > Status: **live on mainnet** (HyperEVM 999) + **testnet**. This document is the package
 > auditors and community reviewers should read first.
-> Last updated: **2026-10-26** (second pass) — book #1 is the 2026-10-25 R1 generation; §1.2/§1.4
+> Last updated: **2026-10-26** (third pass) — book #1 is the 2026-10-25 R1 generation; §1.2/§1.4
 > carry the read traps (`vault.strategyActive`, `strategyList(i)`) and the hash conventions an
-> auditor needs to avoid filing false build-pin findings.
+> auditor needs to avoid filing false build-pin findings. Every digest in §1.4 now names the exact
+> input it hashes (artifact/live × hex text/raw bytes; the 0x-prefixed readings are listed too, so
+> a fourth encoding cannot read as a mismatch).
 
 > ✅ **Book #1 was replaced on 2026-10-25 and now runs a build this repository contains.**
 > Book #1 is `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9` (deployed 2026-10-25T14:22Z). The
@@ -182,18 +184,24 @@ build**, and that build is this repository's source:
 
 **Hash convention — read this before you “fail” the pin.** The two digests above are `sha256`
 over the artifact's runtime **hex text, lowercased** (the `deployedBytecode` field with `0x`
-dropped) — that is the convention the pin file uses. Two other inputs are also “the SHA-256 of the
-runtime” and give different values, correctly:
+dropped) — that is the convention the pin file uses. Three other inputs are also “the SHA-256 of the
+runtime” and give different values, correctly (each row names its input; the fourth reading, the
+0x-prefixed string, is noted below the table):
 
 | Input | vault | FeeDistributor |
 |---|---|---|
 | sha256 of the **raw runtime bytes** of the same artifact | `74dd42d1…7645027f` | `aa018dff…c000c86c` |
-| sha256 of **live `eth_getCode`** (immutables filled on chain, block 49,585,525) | `c92fb81d…55200f1f` | `cfa271ad…a7ace7ac` |
+| sha256 of the **lowercase hex text** of live `eth_getCode`, `0x` dropped (immutables filled on chain, block 49,585,525) | `c92fb81d…55200f1f` | `cfa271ad…a7ace7ac` |
+| sha256 of the **raw runtime bytes** of live `eth_getCode` (same block, immutables filled on chain) | `2e003eee…bccbabc9` | `7f6bf09d…7cb62b4c` |
 
-None of the three disagree — they are different inputs to the same function. The live-code hash can
-never equal the artifact hash, because the constructor immutables (vault owner, asset, fee
-distributor, caps…) are zeroed in the artifact and filled in on chain. A pin is only meaningful
-artifact-vs-artifact, or live-vs-artifact **outside the `immutableReferences` spans** (next
+Each row states its own input encoding — check that first, because a digest that “does not match” is
+almost always a good hash read against the convention of a different row. The fourth reading, the
+0x-prefixed string (artifact `a8b0c0b1…c77287b5` / `04c49487…49bbcf45`, live `f278e288…4b448abc` /
+`773eed7a…4c2bb13d`), is published here only so nobody mistakes it for a mismatch. Every value in
+this table is a correct hash of a different encoding of the same code; none of them contradict each
+other. The live-code hash can never equal the artifact hash, because the constructor immutables
+(vault owner, asset, fee distributor, caps…) are zeroed in the artifact and filled in on chain. A pin
+is only meaningful artifact-vs-artifact, or live-vs-artifact **outside the `immutableReferences` spans** (next
 paragraph). Hashing live code and comparing it to `ff907cc7…` is a false finding.
 
 Build profile: solc 0.8.28, optimizer **runs=200**, no viaIR, evm `paris`; build cut `0624616c`
