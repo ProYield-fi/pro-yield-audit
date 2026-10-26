@@ -2,7 +2,9 @@
 
 > Status: **live on mainnet** (HyperEVM 999) + **testnet**. This document is the package
 > auditors and community reviewers should read first.
-> Last updated: **2026-10-26** — book #1 is the 2026-10-25 R1 generation; §1.2 and §1.4 rewritten.
+> Last updated: **2026-10-26** (second pass) — book #1 is the 2026-10-25 R1 generation; §1.2/§1.4
+> carry the read traps (`vault.strategyActive`, `strategyList(i)`) and the hash conventions an
+> auditor needs to avoid filing false build-pin findings.
 
 > ✅ **Book #1 was replaced on 2026-10-25 and now runs a build this repository contains.**
 > Book #1 is `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9` (deployed 2026-10-25T14:22Z). The
@@ -10,10 +12,10 @@
 > Deployed build: source cut `0624616c` (= F-4/F-4R-2 vault tip `808e2ecf` + the `depositFor`
 > auto-earn guard), solc 0.8.28, optimizer **runs=200**, no viaIR, evm `paris`. Vault runtime
 > **12,140 B**, lowercase-hex sha256 `ff907cc7…f97e6f0a`, CBOR ipfs `12207cfb…e30ef1dc`;
-> FeeDistributor `0xc8cc10dd…C27970`, 2,106 B, sha256 `e7cceb78…5b004b5`, ipfs `1220161a…4d38bdd8`.
+> FeeDistributor `0xc8cc10dd…C27970`, 2,106 B, sha256 `e7cceb78…75b004b5`, ipfs `1220161a…4d38bdd8`.
 > Live code equals the pinned artifact **outside constructor-immutable slots only** (vault 440
 > differing bytes, FeeDistributor 80, **0 outside** `immutableReferences`; CBOR trailers
-> byte-identical; block 49,583,955, 2026-10-26). **PY-SCOPE-02's "undeployed fixes" list is CLOSED
+> byte-identical; block 49,585,544, 2026-10-26 — hash conventions in §1.4). **PY-SCOPE-02's "undeployed fixes" list is CLOSED
 > for the vault and the FeeDistributor** — r1 (`c652e006`), r3-CEI (`609ad90b`), sUSD3 (`e9c899a8`),
 > F-4 gate (`dca15b6a`), F-4R-2 (`808e2ecf`) and `depositFor` are on chain. §1.4 lists exactly what
 > is **still** not deployed (DN core, the PT/sUSD3 lanes, the Morpho build — read it before scoping
@@ -81,10 +83,19 @@ now corrected above. Findings and fixes: `AUDIT_HANDOFF_2026-09-30.md` and
 ### 1.2 Live `strategyList` — 2 registered strategies on book #1 (live-verified 2026-10-26)
 
 The live vault `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9` holds **2 registered
-strategies**, both `strategyActive == true`. Flags and values are `strategyActive()` /
-`totalAssets()` read in the same block, **49,583,849** (2026-10-26T15:15Z); the vault's own
-`totalAssets()` and `totalShares()` are both 12,950,000 (6dp) = **$12.95**, `depositsPaused=false`,
-caps $10,000 TVL / $1,000 per user. Both strategies' `vault()` returns the R1 vault.
+strategies**, both active. **Read them correctly — two traps here:**
+
+- `strategyActive` is a **public mapping on the vault**, not a strategy method. Call
+  `vault.strategyActive(addr)`; calling `strategyActive()` on the strategy contract reverts.
+- `strategyList` is a public **dynamic array**, so it has no argument-less getter. Enumerate it
+  with the index accessor `vault.strategyList(i)` until it reverts (i = 0,1 here). A bare
+  `strategyList()` call reverts too — that is not an empty list.
+
+Flags and values below are `vault.strategyActive(addr)` / `strategy.totalAssets()` read in the
+same block, **49,585,504** (2026-10-26T15:42Z), unchanged from the 49,583,849 read earlier the
+same day; the vault's own `totalAssets()` and `totalShares()` are both 12,950,000 (6dp) =
+**$12.95**, `depositsPaused=false`, caps $10,000 TVL / $1,000 per user. Both strategies' `vault()`
+returns the R1 vault.
 
 | # | Live strategy address | Active | Value (USDC-6dp) | Source |
 |---|---|---|---|---|
@@ -103,7 +114,8 @@ The same list is recorded machine-readably in `deployed_addresses.mainnet.json` 
 > (`depositsPaused=true` since 2026-10-25; `totalAssets` = 4,768 = **$0.004768** on 2026-10-26).
 > It is kept because it is the record of where the pre-R1 capital sat and because every entry's
 > `vault()` still points at that vault (except HLEarn, which was re-pointed). **Do not scope these
-> as the live book.** Re-read 2026-10-26: `strategyActive` is now false for PT v1 `0x3AE855B6…`,
+> as the live book.** Re-read 2026-10-26 (block 49,585,504, `vault.strategyActive(addr)` on the
+> superseded vault): it is now false for PT v1 `0x3AE855B6…`,
 > PT-Arb `0x2D3E5bf1…`, PT-ETH `0xA96D0BB2…` and legacy sUSD3 `0x9978e874…`; it is still true for
 > DN core `0xeD40C3c3…` and the old Morpho `0xBF4C5e33…`; HLEarn `0xA2e53597…` still appears in
 > this old list but now serves the R1 vault. Values below are the 2026-10-23 snapshot; on
@@ -158,30 +170,59 @@ attack-surface concern; see audit F-1).
 **Book #1 is `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9`** (HyperEVM 999), deployed
 2026-10-25T14:22:00Z (deploy txs in `deployed_addresses.mainnet.json`, nonces 692–696), owned by the
 treasury Safe `0x8A1b107e…C9aB` (Safe v1.4.1, 2-of-3), caps $10,000 TVL / $1,000 per user,
-`depositsPaused=false`, `totalAssets` = $12.95 at block 49,583,849. It runs the **R1 converged
+`depositsPaused=false`, `totalAssets` = $12.95 at block 49,585,504. It runs the **R1 converged
 build**, and that build is this repository's source:
 
 | | vault `0x9DA979…AcFD9` | FeeDistributor `0xc8cc10dd…C27970` |
 |---|---|---|
 | runtime | 12,140 B | 2,106 B |
-| sha256 (lowercase-hex runtime digest) | `ff907cc7…f97e6f0a` | `e7cceb78…5b004b5` |
+| sha256 of the **artifact's lowercase hex runtime string** | `ff907cc7…f97e6f0a` | `e7cceb78…75b004b5` |
 | CBOR ipfs | `12207cfb…e30ef1dc` | `1220161a…4d38bdd8` |
 | live vs pinned artifact | 440 bytes differ, **0 outside** `immutableReferences` | 80 bytes differ, **0 outside** `immutableReferences` |
 
+**Hash convention — read this before you “fail” the pin.** The two digests above are `sha256`
+over the artifact's runtime **hex text, lowercased** (the `deployedBytecode` field with `0x`
+dropped) — that is the convention the pin file uses. Two other inputs are also “the SHA-256 of the
+runtime” and give different values, correctly:
+
+| Input | vault | FeeDistributor |
+|---|---|---|
+| sha256 of the **raw runtime bytes** of the same artifact | `74dd42d1…7645027f` | `aa018dff…c000c86c` |
+| sha256 of **live `eth_getCode`** (immutables filled on chain, block 49,585,525) | `c92fb81d…55200f1f` | `cfa271ad…a7ace7ac` |
+
+None of the three disagree — they are different inputs to the same function. The live-code hash can
+never equal the artifact hash, because the constructor immutables (vault owner, asset, fee
+distributor, caps…) are zeroed in the artifact and filled in on chain. A pin is only meaningful
+artifact-vs-artifact, or live-vs-artifact **outside the `immutableReferences` spans** (next
+paragraph). Hashing live code and comparing it to `ff907cc7…` is a false finding.
+
 Build profile: solc 0.8.28, optimizer **runs=200**, no viaIR, evm `paris`; build cut `0624616c`
 (= the F-4/F-4R-2 vault tip `808e2ecf` + the `depositFor` auto-earn guard). Verified 2026-10-26 by
-rebuilding the cut at that profile and comparing to chain at block 49,583,955: CBOR trailers
+rebuilding the cut at that profile and comparing to chain at block 49,585,544: CBOR trailers
 byte-identical (the ipfs values above), every differing byte inside a constructor-immutable slot,
 and `contracts/ProYieldVault.sol` / `contracts/FeeDistributor.sol` / `contracts/BaseStrategy.sol`
 unchanged since the cut. The same pins ship machine-readably in `deployed_addresses.mainnet.json`
-(`expected_ipfs.contracts` → address, byte length, ipfs multihash, build key), which is what
-`scripts/build_currency_gate.js` grades. Two build traps, both checked: (a) the repo default
-`hardhat.config.js` is `runs=1 + viaIR` and never produces a deploy artifact — build at runs=200 /
-no-viaIR / paris; (b) the manifest's build label `r1-2026-10-25-808e2ecf` names the F-4/F-4R-2
+(`expected_ipfs.contracts` → address, byte length, ipfs multihash, build key). The grading script
+`scripts/build_currency_gate.js` lives in the **private operations repository**, not in this public
+one — reproduce its verdict by hand instead: build the source at the pinned profile, compare the
+CBOR trailer (the `ipfs` value) byte-for-byte, then diff live `eth_getCode` against the artifact
+and confirm every differing byte falls inside `immutableReferences`. Two build traps, both checked:
+(a) the repo default `hardhat.config.js` is `runs=1 + viaIR` and never produces a deploy artifact —
+build at runs=200 / no-viaIR / paris; (b) the manifest's build label `r1-2026-10-25-808e2ecf` names the F-4/F-4R-2
 *base* commit, and `808e2ecf` **alone** rebuilds to 11,761 B / sha `90e392b4…`, which is **not** the
 deployed code — the deployable artifact carries the following `depositFor` commit (`0624616c`).
 Reproduce from the pinned artifact or the `0624616c` tree; the runtime sizes and hashes above are
 the check that matters.
+
+**Where those commit ids live.** Every `c652e006` / `609ad90b` / `808e2ecf` / `0624616c`-style id
+in this section is a commit in the **private operations repository**. This public audit repo is a
+filtered export with its own history, so `git show 808e2ecf` fails here — that is not evidence that
+the source is missing. The public anchor is the file content: in this repo
+`contracts/ProYieldVault.sol` (sha256 `aa15247f…f145ef33f`), `contracts/FeeDistributor.sol`
+(`611a5663…842a0624`) and `contracts/BaseStrategy.sol` (`4e75eb3e…c0b6bee2d`) are **byte-identical**
+to those files in the private build cut that produced the deployed artifact (checked 2026-10-26).
+Rebuild them here at the pinned profile and compare to chain as above — that reproduces the deployed
+build without needing our git history.
 
 **PY-SCOPE-02 status: CLOSED for the vault and the FeeDistributor.** On chain now: r1 `c652e006`
 (F-4 `uncreditedArrivals()`/arrival clamp, F-15 codeless-strategy check, F-13 FD cumulative fees),
@@ -209,16 +250,19 @@ old "selector present on chain, absent at HEAD" divergence is gone.
   (`bec2ff29`), and `MorphoStrategy.sol` + `BaseStrategy.sol` are byte-identical between `168310a5`
   and HEAD, so PY-RECALL-01 is closed on the live book as well; it is simply not a build of the
   `bec2ff29` commit itself.
-- **PYDFeeDiscount v3** is deployed but inert (§1.0): `budgetAvailable()` = 0, no rebates accrue,
-  and it is not in the published `deployed_addresses.pyd.mainnet.json` until that manifest is
-  promoted.
+- **PYDFeeDiscount v3** is deployed but inert (§1.0): `budgetAvailable()` = 0, no rebates accrue.
+  Its address is now named in `deployed_addresses.pyd.mainnet.json` (`generation` block,
+  2026-10-26) while that file's per-contract `contracts` record is still the 2026-09-30 deploy —
+  read the `generation` / `supersedes` blocks first, never the bare `contracts` map.
 
 **F-1 (accepted risk) no longer attaches to the live book.** The pre-remediation PT lanes named in
 `deployed_addresses.mainnet.json:_accepted_risks[F-1]` (`0x2D3E5bf1…`, `0xA96D0BB2…`) are on the
-superseded vault with `strategyActive=false` (block 49,583,849); the R1 vault cannot allocate to
-them, and `scripts/pt_strategy_gate.js` still hard-fails any activation. The manifest entry stays
-(the gate reads it) as the record of a risk that is now live only on the archived book. Every PT
-leg reads $0 on 2026-10-26, so the accepted risk has no capital behind it today.
+superseded vault with `vault.strategyActive(addr) == false` (block 49,585,504); the R1 vault cannot
+allocate to them, and `scripts/pt_strategy_gate.js` still hard-fails any activation. The manifest
+entry stays (the gate reads its address list) as the record of a risk that is now live only on the
+archived book — its per-address `registered+ACTIVE` labels are the 2026-10-10 state and are marked
+historical in the entry itself. Every PT leg reads $0 on 2026-10-26, so the accepted risk has no
+capital behind it today.
 
 **Historical generation (record, not scope):** the superseded vault `0x8954a73B…D1C1` (2026-09-25,
 source `8daa2ce5`, runtime 9,952 B, ipfs `1220e58e6bea…24ea`) is `depositsPaused=true` and holds

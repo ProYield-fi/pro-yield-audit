@@ -36,6 +36,6 @@ ProYield adds no fees on top of a provider's shown rates, and no provider is ena
 
 ## Status & honesty notes
 
-- **Guarded beta** on HyperEVM mainnet: hard caps enforced in code (**$500 TVL / $500 per user**), stepped up as confidence grows. The external audit gates the cap-raise and is funded from protocol fees.
+- **Guarded beta** on HyperEVM mainnet: hard caps enforced in code (**$10,000 TVL / $1,000 per user** since the 2026-10-25 R1 redeploy; the superseded 2026-09-25 vault ran $500 / $500), stepped up only as confidence grows. The external audit gates the next cap-raise and is funded from protocol fees.
 - **Contracts are not yet externally audited.** Static analysis (Slither), a full isolated test battery, and a public community audit run continuously — [github.com/ProYield-fi/pro-yield-audit](https://github.com/ProYield-fi/pro-yield-audit), issue #1. Do not treat unaudited contracts as risk-free.
 - This page describes only services in use or under evaluation, and is updated as the lineup changes.

@@ -1,6 +1,102 @@
 {
+  "_read_me_first": "This file is the 2026-09-30 PYD deployment record. The bare `contracts` map below is HISTORICAL: its `vault`, `feeDistributor` and `pydFeeDiscount` entries are retired addresses. Current live addresses are in `generation`; retired ones (with the reason and the replacement) are in `retired`. Read `generation` and `retired` before trusting any address in `contracts`. `pydToken` and `treasurySafe` in `contracts` are still the deployed instances; of the rest, see `contracts_status` — only pydToken sits on a live money path.",
   "chainId": 999,
   "network": "hyperevm-mainnet",
+  "generation": {
+    "recordedUtc": "2026-10-26",
+    "book": "book #1, generation 2026-10-25 (R1)",
+    "vault": "0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9",
+    "feeDistributor": "0xc8cc10ddC8a6605CfDDB3886962C184829C27970",
+    "pydFeeDiscount": "0xD31e6E62F3A2378C12B993BFF6022aD68a8c583e",
+    "treasurySafe": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+    "status": {
+      "vault": "LIVE — depositsPaused=false, totalAssets=totalShares=12,950,000 (6dp) = $12.95, caps $10,000 TVL / $1,000 per user, 2 registered strategies (Morpho 0xb7F5DD7b, HLEarn 0xA2e53597), owner = treasury Safe (v1.4.1, 2-of-3). Read at block 49,585,504, 2026-10-26.",
+      "feeDistributor": "LIVE — vault.feeDistributor() returns it; runtime 2,106 B, ipfs 1220161a…4d38bdd8, byte-identical to its pinned artifact outside constructor-immutable slots. Block 49,585,544.",
+      "pydFeeDiscount": "DEPLOYED BUT INERT — budgetAvailable()=0, no rebates accrue, both R1 books registered (booksHealthy=true), owner = treasury Safe, minEpochSeconds=86400. Runtime 9,791 B, keccak 0xa421f7f5…2c922e24 (matches the deploy record). Block 49,585,667."
+    },
+    "source": {
+      "vault_and_feeDistributor": "deployed_addresses.mainnet.json (generation 2026-10-25; the R1 pin block)",
+      "pydFeeDiscount": "deployed_addresses.pyd.mainnet.json on branch deploy/pyd-v3-2026-10-25 (record mirrored below in `pydFeeDiscountV3`)",
+      "scope_document": "docs/AUDIT_SCOPE.md §1.0 / §1.2 / §1.4"
+    }
+  },
+  "retired": {
+    "vault_0x8954": {
+      "address": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+      "role": "book #1, generation 2026-09-25",
+      "supersededUtc": "2026-10-25",
+      "replacedBy": "0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9",
+      "state": "depositsPaused=true, totalAssets=4,768 (6dp) = $0.004768, 7-entry strategyList retained, owner = treasury Safe. Read at block 49,585,504.",
+      "note": "Do not scope, deposit to, or read book metrics from this address. It ran caps $500/$500 and the 2026-09-25 build (source 8daa2ce5); the R1 fixes are NOT on it."
+    },
+    "feeDistributor_0x18FB": {
+      "address": "0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9",
+      "role": "FeeDistributor for the generation 2026-09-25 vault",
+      "supersededUtc": "2026-10-25",
+      "replacedBy": "0xc8cc10ddC8a6605CfDDB3886962C184829C27970",
+      "note": "FeeDistributor stores no vault pointer (its only immutable is USDC), so the link is directional: the OLD vault's feeDistributor immutable pointed here, and the live vault's points at 0xc8cc10dd…. This instance receives nothing from the live book. Named here because older docs sent readers to this file for it."
+    },
+    "pydFeeDiscount_0x2B59": {
+      "address": "0x2B591845a250258d40B468372F432f7fda7cBE88",
+      "role": "PYDFeeDiscount, PY-REBATE-01 build (defective: unclamped weights, non-epoch-lagged accrual)",
+      "retiredUtc": "2026-10-23",
+      "replacedBy": "0xcFC78dc4Ad488f0f3b5345ceC26BB5354Cd4f0aF (A2), which is itself superseded by 0xD31e6E62…583e (v3)",
+      "state": "deployed, 5,134 B, never registered or activated, out of scope. Runtime keccak 0x554395e9…9c4047.",
+      "note": "Findings here are out of scope — it is not a money path and may never be funded."
+    },
+    "pydFeeDiscount_0xCfc7 (A2)": {
+      "address": "0xcFC78dc4Ad488f0f3b5345ceC26BB5354Cd4f0aF",
+      "role": "PYDFeeDiscount A2 build (PY-REBATE-01 fix; epoch-lagged + min-clamped weights)",
+      "deployedUtc": "2026-10-23",
+      "supersededUtc": "2026-10-26",
+      "replacedBy": "0xD31e6E62F3A2378C12B993BFF6022aD68a8c583e (v3)",
+      "state": "deployed, 6,116 B, runtime keccak 0xb71859e9…c6258d, owner = treasury Safe, constructor wired to the SUPERSEDED vault/FD pair (0x8954… / 0x18FB…). Never funded.",
+      "note": "v3 is the only rebate build that may be funded or wired (docs/AUDIT_SCOPE.md §1.3). A2 stays on chain as history."
+    },
+    "pydFunder_0x1af2": {
+      "address": "0x1af2Cc1045584069fA34b0121D4020d28104dd1e",
+      "role": "PYDFunder (capped USDC→PYD conversion → PYDStaking streams)",
+      "retiredUtc": "2026-10-23",
+      "replacedBy": null,
+      "state": "paused=true, swapper=null, holds no USDC, runs the 2534780f build that predates the F-8 top-up/rate-floor fix. Owner = treasury Safe. Read at block 49,585,553.",
+      "note": "Retired by owner decision B (kanban t_97bf74a2). History, not a money path. A future demand layer deploys fresh from reviewed HEAD."
+    }
+  },
+  "contracts_status": {
+    "pydToken": "live — fixed-supply ERC20, no mint path (1,618 B)",
+    "pydStaking": "deployed but DORMANT — its owner is still pydFunder 0x1af2Cc10… (retired and paused since 2026-10-23), so no new streams can start; the contract is otherwise unchanged (3,451 B)",
+    "pydFunder": "RETIRED 2026-10-23 — see `retired.pydFunder_0x1af2`. Do not wire.",
+    "pydFeeDiscount": "RETIRED — this is the PY-REBATE-01 build 0x2B591845…; the live (inert) build is v3 0xD31e6E62… in `generation`",
+    "feeDistributor": "RETIRED — 0x18FB3e2F… belongs to the superseded 2026-09-25 vault; live FD is 0xc8cc10dd… in `generation`",
+    "vault": "RETIRED — 0x8954a73B… is depositsPaused=true; live vault is 0x9DA979… in `generation`",
+    "treasurySafe": "live — v1.4.1 Safe, threshold 2 of 3 owners; owner of the vault, FD, v3 discount and funder"
+  },
+  "pydFeeDiscountV3": {
+    "address": "0xD31e6E62F3A2378C12B993BFF6022aD68a8c583e",
+    "deployedAtUtc": "2026-10-26T01:56:00Z",
+    "txHash": "0xad227783b2a8f81268b7aa78ecd3489c0ec43d66b77b7e26881e57afdac2b37b",
+    "blockNumber": 49535113,
+    "constructorArgs": [
+      "0xbF38e441166f44cfc05205B21168a01b8a1ABf4F",
+      "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+      "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+      "86400"
+    ],
+    "runtimeBytes": 9791,
+    "runtimeKeccak": "0xa421f7f5ffcbf4fab49d88fc4814a776cf7e80729c2a8ff960bd0e7a2c922e24",
+    "ipfs": "1220a1325e7a94e2884b4a5790639709ef0089b1a4908806d09e6b11722fab158575",
+    "scope": "inactive",
+    "funded": false,
+    "owner": "0x8A1b107e1DDabC868E40b8718F09537B0A50C9aB",
+    "minEpochSeconds": 86400,
+    "budgetAvailable": "0",
+    "booksHealthy": true,
+    "note": "Verified on chain 2026-10-26 (block 49,585,667): 9,791 B, keccak matches, owner = treasury Safe, budgetAvailable()=0. Both R1 books are registered and healthy; the pool is unfunded and must stay scope:inactive until the 10% fee slice lands and a signed activation review exists."
+  },
+  "previousBuilds": {
+    "pydFeeDiscount_defective_PY_REBATE_01": "0x2B591845a250258d40B468372F432f7fda7cBE88",
+    "pydFeeDiscount_A2": "0xcFC78dc4Ad488f0f3b5345ceC26BB5354Cd4f0aF"
+  },
   "deployedBy": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
   "timestamp": "2026-09-30T12:41:35.154Z",
   "contracts": {
@@ -29,6 +125,8 @@
     "funderPaused": "0xa00e9a80f4c824d9857468d5a66380c3fa3c451990e8cf9f6a12e9991daa8a8e",
     "tokenToTreasury": "0xe7061235144a44fa988dcbeb36206fd7ed00e4900f97b1bea2fa4bbf9b0570de",
     "funderOwnershipToSafe": "0x60a9c814ff8317cd3fc8259e422e7212551dc6a49f722d877ec113d0e20ec385",
-    "discountOwnershipToSafe": "0xee773d9508a660c0e4faf4cfbd33654be5be8a8dcd17f406387196a1c2404567"
+    "discountOwnershipToSafe": "0xee773d9508a660c0e4faf4cfbd33654be5be8a8dcd17f406387196a1c2404567",
+    "pydFeeDiscountFix2026_10_23": "0xa76c10f0d810fa06609df8d4360a0aee8163a8ed525994afb7139d3f7be9a152",
+    "pydFeeDiscountV3_2026_10_26": "0xad227783b2a8f81268b7aa78ecd3489c0ec43d66b77b7e26881e57afdac2b37b"
   }
 }

@@ -62,9 +62,10 @@
   {
    "id": "F-1",
    "severity": "HIGH (accepted, time-boxed)",
+   "status_2026_10_26": "HISTORICAL — the two lanes below are registered on the SUPERSEDED 2026-09-25 vault 0x8954a73B…, not on the live R1 vault 0x9DA979…, and vault.strategyActive(addr) reads false for both (block 49,585,504, 2026-10-26). The labels in `contracts` are the 2026-10-10 state when they were registered+ACTIVE. The live R1 vault cannot allocate to them; every PT leg reads $0. The address list is kept verbatim because scripts/pt_strategy_gate.js reads it.",
    "contracts": [
-    "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b (pt_sleeve_strategy, registered+ACTIVE)",
-    "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25 (pt_sleeve_eth_strategy, registered+ACTIVE)"
+    "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b (pt_sleeve_strategy, registered+ACTIVE — as of 2026-10-10, on the superseded vault; now strategyActive=false)",
+    "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25 (pt_sleeve_eth_strategy, registered+ACTIVE — as of 2026-10-10, on the superseded vault; now strategyActive=false)"
    ],
    "what": "Pre-remediation PTSleeveStrategy.completeInbound books retFace6 but does NOT consume inFlight6 (zeroing it is a separate keeper ackArrival). A forgotten/failed ack leaves a returned inbound counted TWICE (idle cash AND still-'in-flight') -> totalAssets() reports up to 2x the real money (false-HIGH book that masks a shortfall). R-1 (un-swept realized yield bridgeable back to the venue) is also unfixed live. Source: docs/PT_SLEEVE_REMEDIATION_2026-10-05.md (F-1 HIGH, 'remains LIVE until redeployed'); bytecode sweep t_edbb5fb7.",
    "loss_bound_2026-10-10": "Per-lane overstatement = the un-acked inbound amount, bounded by that lane's outstanding sent face; reported totalAssets() can reach up to 2x real for that lane. Measured live 2026-10-10 (t_c6e22ed9): PT-Arb 0x2D3E5bf1 = $0 (lane flat, fully unwound 2026-10-09; inFlight6=0, arbValue6=0, totalAssets=0); PT-ETH 0xA96D0BB2 = up to $18.953737 (sent face; arbValue6 $18.959029, inFlight6=0 -> no active phantom) -> vault book $126.269032 could be overstated by up to ~$18.95 (+15%) in the worst case. NOT a direct money loss: it is a book overstatement realizable only by overpaying a withdrawing depositor.",
