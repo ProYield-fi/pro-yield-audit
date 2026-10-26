@@ -201,16 +201,27 @@ Build profile: solc 0.8.28, optimizer **runs=200**, no viaIR, evm `paris`; build
 rebuilding the cut at that profile and comparing to chain at block 49,585,544: CBOR trailers
 byte-identical (the ipfs values above), every differing byte inside a constructor-immutable slot,
 and `contracts/ProYieldVault.sol` / `contracts/FeeDistributor.sol` / `contracts/BaseStrategy.sol`
-unchanged since the cut. The same pins ship machine-readably in `deployed_addresses.mainnet.json`
+unchanged since the cut. The vendored artifact in the private repo (`deploy-artifacts/r1-2026-10-25/`)
+is **byte-for-byte** the `0624616c` rebuild — creation 13,549 B / `55782ba0…`, runtime 12,140 B /
+`ff907cc7…` — while `808e2ecf` alone reproduces neither its creation nor its runtime bytes: it yields
+11,761 B / `90e392b4…`, the pre-`depositFor` cut that was never deployed. The real deploy
+consumed **2,824,591** of HyperEVM's 3,000,000 gas/tx hard cap (**5.85% headroom**, block 49,492,740),
+which is what any future generation of this size has to plan against. The same pins ship
+machine-readably in `deployed_addresses.mainnet.json`
 (`expected_ipfs.contracts` → address, byte length, ipfs multihash, build key). The grading script
 `scripts/build_currency_gate.js` lives in the **private operations repository**, not in this public
 one — reproduce its verdict by hand instead: build the source at the pinned profile, compare the
 CBOR trailer (the `ipfs` value) byte-for-byte, then diff live `eth_getCode` against the artifact
 and confirm every differing byte falls inside `immutableReferences`. Two build traps, both checked:
 (a) the repo default `hardhat.config.js` is `runs=1 + viaIR` and never produces a deploy artifact —
-build at runs=200 / no-viaIR / paris; (b) the manifest's build label `r1-2026-10-25-808e2ecf` names the F-4/F-4R-2
-*base* commit, and `808e2ecf` **alone** rebuilds to 11,761 B / sha `90e392b4…`, which is **not** the
-deployed code — the deployable artifact carries the following `depositFor` commit (`0624616c`).
+build at runs=200 / no-viaIR / paris; (b) the manifest's build **key** is named
+`r1-2026-10-25-808e2ecf`, but that is a historical name for the F-4/F-4R-2 *base* commit — the entry's
+`source_commit` is `0624616c`. `808e2ecf` **alone** rebuilds to 11,761 B / sha `90e392b4…`, which is
+**not** the deployed code (its source contains no `depositFor`) — the deployable artifact carries the
+following `depositFor` commit (`0624616c`). Since 2026-10-26 the manifest's top-level
+`build.source_commit` / `build.label` and that build entry's `source_commit` all name `0624616c`
+explicitly (private card `t_dfb93276`), so the written pointer and the artifact agree; only the key
+keeps the old name.
 Reproduce from the pinned artifact or the `0624616c` tree; the runtime sizes and hashes above are
 the check that matters.
 

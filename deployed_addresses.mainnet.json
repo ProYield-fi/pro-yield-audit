@@ -44,10 +44,11 @@
  "stage": "S2-team",
  "build": {
   "key": "fixed",
-  "label": "R1 2026-10-25 fixed r1+r3+sUSD3+F-4+F-4R-2, AUDIT LINEAGE (source 808e2ecf = F-4 gate dca15b6a + F-4R-2 cap, solc 0.8.28+commit.7893614a, optimizer runs=200, no viaIR, paris)",
-  "source_commit": "808e2ecf6072fa598b80b64887da35b03c4b323a",
+  "label": "R1 2026-10-25 fixed r1+r3+sUSD3+F-4+F-4R-2+depositFor, AUDIT LINEAGE (artifact cut 0624616c = base 808e2ecf [F-4 gate dca15b6a + F-4R-2 cash-ledger cap] + the depositFor auto-earn guard; 808e2ecf ALONE rebuilds the undeployed 11,761 B cut. solc 0.8.28+commit.7893614a, optimizer runs=200, no viaIR, paris)",
+  "source_commit": "0624616c40ef1734aebf75d98c32f27f48546b01",
   "vault_runtime_sha256": "ff907cc76f57428755b980ad9d817495bbf54b851338e9b338ee9dc3f97e6f0a",
-  "fd_runtime_sha256": "e7cceb785de5ecf2571d4cc98b1cca9f3533411839226c9b0654c25b75b004b5"
+  "fd_runtime_sha256": "e7cceb785de5ecf2571d4cc98b1cca9f3533411839226c9b0654c25b75b004b5",
+  "base_commit": "808e2ecf6072fa598b80b64887da35b03c4b323a"
  },
  "_notes": [
   "R1 convergence \u2014 book #1 REPLACEMENT vault + FeeDistributor from the fixed build (r1+r3+sUSD3).",
@@ -271,10 +272,11 @@
     "artifact": "deploy-artifacts/head-fixed/ (runtime sha256 re-checked by deploy_boost_mainnet.js guard 6)"
    },
    "r1-2026-10-25-808e2ecf": {
-    "source_commit": "808e2ecf",
+    "source_commit": "0624616c",
     "profile": "solc 0.8.28+commit.7893614a \u00b7 optimizer runs=200 \u00b7 viaIR=false \u00b7 evm paris",
     "artifact": "deploy-artifacts/r1-2026-10-25/ (ProYieldVault.json + FeeDistributor.json; runtime sha256 pinned in this manifest's top-level build{} block \u2014 vault ff907cc7\u2026, FD e7cceb78\u2026 \u2014 and re-checked by scripts/bytecode_identity_check.js BUILDS.fixed, whose pinned shas are byte-identical to these)",
-    "note": "the R1 deploys' build (F-4 gate dca15b6a + F-4R-2 cap 808e2ecf; re-cut 2026-10-23 by card t_be3c895f because the earlier dca15b6a cut predated F-4R-2, that older artifact preserved at deploy-artifacts/r1-2026-10-25-dca15b6a/). Deployed 2026-10-25 to book #1 (the pins below) and, byte-identical, to book #2. A pin was moved here from 'head-audit-lineage' on 2026-10-26 (card t_e7e6ae53) because the generation actually deployed had changed and the old pin pointed at a build nobody deployed."
+    "note": "the R1 deploys' build. THE KEY NAME IS HISTORICAL and names the BASE commit, not the artifact (kept for stability: card t_e7e6ae53 published it, card t_dfb93276 corrected the pointer). The deploys came from 0624616c = 808e2ecf (F-4 gate dca15b6a + F-4R-2 cash-ledger cap) + the depositFor(address,uint256) auto-earn guard. Rebuilt at this profile on 2026-10-26, 0624616c reproduces deploy-artifacts/r1-2026-10-25/ BYTE FOR BYTE (creation 13,549 B / 55782ba0\u2026, runtime 12,140 B / ff907cc7\u2026 / CBOR ipfs 12207cfb\u2026), and that is the code on chain. 808e2ecf ALONE rebuilds to 11,761 B / 90e392b4\u2026 / a different ipfs and its source has no depositFor (selector 0x2f4f21e2) at all \u2014 the pre-depositFor cut, NEVER deployed; do not reproduce or audit it as 'the R1 build'. Deployed 2026-10-25 to book #1 (the pins below) and, byte-identical, to the Frontier book #3 (0xEDcdC0D9\u2026, also 12,140 B / ipfs 12207cfb\u2026 on chain). The earlier dca15b6a cut (11,667 B / 39b43d30\u2026) is preserved at deploy-artifacts/r1-2026-10-25-dca15b6a/. A pin was moved here from 'head-audit-lineage' on 2026-10-26 (card t_e7e6ae53) because the generation actually deployed had changed and the old pin pointed at a build nobody deployed.",
+    "base_commit": "808e2ecf"
    },
    "morpho-head-fixed-168310a5": {
     "source_commit": "168310a5",
@@ -312,14 +314,14 @@
     "expected_ipfs": "12207cfbb7f236e45283eaf1c3a91a0dab54f33b27b9fe984430dce99de30ef1dcfc",
     "bytes": 12140,
     "build": "r1-2026-10-25-808e2ecf",
-    "note": "R1 book-#1 vault (generation 2026-10-25, card t_e7e6ae53). Live runtime == deploy-artifacts/r1-2026-10-25/ProYieldVault.json (12,140 B, runtime sha256 ff907cc7\u2026) INCLUDING the trailing CBOR metadata: 440 differing bytes at block 49,583,932 and every one of them falls inside immutableReferences (0 outside), CBOR trailer byte-identical. The reviewed source is 808e2ecf (F-4 gate + F-4R-2 cap), the profile runs=200 / no viaIR / paris. Superseded 0x8954a73B\u2026D1C1 (depositsPaused=true since the 2026-10-25 migration; $0.004768 left, its FD 0x18FB3e2F\u20268E9) is recorded under supersedes, not graded here."
+    "note": "R1 book-#1 vault (generation 2026-10-25, card t_e7e6ae53). Live runtime == deploy-artifacts/r1-2026-10-25/ProYieldVault.json (12,140 B, runtime sha256 ff907cc7\u2026) INCLUDING the trailing CBOR metadata: 440 differing bytes at block 49,583,932 and every one of them falls inside immutableReferences (0 outside), CBOR trailer byte-identical. The reviewed source is the artifact cut 0624616c (= the F-4/F-4R-2 base 808e2ecf + the depositFor auto-earn guard), the profile runs=200 / no viaIR / paris; rebuilding 808e2ecf ALONE yields 11,761 B / sha 90e392b4\u2026, which is NOT this vault (2026-10-26, card t_dfb93276). Superseded 0x8954a73B\u2026D1C1 (depositsPaused=true since the 2026-10-25 migration; $0.004768 left, its FD 0x18FB3e2F\u20268E9) is recorded under supersedes, not graded here."
    },
    "fee_distributor": {
     "address": "0xc8cc10ddC8a6605CfDDB3886962C184829C27970",
     "expected_ipfs": "1220161a7b46be95efe6ffe2fc0777e43280dadf659b52a28a66ba6644d38bdd8a45",
     "bytes": 2106,
     "build": "r1-2026-10-25-808e2ecf",
-    "note": "R1 FeeDistributor (generation 2026-10-25, card t_e7e6ae53), and the FD the R1 vault's feeDistributor() names. F-13 (lifetime fee counter frozen after the first route()) is FIXED here. Live runtime == deploy-artifacts/r1-2026-10-25/FeeDistributor.json INCLUDING the trailing CBOR metadata (80 differing bytes at block 49,583,932, all inside immutableReferences; CBOR trailer byte-identical). Superseded 0x18FB3e2F\u20268E9 (1220e71e\u2026, 1,977 B, F-13 absent) is recorded under supersedes, not graded here."
+    "note": "R1 FeeDistributor (generation 2026-10-25, card t_e7e6ae53), and the FD the R1 vault's feeDistributor() names. F-13 (lifetime fee counter frozen after the first route()) is FIXED here. Live runtime == deploy-artifacts/r1-2026-10-25/FeeDistributor.json INCLUDING the trailing CBOR metadata (80 differing bytes at block 49,583,932, all inside immutableReferences; CBOR trailer byte-identical). Superseded 0x18FB3e2F\u20268E9 (1220e71e\u2026, 1,977 B, F-13 absent) is recorded under supersedes, not graded here. The deploy cut is 0624616c; FeeDistributor.sol is unchanged since e9c899a8, so 808e2ecf and 0624616c both rebuild this FD byte for byte."
    },
    "dn_core_strategy": {
     "address": "0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4",
