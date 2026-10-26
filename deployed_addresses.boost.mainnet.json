@@ -11,7 +11,13 @@
  "supersedes": {
   "pro_yield_vault": "0xdeD29C2EcC1bc26D6cE0844498Dd608e1C725d3e",
   "fee_distributor": "0x535Fe981A9a3D536ECA02bdaA5a63679F900323b",
-  "deployed_utc": "2026-10-09T20:12:43.394Z"
+  "deployed_utc": "2026-10-09T20:12:43.394Z",
+  "book1_pins_carried_until_2026_10_26": {
+   "_note": "RECORD, NOT A PIN. Until the re-pin of 2026-10-26 (card t_631004f9) this manifest's expected_ipfs.contracts block was a verbatim carry-forward of book #1's PRE-R1 pin block. The gate therefore graded three BOOK #1 addresses — one of them a paused vault with $0.004768 in it — as if they were book #2's money contracts, while book #2's own four live contracts appeared nowhere in contracts{} and could not even be reported as unpinned: coverage of the live book was 0 in a report that looked populated. The identities below are what those addresses carried when they were retired from this block. They are NOT graded here; where an address is still book #1's live generation it is graded by book #1's own manifest (deployed_addresses.mainnet.json), and where it is not, book #1 records it under its own supersedes.",
+   "pro_yield_vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1 — 9,952 B, ipfs 1220e58e6bea6e80df9b6f0aaafc5520ddff4a4f169a988344a6b7898a32ea5224ea (build book1-parity-8daa2ce5). Live-read 2026-10-26: depositsPaused=true, totalAssets 0.004768 USDC. Book #1's vault of record 2026-09-25..2026-10-25; never book #2's.",
+   "fee_distributor": "0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9 — 1,977 B, ipfs 1220e71e362520024a90a6b20e55f4f9a3896cd99acd45e88146bf6484c26015a1d4 (F-13 lifetime-fee-counter fix absent). Book #1's FD of record 2026-09-25..2026-10-25.",
+   "morpho_strategy": "0xBF4C5e339D63EEB393DA2797679879a0a5Af2D53 — 7,122 B, ipfs 1220e11e2248156d8fdf7d932d956fa54b87feac209fc590493b8b5c4e173bbbb0f2 (morpho-pre-bec2ff29; PY-RECALL-01 body fix absent). Book #1's Morpho strategy until the 2026-10-25 R1 sitting replaced it with 0xb7F5DD7b…0A3E."
+  }
  },
  "deployed_utc": "2026-10-25T16:28:50.977Z",
  "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
@@ -37,10 +43,11 @@
  "stage": "S2-team",
  "build": {
   "key": "fixed",
-  "label": "R1 2026-10-25 fixed r1+r3+sUSD3+F-4+F-4R-2, AUDIT LINEAGE (source 808e2ecf = F-4 gate dca15b6a + F-4R-2 cap, solc 0.8.28+commit.7893614a, optimizer runs=200, no viaIR, paris)",
-  "source_commit": "808e2ecf6072fa598b80b64887da35b03c4b323a",
+  "label": "R1 2026-10-25 fixed r1+r3+sUSD3+F-4+F-4R-2+depositFor, AUDIT LINEAGE (artifact cut 0624616c = base 808e2ecf [F-4 gate dca15b6a + F-4R-2 cap] + the depositFor auto-earn guard; 808e2ecf alone rebuilds the undeployed 11,761 B cut. solc 0.8.28+commit.7893614a, optimizer runs=200, no viaIR, paris)",
+  "source_commit": "0624616c40ef1734aebf75d98c32f27f48546b01",
   "vault_runtime_sha256": "ff907cc76f57428755b980ad9d817495bbf54b851338e9b338ee9dc3f97e6f0a",
-  "fd_runtime_sha256": "e7cceb785de5ecf2571d4cc98b1cca9f3533411839226c9b0654c25b75b004b5"
+  "fd_runtime_sha256": "e7cceb785de5ecf2571d4cc98b1cca9f3533411839226c9b0654c25b75b004b5",
+  "base_commit": "808e2ecf6072fa598b80b64887da35b03c4b323a"
  },
  "_notes": [
   "R1 convergence — book #2 (BOOST) replacement vault + FeeDistributor from the fixed build (r1+r3+sUSD3). This is NOT book #1: book #1 keeps its own manifest, deployed_addresses.mainnet.json.",
@@ -50,7 +57,8 @@
   "Ownership transferred to the treasury Safe (2-of-3) at deploy time, never left on the deployer EOA.",
   "Caps = guarded-beta $10,000 TVL / $1,000 per user (GO-2 default = restart at $10k, not carry the raise).",
   "The S3b streak is per-address: the attestation must name this new vault from day 1 (streak re-init).",
-  "CARRY-FORWARD (added 2026-10-26, card t_14317b73): deploy_r1_mainnet.js copies the live core manifest's strategy keys forward, so the book-#1 keys present here (pt_sleeve*, hlearn*, susd3_registered*, dn_core_strategy, _accepted_risks F-1) are INFORMATIONAL ONLY and are NOT registered on this vault. The authoritative list for this book is the on-chain strategyList — read 2026-10-26: 0x36D92ab2… (inactive, retired pre-R1 Boost strategy), 0x16181E54… (Morpho R1, active), 0x6be5CE6f… (DN engine, active). Never reconcile this book from a manifest key."
+  "CARRY-FORWARD (added 2026-10-26, card t_14317b73): deploy_r1_mainnet.js copies the live core manifest's strategy keys forward, so the book-#1 keys present here (pt_sleeve*, hlearn*, susd3_registered*, dn_core_strategy, _accepted_risks F-1) are INFORMATIONAL ONLY and are NOT registered on this vault. The authoritative list for this book is the on-chain strategyList — read 2026-10-26: 0x36D92ab2… (inactive, retired pre-R1 Boost strategy), 0x16181E54… (Morpho R1, active), 0x6be5CE6f… (DN engine, active). Never reconcile this book from a manifest key.",
+  "PIN RE-SCOPE (added 2026-10-26, card t_631004f9): expected_ipfs.contracts now grades BOOK #2's own four live money contracts — pro_yield_vault 0x2ebA2DF7…, fee_distributor 0x0002e33C…, morpho_boost_r1_strategy 0x16181E54…, dn_boost_strategy 0x6be5CE6f… — each pinned to the ipfs its live runtime actually carries, read at block 49,585,747 (strict gate: 10 pass · 0 known-drift · 0 FAIL · 0 unpinned · 3 inactive-nopin, exit 0). Until this commit the block was book #1's pre-R1 pin block carried forward by deploy_r1_mainnet.js, so it graded a paused book #1 vault and could not enumerate book #2 at all (coverage 0). Book #1's three old entries are recorded under supersedes.book1_pins_carried_until_2026_10_26. READ THIS BEFORE RECONCILING: the PT / HL-Earn / sUSD3 keys in expected_ipfs.contracts are SHARED-CHAIN identity pins carried from book #1 (each now carries a `registration` field saying so); they are NOT book #2 registrations. The authoritative list for this book is the on-chain strategyList of 0x2ebA2DF7… — read 2026-10-26: 0x36D92ab2… (inactive, retired pre-R1 Boost strategy), 0x16181E54… (Morpho R1, active), 0x6be5CE6f… (DN engine, active). Never reconcile this book from a manifest key."
  ],
  "_accepted_risks": [
   {
@@ -278,8 +286,8 @@
  },
  "expected_ipfs": {
   "_doc": "Build-currency pins (PY-SCOPE-02, card t_5c5b9f05). Checked by scripts/build_currency_gate.js: eth_getCode -> trailing CBOR metadata -> ipfs multihash, compared to expected_ipfs. expected_ipfs = the build this contract is SUPPOSED to run (a reproducible build of the reviewed source, in the compile profile its deploy lineage uses). known_drift = a live build that is KNOWN to differ and is tracked by the named card; it is reported as KNOWN-DRIFT with BOTH hashes, never as PASS. scope:'inactive' = deployed but not registered / not gating money. No pin = UNPINNED (currency unverifiable). known_unpinned = {contract: {card, reason}}: the ONLY way an unpinned live contract may be non-fatal (reported KNOWN-UNPINNED, loud, with the live ipfs) — any unpinned live contract NOT listed still exits 3, and a vacuous or undisclosed entry FAILs (card t_57742b2e). The gate never rewrites this file: a mismatch is a finding, not a fix. Selector diffs are NOT a currency test (MorphoStrategy scores 0 missing while carrying PY-RECALL-01). known_drift MUST name a build that is declared in builds{} (card t_10b79b12) — a drift whose build cannot be identified or reproduced is a FAIL, not a disclosure; and an exemption's card id MUST resolve to an OPEN card on the kanban board (the sentinel cross-checks it every 10 min, the gate only format-checks it).",
-  "verified_block": 49282422,
-  "verified_utc": "2026-10-23",
+  "verified_block": 49585747,
+  "verified_utc": "2026-10-26",
   "builds": {
    "head-audit-lineage": {
     "source_commit": "168310a5",
@@ -311,7 +319,8 @@
    "dn-boost-parity-2534780f": {
     "source_commit": "2534780f",
     "profile": "solc 0.8.28 · optimizer runs=1 · viaIR=true · paris",
-    "artifact": "deploy-artifacts/dn-boost-parity/ (byte-parity proved against both books' live DN strategy)"
+    "artifact": "deploy-artifacts/dn-boost-parity/ (byte-parity proved against book #1's live DN strategy 0xeD40C3c3… and book #2's PRE-R1 0x3b8f8A96… — both measured 12,452 B / 1220e8d1… on 2026-10-26. See note: book #2 no longer runs it)",
+    "note": "byte-parity proved against the DN strategy BOTH books ran until 2026-10-25 (book #1 0xeD40C3c3… and book #2's pre-R1 0x3b8f8A96…, both live-verified at 12,452 B / 1220e8d1…). It is NOT what book #2 runs today: the 2026-10-25 R1 redeploy put the A3 size-feasible build at 0x6be5CE6f… (12,383 B / 12206dde…, see dn-a3-size-feasible-41e6ce01). The 'both books' half of this sentence was true when written and is superseded (card t_631004f9)."
    },
    "pt-pre-remediation-arb": {
     "source_commit": "pre-e0e4847b",
@@ -324,71 +333,50 @@
    "susd3-legacy-2026-09-30": {
     "source_commit": "pre-e9c899a8",
     "artifact": "recorded in this manifest (susd3_registered_2026-09-30.classification) and confirmed live 2026-10-23"
+   },
+   "r1-2026-10-25-808e2ecf": {
+    "source_commit": "0624616c",
+    "base_commit": "808e2ecf",
+    "profile": "solc 0.8.28+commit.7893614a · optimizer runs=200 · viaIR=false · evm paris",
+    "artifact": "deploy-artifacts/r1-2026-10-25/ (ProYieldVault.json + FeeDistributor.json; runtime sha256 pinned in this manifest's top-level build{} block — vault ff907cc7…, FD e7cceb78…, lowercase-hex digest — and re-checked by scripts/bytecode_identity_check.js BUILDS.fixed)",
+    "note": "The R1 deploys' build. THE KEY NAME IS HISTORICAL and names the BASE commit, not the artifact (kept for stability — same convention as deployed_addresses.mainnet.json, cards t_e7e6ae53 + t_dfb93276). source_commit 0624616c = 808e2ecf (F-4 gate dca15b6a + F-4R-2 cash-ledger cap) + the depositFor(address,uint256) auto-earn guard; 808e2ecf ALONE rebuilds to 11,761 B / a different ipfs and its source has no depositFor at all — the pre-depositFor cut, never deployed. Verified 2026-10-26: `git show 808e2ecf:contracts/ProYieldVault.sol` has 0 occurrences of depositFor, 0624616c has 1, and the artifact's ABI carries it. Deployed 2026-10-25, byte-identically, to book #1 (0x9DA979aD…), book #2 (0x2ebA2DF7…) and the Frontier book #3 (0xEDcdC0D9…, re-measured 2026-10-26: 12,140 B / ipfs 12207cfb…) — that parity is MEASURED in each pin, not assumed from §4.10."
+   },
+   "morpho-head-fixed-168310a5": {
+    "source_commit": "168310a5",
+    "profile": "solc 0.8.28+commit.7893614a · optimizer runs=200 · viaIR=false · evm paris",
+    "artifact": "deploy-artifacts/head-fixed/MorphoStrategy.json (runtime sha256 864c90fc…, 7,985 B; the artifact carries its own _provenance, and MorphoStrategy.sol is unchanged between 168310a5 and HEAD)",
+    "note": "Carries the PY-RECALL-01 body fix (bec2ff29, 2026-10-22) — selector-clean AND current, the case where a selector diff would have been a false all-clear. Built by card t_0adbf5f0; deployed as book #1's R1 strategy 0xb7F5DD7b…0A3E and, byte-identically, as book #2's 0x16181E54…9409 on 2026-10-25 (same ipfs 12202e64… on both, re-measured 2026-10-26)."
+   },
+   "dn-a3-size-feasible-41e6ce01": {
+    "source_commit": "e56f294f (branch build/dn-size-feasible-2026-10-24)",
+    "profile": "solc 0.8.28+commit.7893614a · optimizer runs=1 · viaIR=true · evm paris (the repo hardhat.config.js profile — deploy_dn_mainnet.js deploys from the committed artifacts tree)",
+    "artifact": "deploy-artifacts/dn-size-feasible-f04a63f2/ — PIN.json: runtime 12,383 B / runtime_sha256 72d61807…, creation 13,612 B / creation_sha256 f04a63f2…; guarded by scripts/dn_deploy_size_gate.js. Provenance of that directory read from commit e56f294f (it is not on main); its DNCoreStrategy.json is byte-identical (sha256 56076d50…) to the working copy reviewed here.",
+    "note": "The A3 NAV fix made DEPLOYABLE: bounds bridgeBackToEvm on coreSpotUsdc6() (the balance the send is sourced from) and counts Core spot cash in totalAssets(). HEAD's runs=200 build cannot deploy at all (>3,000,000 gas/tx); this build measured 2,938,285. It is NOT the 2534780f build book #1 still runs, and that difference is deliberate enough to be recorded, not hidden: book #2's live DN 0x6be5CE6f… is 12,383 B / ipfs 12206dde…, book #1's 0xeD40C3c3… is 12,452 B / ipfs 1220e8d1…. So book #2 runs AHEAD of book #1 on the A3 money-path fix; converging book #1's DN is blocked on size (docs/SECURITY_FINDING_PY-SCOPE-02 §4)."
    }
   },
   "known_unpinned": {},
   "contracts": {
    "pro_yield_vault": {
-    "address": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
-    "expected_ipfs": "12207fd91ecd84ee57a853b6213e389deaabac9fb03c694f777ecc421f5ee6f3e418",
-    "bytes": 11256,
-    "build": "head-audit-lineage",
-    "accept_ipfs": [
-     "1220b8307b32bdccdc9f4dfbabf5fc08add60a8d3e5e902811964659b892c5c1dcf7"
-    ],
-    "accept_note": "deploy-artifacts/head-fixed (source 91062aa8) is the deploy artifact card t_a1c466e6 names for the convergence: its runtime is 11,203 of 11,203 CODE bytes identical to a HEAD runs=200 rebuild — the only delta is the trailing CBOR ipfs metadata (the bec2ff29 comment edit moved the source hash). The repo-profile build (runs=1+viaIR, 1220285e…, 10,229 B) is deliberately NOT accepted: it is a different bytecode profile and the convergence plan forbids deploying it.",
-    "known_drift": {
-     "ipfs": "1220e58e6bea6e80df9b6f0aaafc5520ddff4a4f169a988344a6b7898a32ea5224ea",
-     "bytes": 9952,
-     "build": "book1-parity-8daa2ce5",
-     "card": "t_1add0cd1",
-     "finding": "PY-SCOPE-02",
-     "note": "live book-#1 vault IS the round-2 8daa2ce5 build (1220e58e… ipfs identity, 380 diffs / 0 outside immutable slots). r1 F-4/F-15/F-13 (c652e006), r3 CEI (609ad90b), sUSD3 F-5 (e9c899a8) and 10-22 (bec2ff29) are all undeployed. Tracking card re-pointed 2026-10-23 (t_10b79b12) from t_a1c466e6 — that closed as the PLAN card and named t_1add0cd1 (the 2026-10-25 R1 sitting, book #1 onto the converged build) for the actual migration; an exemption must name an OPEN card."
-    },
-    "note": "currency target = the reviewed source at HEAD, deployed from the frozen runs=200 profile"
+    "address": "0x2ebA2DF7d4A81a4B6294185468F3Bb516970cE29",
+    "expected_ipfs": "12207cfbb7f236e45283eaf1c3a91a0dab54f33b27b9fe984430dce99de30ef1dcfc",
+    "bytes": 12140,
+    "build": "r1-2026-10-25-808e2ecf",
+    "note": "R1 book-#2 (BOOST) vault, generation boost-r1-20261025 (card t_631004f9). Live runtime == deploy-artifacts/r1-2026-10-25/ProYieldVault.json INCLUDING the trailing CBOR metadata: at block 49,585,747, 436 differing bytes and every one of them inside immutableReferences (0 outside), CBOR trailer byte-identical. §4.10 cross-book parity was MEASURED, not assumed — this vault's ipfs is the same 12207cfb… that book #1's R1 vault 0x9DA979aD…AcFD9 carries. Live state (block 49,585,898): depositsPaused=false, totalAssets 118.630918 USDC, underlying 0xb88339CB…630f, feeDistributor() = 0x0002e33C…cb2a (the FD pinned below), owner = treasury Safe 0x8A1b107e…C9aB. The PRE-R1 BOOK #1 pins this block used to grade (0x8954a73B… / 0x18FB3e2F… / 0xBF4C5e33…) are recorded under supersedes.book1_pins_carried_until_2026_10_26 — a record, not a pin."
    },
    "fee_distributor": {
-    "address": "0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9",
+    "address": "0x0002e33CC53B720041Bff68Eb084F2DaE345cb2a",
     "expected_ipfs": "1220161a7b46be95efe6ffe2fc0777e43280dadf659b52a28a66ba6644d38bdd8a45",
     "bytes": 2106,
-    "build": "head-audit-lineage",
-    "known_drift": {
-     "ipfs": "1220e71e362520024a90a6b20e55f4f9a3896cd99acd45e88146bf6484c26015a1d4",
-     "bytes": 1977,
-     "build": "book1-parity-8daa2ce5",
-     "card": "t_1add0cd1",
-     "finding": "PY-SCOPE-02",
-     "note": "F-13 fix absent: the live FD freezes its lifetime fee counter after the first route() (dashboard fee income permanently understated). Tracking card re-pointed 2026-10-23 (t_10b79b12) from t_a1c466e6 (plan card, closed) to t_1add0cd1, the 2026-10-25 R1 sitting that redeploys book #1 onto the converged build."
-    }
-   },
-   "dn_core_strategy": {
-    "address": "0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4",
-    "expected_ipfs": "1220e8d1afa2558d87a44af2c2325ee0ec6ccccd1c250ad09c3de99859de4a841c80",
-    "bytes": 12452,
-    "build": "dn-boost-parity-2534780f",
-    "note": "HEAD DNCoreStrategy is 14,755 B at runs=200 and its deploy estimate exceeds HyperEVM's 3,000,000-gas/tx cap, so the audited 2534780f build IS the intended deployable code. Convergence of the A3 NAV fixes (7c2a1611 / e958c426) is BLOCKED on size, not forgotten — docs/SECURITY_FINDING_PY-SCOPE-02 §4 (live DN under-reports NAV by $30.35)."
-   },
-   "morpho_strategy": {
-    "address": "0xBF4C5e339D63EEB393DA2797679879a0a5Af2D53",
-    "expected_ipfs": "1220b33f048a2c001435947b342a0e87ce599c384d6898743b2247b2d60961006964",
-    "bytes": 7424,
-    "build": "head-repo-profile",
-    "known_drift": {
-     "ipfs": "1220e11e2248156d8fdf7d932d956fa54b87feac209fc590493b8b5c4e173bbbb0f2",
-     "bytes": 7122,
-     "build": "morpho-pre-bec2ff29",
-     "card": "t_1add0cd1",
-     "finding": "PY-RECALL-01",
-     "note": "selector-clean but NOT current: 0 missing functions against HEAD while the PY-RECALL-01 body fix (bec2ff29) is absent — the case that makes a selector diff a false all-clear"
-    },
-    "note": "deployed via scripts/deploy_morpho_mainnet.js from the repo artifacts tree, so its currency reference is a HEAD build in that profile"
+    "build": "r1-2026-10-25-808e2ecf",
+    "note": "R1 book-#2 FeeDistributor (card t_631004f9), and the FD that the R1 vault's feeDistributor() actually returns (read on chain 2026-10-26). F-13 (lifetime fee counter frozen after the first route()) is FIXED in this build. Live runtime == deploy-artifacts/r1-2026-10-25/FeeDistributor.json INCLUDING the trailing CBOR metadata (80 differing bytes at block 49,585,747, all inside 4 immutable slots; CBOR trailer byte-identical). Same ipfs as book #1's R1 FD 0xc8cc10dd…C27970 — cross-book parity measured, not assumed. Superseded book-#1 FD 0x18FB3e2F…8E9 (1220e71e…, 1,977 B, F-13 absent) is recorded under supersedes, not graded here."
    },
    "pt_sleeve_strategy": {
     "address": "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b",
     "expected_ipfs": "1220c1b8c69feeea9c8189e69f174d2419eacbc14b0369509506336adbfc5dd03071",
     "bytes": 7699,
     "build": "pt-pre-remediation-arb",
-    "note": "pre-remediation PTSleeveStrategy — accepted risk F-1 (registered, strategyActive=false since 2026-10-10, totalAssets 0). Identity-pinned so a silent swap is caught; the fix is registering the remediated pair 0xd7075C9B/0x9238320C."
+    "note": "pre-remediation PTSleeveStrategy — accepted risk F-1 (registered, strategyActive=false since 2026-10-10, totalAssets 0). Identity-pinned so a silent swap is caught; the fix is registering the remediated pair 0xd7075C9B/0x9238320C.",
+    "registration": "NOT this book's registration — carried book-#1 / shared-chain pin kept so a silent swap is caught. 0x2ebA2DF7…'s on-chain strategyList is the source of truth for what book #2 runs (see _notes CARRY-FORWARD)."
    },
    "pt_v1_quarantined_2026-10-10": {
     "address": "0x3AE855B65A021397f7a3ca838acc8E4c82cF815f",
@@ -396,35 +384,40 @@
     "bytes": 7699,
     "build": "pt-pre-remediation-arb",
     "scope": "inactive",
-    "note": "registered + INACTIVE (strategyList index 2), totalAssets 0 — quarantined 2026-10-10"
+    "note": "registered + INACTIVE (strategyList index 2), totalAssets 0 — quarantined 2026-10-10",
+    "registration": "NOT this book's registration — carried book-#1 / shared-chain pin kept so a silent swap is caught. 0x2ebA2DF7…'s on-chain strategyList is the source of truth for what book #2 runs (see _notes CARRY-FORWARD)."
    },
    "pt_sleeve_eth_strategy": {
     "address": "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25",
     "expected_ipfs": "1220219d740d4bf5f2ae623c1c25b454338c495ecb1c02ae280382de837cfa69b838",
     "bytes": 7733,
     "build": "pt-pre-remediation-eth",
-    "note": "pre-remediation, accepted risk F-1, registered + strategyActive=false; still holds ~$18.89 until it unwinds (~2026-11-05). Identity-pinned so a silent swap is caught."
+    "note": "pre-remediation, accepted risk F-1, registered + strategyActive=false; still holds ~$18.89 until it unwinds (~2026-11-05). Identity-pinned so a silent swap is caught.",
+    "registration": "NOT this book's registration — carried book-#1 / shared-chain pin kept so a silent swap is caught. 0x2ebA2DF7…'s on-chain strategyList is the source of truth for what book #2 runs (see _notes CARRY-FORWARD)."
    },
    "hlearn_strategy": {
     "address": "0xA2e535970dc1492f77843E26F25Ab314735F4dF5",
     "expected_ipfs": "1220b709ad5b21db6e3011686f915785d41049e54848e52843fdf47559ebd0ee53fd",
     "bytes": 9019,
     "build": "head-repo-profile",
-    "note": "HLEarnStrategy is current: live == HEAD source (repo profile). Same runtime as the always-on instance, as designed."
+    "note": "HLEarnStrategy is current: live == HEAD source (repo profile). Same runtime as the always-on instance, as designed.",
+    "registration": "NOT this book's registration — carried book-#1 / shared-chain pin kept so a silent swap is caught. 0x2ebA2DF7…'s on-chain strategyList is the source of truth for what book #2 runs (see _notes CARRY-FORWARD)."
    },
    "hlearn_alwayson_strategy": {
     "address": "0x1C770315D159b52a7fA892878B1F33B1A61618Bf",
     "expected_ipfs": "1220b709ad5b21db6e3011686f915785d41049e54848e52843fdf47559ebd0ee53fd",
     "bytes": 9019,
     "build": "head-repo-profile",
-    "note": "KinkWrapper engine instance — same ipfs as 0xA2e53597 (deliberately a case where the code is fine)"
+    "note": "KinkWrapper engine instance — same ipfs as 0xA2e53597 (deliberately a case where the code is fine)",
+    "registration": "NOT this book's registration — carried book-#1 / shared-chain pin kept so a silent swap is caught. 0x2ebA2DF7…'s on-chain strategyList is the source of truth for what book #2 runs (see _notes CARRY-FORWARD)."
    },
    "susd3_registered_2026-09-30": {
     "address": "0x9978e8745cdb0d3e5B970aC36C38575eC70D612A",
     "expected_ipfs": "12208ce737c32d819ca5c2331817f5337d161a851bde5fc8069a7b2a4e1a51c37eb6",
     "bytes": 7939,
     "build": "susd3-legacy-2026-09-30",
-    "note": "legacy SUSD3Strategy v1 — registered + ACTIVE with totalAssets 0; superseded by the dormant 0x7dc1874F replacement. Identity-pinned; de-registration is a vault-owner (Safe) action."
+    "note": "legacy SUSD3Strategy v1 — registered + ACTIVE with totalAssets 0; superseded by the dormant 0x7dc1874F replacement. Identity-pinned; de-registration is a vault-owner (Safe) action.",
+    "registration": "NOT this book's registration — carried book-#1 / shared-chain pin kept so a silent swap is caught. 0x2ebA2DF7…'s on-chain strategyList is the source of truth for what book #2 runs (see _notes CARRY-FORWARD)."
    },
    "susd3_strategy": {
     "address": "0x7dc1874FFfCb0481b68501eb2f28c17d18C616DB",
@@ -440,6 +433,20 @@
     "address": "0x9238320Cc802863c7c1d78D1aaA6cbe0F7975092",
     "scope": "inactive",
     "note": "remediated ETH lane, NOT registered — pin it when the Safe registration re-points the lane (no pin)"
+   },
+   "morpho_boost_r1_strategy": {
+    "address": "0x16181E549860003dC20585B21DDB9007aD339409",
+    "expected_ipfs": "12202e644bfce454b8fab7fa67fc609022d5e20b39685aeb724af56f6b6bf132c45d",
+    "bytes": 7985,
+    "build": "morpho-head-fixed-168310a5",
+    "note": "Book #2's fresh Morpho strategy (card t_0adbf5f0) — registered + ACTIVE at strategyList index 1 on 0x2ebA2DF7… (strategyList read 2026-10-26, block 49,585,898) — carrying the PY-RECALL-01 body fix (bec2ff29). This key and its pin are NEW here: until 2026-10-26 the block had no key for this contract at all, so the gate could not enumerate it and could not even report it as unpinned. Live runtime == deploy-artifacts/head-fixed/MorphoStrategy.json INCLUDING the trailing CBOR metadata (744 differing bytes at block 49,585,747, all inside its 35 immutable slots; CBOR trailer byte-identical). Same ipfs as book #1's R1 morpho 0xb7F5DD7b…0A3E. Agrees with this manifest's top-level morpho_boost_r1_strategy_build{} record (runtime_ipfs 12202e64…, 7,985 B)."
+   },
+   "dn_boost_strategy": {
+    "address": "0x6be5CE6f4E973C42848e2Ed4adfb724244fEC375",
+    "expected_ipfs": "12206ddec10083b0d4f72a163b205d98c9fee1fc33c1e8e3c1e06fb06fd7c3c229be",
+    "bytes": 12383,
+    "build": "dn-a3-size-feasible-41e6ce01",
+    "note": "Book #2's DN funding engine at 0x6be5CE6f… (top-level dn_boost_strategy), registered + ACTIVE at strategyList index 2 with vault = 0x2ebA2DF7… (read 2026-10-26). This key and its pin are NEW here. It is NOT the build book #1 runs: live ipfs 12206dde… / 12,383 B == deploy-artifacts/dn-size-feasible-f04a63f2/DNCoreStrategy.json (PIN.json runtime_sha256 72d61807…), the A3 size-feasible build of card t_41e6ce01 — whereas book #1's DN 0xeD40C3c3… is 12,452 B / 1220e8d1… (dn-boost-parity-2534780f, pinned in deployed_addresses.mainnet.json). Live vs artifact at block 49,585,747: length-equal (12,383 B), 152 differing bytes and all 152 inside that build's 17 immutable slots, 0 outside, CBOR trailer byte-identical. The ranges come from the build-info that produced the artifact (67163954…), because this artifact does not carry immutableReferences — measured, not assumed."
    }
   }
  },
