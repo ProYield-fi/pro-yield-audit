@@ -160,9 +160,11 @@ The two mechanisms behind them:
   snapshot's `generated_at`, block and per-book `gap_bps` — the 2026-10-17 hand-written bullet list is
   retired, because the doc itself noted that some of its boost figures matched no run of their day.
 - **Quarantine (audit F4).** A degraded run is written to `attestations/degraded/<date>.json` and is
-  never counted. 2026-10-23 is degraded because the recon breach flag forces `degraded` status in
-  `scripts/attestation.js`; 2026-10-24 and 2026-10-25 are degraded because their runs resolved no
-  snapshot at publication time. None of them counts.
+  never counted. 2026-10-23, 2026-10-24 and 2026-10-25 are degraded for the same reason: each day's
+  recon snapshot carried `breach: true` on the core book (−191.09, −194.87 and −202.60 bps
+  respectively) with no owner exception on file, and the generator fails closed to `degraded` on a
+  breach (`scripts/attestation.js`). Their own "unavailable reads" sections are empty — the breach, not
+  a missing read, is the reason. None of them counts.
 
 ## Missed day — 2026-10-16 (diagnosed 2026-10-17, card `t_ba8c3805`)
 
