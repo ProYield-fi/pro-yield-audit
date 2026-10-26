@@ -9,9 +9,16 @@
  "book_index": 1,
  "generation": "2026-10-25",
  "supersedes": {
-  "pro_yield_vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+  "pro_yield_vault": "0x8954a73Bb36D17E4B212137Eb7B2328A1A14D1C1",
   "fee_distributor": "0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9",
-  "deployed_utc": "2026-09-25T17:43:23.308Z"
+  "morpho_strategy": "0xBF4C5e339D63EEB393DA2797679879a0a5Af2D53",
+  "deployed_utc": "2026-09-25T17:43:23.308Z",
+  "runtime_ipfs_at_supersede": {
+   "pro_yield_vault": "1220e58e6bea6e80df9b6f0aaafc5520ddff4a4f169a988344a6b7898a32ea5224ea (9,952 B, book1-parity-8daa2ce5)",
+   "fee_distributor": "1220e71e362520024a90a6b20e55f4f9a3896cd99acd45e88146bf6484c26015a1d4 (1,977 B, F-13 fix absent)",
+   "morpho_strategy": "1220e11e2248156d8fdf7d932d956fa54b87feac209fc590493b8b5c4e173bbbb0f2 (7,122 B, pre-bec2ff29 \u2014 PY-RECALL-01 body fix absent)"
+  },
+  "_note": "Superseded 2026-10-25. These addresses are NOT graded by expected_ipfs.contracts any more (card t_e7e6ae53): grading a paused vault as if it were the live money contract was the defect. The hashes above are the identities those addresses carried when they were retired; they are a record, not a pin."
  },
  "deployed_utc": "2026-10-25T14:22:00.993Z",
  "deployer": "0xaDD8f2678De34FD06C158DD80C5253A504A5EA1D",
@@ -45,12 +52,12 @@
  "_notes": [
   "R1 convergence \u2014 book #1 REPLACEMENT vault + FeeDistributor from the fixed build (r1+r3+sUSD3).",
   "Mirror bytecode with book #2's first deploy (\u00a74.10 parity): both books land identical bytecode.",
-  "Generation-suffixed manifest \u2014 deployed_addresses.mainnet.json is UNTOUCHED (rollback anchor).",
-  "Strategies are NOT registered here; they are re-pointed (setVault) + re-registered (addStrategy) by owner Safe txs during migration (docs/CONVERGENCE_R1_RUNBOOK.md).",
+  "THIS FILE IS THE R1 RECORD: deployed_addresses.mainnet.json was promoted to the 2026-10-25 generation when the R1 sitting landed. The pre-R1 rollback anchor is the on-disk archive deployed_addresses.mainnet.pre-r1-20261025.json (deliberately untracked: under a gate-discovered filename it would be graded as live and re-create the paused-vault row this card removed). (This note used to say this file was left UNTOUCHED as the rollback anchor \u2014 that stopped being true at the promotion and is corrected here, card t_e7e6ae53.)",
+  "Strategies ARE registered on the R1 vault: strategyList = [0xb7F5DD7b\u20260A3E Morpho, 0xA2e53597\u2026F4dF5 HLEarn], BOTH ACTIVE, $5.974999 each, vault totalAssets = totalShares = $12.95 (chain read at block 49,583,932, 2026-10-26). Registering none was the deploy-step contract; the owner-Safe setVault/addStrategy migration txs did it (docs/CONVERGENCE_R1_RUNBOOK.md) and it is done, not pending. The 7-entry list in strategyList_reconciled below is the SUPERSEDED vault's \u2014 regenerating it for R1 is card t_acc5f03b.",
   "Ownership transferred to the treasury Safe (2-of-3) at deploy time, never left on the deployer EOA.",
   "Caps = guarded-beta $10,000 TVL / $1,000 per user (GO-2 default = restart at $10k, not carry the raise).",
   "The S3b streak is per-address: the attestation must name this new vault from day 1 (streak re-init).",
-  "[public snapshot 2026-10-26 \u2014 pinned read block 49,583,100] R1 live state: vault.strategyList = 2 entries, both ACTIVE (0xb7F5DD7b\u2026 Morpho, 0xA2e53597\u2026 HLEarn, $5.974999 each); vault totalAssets = totalShares = $12.95; deposits open. The superseded vault 0x8954a73B\u2026 is depositsPaused=true with $0.004768 left; it still carries the 7-entry list recorded in strategyList_reconciled below, whose balances are a 2026-10-23 snapshot taken BEFORE the 2026-10-25 migration \u2014 that block describes the SUPERSEDED vault, not this generation. 'Strategies are NOT registered here' above describes the deploy step: two are registered now (see this note). expected_ipfs is withheld from this public copy because its pins and known_drift still name the superseded vault, FeeDistributor and Morpho strategy \u2014 republishing it as-is would point readers a second time at a paused vault; it ships once the pins are re-pointed to this generation."
+  "[public snapshot 2026-10-26 \u2014 pinned read block 49,583,100; expected_ipfs verified at 49,583,932] R1 live state: vault.strategyList = 2 entries, both ACTIVE (0xb7F5DD7b\u2026 Morpho, 0xA2e53597\u2026 HLEarn, $5.974999 each); vault totalAssets = totalShares = $12.95; deposits open; the superseded vault 0x8954a73B\u2026 is depositsPaused=true with $0.004768 left. The 7-entry list recorded in strategyList_reconciled below was read at block 49,277,959 on 2026-10-23, i.e. BEFORE the 2026-10-25 migration \u2014 that block describes the SUPERSEDED vault, not this generation; its R1 regeneration is card t_acc5f03b. expected_ipfs IS published in this copy as of 2026-10-26 (card t_e7e6ae53): pro_yield_vault / fee_distributor now pin the R1 build (deploy-artifacts/r1-2026-10-25, source 808e2ecf) at 0x9DA979aD\u2026AcFD9 / 0xc8cc10dd\u2026C27970, morpho_strategy pins the PY-RECALL-01-fixed head-fixed build at 0xb7F5DD7b\u2026fe0A3E, and the superseded 0x8954/0x18FB/0xBF4C addresses moved to `supersedes` \u2014 they are recorded, not graded. Verified against chain 999 before publishing: live runtime == those artifacts except immutable slots (vault 440 differing bytes / FD 80 / morpho 744, 0 outside the immutable ranges; CBOR ipfs identical in all three)."
  ],
  "_accepted_risks": [
   {
@@ -275,6 +282,158 @@
     "total_assets_usdc6": "0"
    }
   ]
+ },
+ "expected_ipfs": {
+  "_doc": "Build-currency pins (PY-SCOPE-02, card t_5c5b9f05). Checked by scripts/build_currency_gate.js: eth_getCode -> trailing CBOR metadata -> ipfs multihash, compared to expected_ipfs. expected_ipfs = the build this contract is SUPPOSED to run (a reproducible build of the reviewed source, in the compile profile its deploy lineage uses). known_drift = a live build that is KNOWN to differ and is tracked by the named card; it is reported as KNOWN-DRIFT with BOTH hashes, never as PASS. scope:'inactive' = deployed but not registered / not gating money. No pin = UNPINNED (currency unverifiable). known_unpinned = {contract: {card, reason}}: the ONLY way an unpinned live contract may be non-fatal (reported KNOWN-UNPINNED, loud, with the live ipfs) \u2014 any unpinned live contract NOT listed still exits 3, and a vacuous or undisclosed entry FAILs (card t_57742b2e). The gate never rewrites this file: a mismatch is a finding, not a fix. Selector diffs are NOT a currency test (MorphoStrategy scores 0 missing while carrying PY-RECALL-01). known_drift MUST name a build that is declared in builds{} (card t_10b79b12) \u2014 a drift whose build cannot be identified or reproduced is a FAIL, not a disclosure; and an exemption's card id MUST resolve to an OPEN card on the kanban board (the sentinel cross-checks it every 10 min, the gate only format-checks it).",
+  "verified_block": 49583932,
+  "verified_utc": "2026-10-26",
+  "builds": {
+   "head-audit-lineage": {
+    "source_commit": "168310a5",
+    "profile": "solc 0.8.28+commit.7893614a \u00b7 optimizer runs=200 \u00b7 viaIR=false \u00b7 evm paris",
+    "artifact": "isolated rebuild of `git archive 168310a5` with hardhat.config.js patched to runs=200 + viaIR:false (the frozen deploy profile: AGENTS.md, deploy-artifacts/*/README.md), rebuilt 2026-10-23 for t_5c5b9f05",
+    "note": "the committed artifacts/ tree is runs=1+viaIR and can never reproduce a runs=200 deployment \u2014 that is why this pin exists"
+   },
+   "head-repo-profile": {
+    "source_commit": "168310a5",
+    "profile": "solc 0.8.28+commit.7893614a \u00b7 optimizer runs=1 \u00b7 viaIR=true \u00b7 evm paris",
+    "artifact": "artifacts/contracts/** (committed tree; CI asserts it equals a fresh build)",
+    "note": "the profile the repo's deploy scripts use via ethers.getContractFactory \u2014 used as the currency reference only for contracts deployed that way"
+   },
+   "book1-parity-8daa2ce5": {
+    "source_commit": "8daa2ce5",
+    "profile": "solc 0.8.28 \u00b7 optimizer runs=200 \u00b7 viaIR=false \u00b7 paris",
+    "artifact": "deploy-artifacts/book1-parity/ (runtime sha256 pinned in its README; creation-code proof GREEN)"
+   },
+   "head-fixed-91062aa8": {
+    "source_commit": "91062aa8",
+    "profile": "solc 0.8.28 \u00b7 optimizer runs=200 \u00b7 viaIR=false \u00b7 paris",
+    "artifact": "deploy-artifacts/head-fixed/ (runtime sha256 re-checked by deploy_boost_mainnet.js guard 6)"
+   },
+   "r1-2026-10-25-808e2ecf": {
+    "source_commit": "808e2ecf",
+    "profile": "solc 0.8.28+commit.7893614a \u00b7 optimizer runs=200 \u00b7 viaIR=false \u00b7 evm paris",
+    "artifact": "deploy-artifacts/r1-2026-10-25/ (ProYieldVault.json + FeeDistributor.json; runtime sha256 pinned in this manifest's top-level build{} block \u2014 vault ff907cc7\u2026, FD e7cceb78\u2026 \u2014 and re-checked by scripts/bytecode_identity_check.js BUILDS.fixed, whose pinned shas are byte-identical to these)",
+    "note": "the R1 deploys' build (F-4 gate dca15b6a + F-4R-2 cap 808e2ecf; re-cut 2026-10-23 by card t_be3c895f because the earlier dca15b6a cut predated F-4R-2, that older artifact preserved at deploy-artifacts/r1-2026-10-25-dca15b6a/). Deployed 2026-10-25 to book #1 (the pins below) and, byte-identical, to book #2. A pin was moved here from 'head-audit-lineage' on 2026-10-26 (card t_e7e6ae53) because the generation actually deployed had changed and the old pin pointed at a build nobody deployed."
+   },
+   "morpho-head-fixed-168310a5": {
+    "source_commit": "168310a5",
+    "profile": "solc 0.8.28+commit.7893614a \u00b7 optimizer runs=200 \u00b7 viaIR=false \u00b7 evm paris",
+    "artifact": "deploy-artifacts/head-fixed/MorphoStrategy.json (runtime sha256 864c90fc\u2026, 7,985 B; the artifact carries its own _provenance, and MorphoStrategy.sol is unchanged between 168310a5 and HEAD)",
+    "note": "carries the PY-RECALL-01 body fix (bec2ff29, 2026-10-22) \u2014 the case where a selector diff against HEAD is a false all-clear. Built 2026-10-23 by card t_0adbf5f0 (git archive 168310a5, runs=200 / no viaIR) and deployed as the R1 mainnet strategy 0xb7F5DD7b\u20260A3E on 2026-10-25."
+   },
+   "morpho-pre-bec2ff29": {
+    "source_commit": "pre-bec2ff29",
+    "profile": "same profile as head-repo-profile (runs=1 \u00b7 viaIR=true) \u2014 deployed by scripts/deploy_morpho_mainnet.js from the repo artifacts tree",
+    "artifact": "recorded in this manifest under supersedes.runtime_ipfs_at_supersede.morpho_strategy (ipfs 1220e11e\u2026, 7,122 B, live-confirmed 2026-10-23, retired 2026-10-25 \u2014 it is no longer a contracts{} pin). PY-RECALL-01 body fix (bec2ff29) is ABSENT from this build \u2014 it is pre-fix by definition, so there is no commit that reproduces it."
+   },
+   "dn-boost-parity-2534780f": {
+    "source_commit": "2534780f",
+    "profile": "solc 0.8.28 \u00b7 optimizer runs=1 \u00b7 viaIR=true \u00b7 paris",
+    "artifact": "deploy-artifacts/dn-boost-parity/ (byte-parity proved against both books' live DN strategy)"
+   },
+   "pt-pre-remediation-arb": {
+    "source_commit": "pre-e0e4847b",
+    "artifact": "recorded in this manifest (pt_v1_quarantined_2026-10-10.classification) and confirmed live 2026-10-23"
+   },
+   "pt-pre-remediation-eth": {
+    "source_commit": "pre-e0e4847b",
+    "artifact": "deploy-artifacts/pt-sleeve-old/ (vendored pre-remediation build, IPFS pinned in its README)"
+   },
+   "susd3-legacy-2026-09-30": {
+    "source_commit": "pre-e9c899a8",
+    "artifact": "recorded in this manifest (susd3_registered_2026-09-30.classification) and confirmed live 2026-10-23"
+   }
+  },
+  "known_unpinned": {},
+  "contracts": {
+   "pro_yield_vault": {
+    "address": "0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9",
+    "expected_ipfs": "12207cfbb7f236e45283eaf1c3a91a0dab54f33b27b9fe984430dce99de30ef1dcfc",
+    "bytes": 12140,
+    "build": "r1-2026-10-25-808e2ecf",
+    "note": "R1 book-#1 vault (generation 2026-10-25, card t_e7e6ae53). Live runtime == deploy-artifacts/r1-2026-10-25/ProYieldVault.json (12,140 B, runtime sha256 ff907cc7\u2026) INCLUDING the trailing CBOR metadata: 440 differing bytes at block 49,583,932 and every one of them falls inside immutableReferences (0 outside), CBOR trailer byte-identical. The reviewed source is 808e2ecf (F-4 gate + F-4R-2 cap), the profile runs=200 / no viaIR / paris. Superseded 0x8954a73B\u2026D1C1 (depositsPaused=true since the 2026-10-25 migration; $0.004768 left, its FD 0x18FB3e2F\u20268E9) is recorded under supersedes, not graded here."
+   },
+   "fee_distributor": {
+    "address": "0xc8cc10ddC8a6605CfDDB3886962C184829C27970",
+    "expected_ipfs": "1220161a7b46be95efe6ffe2fc0777e43280dadf659b52a28a66ba6644d38bdd8a45",
+    "bytes": 2106,
+    "build": "r1-2026-10-25-808e2ecf",
+    "note": "R1 FeeDistributor (generation 2026-10-25, card t_e7e6ae53), and the FD the R1 vault's feeDistributor() names. F-13 (lifetime fee counter frozen after the first route()) is FIXED here. Live runtime == deploy-artifacts/r1-2026-10-25/FeeDistributor.json INCLUDING the trailing CBOR metadata (80 differing bytes at block 49,583,932, all inside immutableReferences; CBOR trailer byte-identical). Superseded 0x18FB3e2F\u20268E9 (1220e71e\u2026, 1,977 B, F-13 absent) is recorded under supersedes, not graded here."
+   },
+   "dn_core_strategy": {
+    "address": "0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4",
+    "expected_ipfs": "1220e8d1afa2558d87a44af2c2325ee0ec6ccccd1c250ad09c3de99859de4a841c80",
+    "bytes": 12452,
+    "build": "dn-boost-parity-2534780f",
+    "note": "HEAD DNCoreStrategy is 14,755 B at runs=200 and its deploy estimate exceeds HyperEVM's 3,000,000-gas/tx cap, so the audited 2534780f build IS the intended deployable code. Convergence of the A3 NAV fixes (7c2a1611 / e958c426) is BLOCKED on size, not forgotten \u2014 docs/SECURITY_FINDING_PY-SCOPE-02 \u00a74 (live DN under-reports NAV by $30.35)."
+   },
+   "morpho_strategy": {
+    "address": "0xb7F5DD7bF4b94540d3B7f8CEC9C59c7eBefe0A3E",
+    "expected_ipfs": "12202e644bfce454b8fab7fa67fc609022d5e20b39685aeb724af56f6b6bf132c45d",
+    "bytes": 7985,
+    "build": "morpho-head-fixed-168310a5",
+    "note": "R1 Morpho strategy (generation 2026-10-25, card t_e7e6ae53): registered + ACTIVE at strategyList index 0, holding $5.974999 at block 49,583,932. Carries the PY-RECALL-01 body fix (bec2ff29) \u2014 selector-clean AND current, the case where a selector diff would have been a false all-clear. Live runtime == deploy-artifacts/head-fixed/MorphoStrategy.json INCLUDING the trailing CBOR metadata (744 differing bytes at block 49,583,932, all inside its 35 immutable_slots; CBOR trailer byte-identical). Superseded 0xBF4C5e33\u2026 (pre-bec2ff29, 1220e11e\u2026, 7,122 B) is recorded under supersedes, not graded here."
+   },
+   "pt_sleeve_strategy": {
+    "address": "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b",
+    "expected_ipfs": "1220c1b8c69feeea9c8189e69f174d2419eacbc14b0369509506336adbfc5dd03071",
+    "bytes": 7699,
+    "build": "pt-pre-remediation-arb",
+    "note": "pre-remediation PTSleeveStrategy \u2014 accepted risk F-1 (registered, strategyActive=false since 2026-10-10, totalAssets 0). Identity-pinned so a silent swap is caught; the fix is registering the remediated pair 0xd7075C9B/0x9238320C."
+   },
+   "pt_v1_quarantined_2026-10-10": {
+    "address": "0x3AE855B65A021397f7a3ca838acc8E4c82cF815f",
+    "expected_ipfs": "1220c1b8c69feeea9c8189e69f174d2419eacbc14b0369509506336adbfc5dd03071",
+    "bytes": 7699,
+    "build": "pt-pre-remediation-arb",
+    "scope": "inactive",
+    "note": "registered + INACTIVE (strategyList index 2), totalAssets 0 \u2014 quarantined 2026-10-10"
+   },
+   "pt_sleeve_eth_strategy": {
+    "address": "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25",
+    "expected_ipfs": "1220219d740d4bf5f2ae623c1c25b454338c495ecb1c02ae280382de837cfa69b838",
+    "bytes": 7733,
+    "build": "pt-pre-remediation-eth",
+    "note": "pre-remediation, accepted risk F-1, registered + strategyActive=false; still holds ~$18.89 until it unwinds (~2026-11-05). Identity-pinned so a silent swap is caught."
+   },
+   "hlearn_strategy": {
+    "address": "0xA2e535970dc1492f77843E26F25Ab314735F4dF5",
+    "expected_ipfs": "1220b709ad5b21db6e3011686f915785d41049e54848e52843fdf47559ebd0ee53fd",
+    "bytes": 9019,
+    "build": "head-repo-profile",
+    "note": "HLEarnStrategy is current: live == HEAD source (repo profile). Same runtime as the always-on instance, as designed."
+   },
+   "hlearn_alwayson_strategy": {
+    "address": "0x1C770315D159b52a7fA892878B1F33B1A61618Bf",
+    "expected_ipfs": "1220b709ad5b21db6e3011686f915785d41049e54848e52843fdf47559ebd0ee53fd",
+    "bytes": 9019,
+    "build": "head-repo-profile",
+    "note": "KinkWrapper engine instance \u2014 same ipfs as 0xA2e53597 (deliberately a case where the code is fine)"
+   },
+   "susd3_registered_2026-09-30": {
+    "address": "0x9978e8745cdb0d3e5B970aC36C38575eC70D612A",
+    "expected_ipfs": "12208ce737c32d819ca5c2331817f5337d161a851bde5fc8069a7b2a4e1a51c37eb6",
+    "bytes": 7939,
+    "build": "susd3-legacy-2026-09-30",
+    "note": "legacy SUSD3Strategy v1 \u2014 registered + ACTIVE with totalAssets 0; superseded by the dormant 0x7dc1874F replacement. Identity-pinned; de-registration is a vault-owner (Safe) action."
+   },
+   "susd3_strategy": {
+    "address": "0x7dc1874FFfCb0481b68501eb2f28c17d18C616DB",
+    "scope": "inactive",
+    "note": "dormant replacement: venueCleared=false, NOT registered with the vault \u2014 currency not gating money until the owner GO (no pin)"
+   },
+   "pt_sleeve_strategy_dormant_2026-10-05": {
+    "address": "0xd7075C9BD95649b3d6831182bea2986552097A2f",
+    "scope": "inactive",
+    "note": "remediated Arb lane, NOT registered \u2014 pin it when the Safe registration re-points the lane (no pin)"
+   },
+   "pt_sleeve_eth_strategy_dormant_2026-10-05": {
+    "address": "0x9238320Cc802863c7c1d78D1aaA6cbe0F7975092",
+    "scope": "inactive",
+    "note": "remediated ETH lane, NOT registered \u2014 pin it when the Safe registration re-points the lane (no pin)"
+   }
+  }
  },
  "morpho_strategy_market": {
   "core": "0x68e37dE8d93d3496ae143F2E900490f6280C57cD",
