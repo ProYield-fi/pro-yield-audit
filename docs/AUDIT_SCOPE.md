@@ -2,16 +2,27 @@
 
 > Status: **live on mainnet** (HyperEVM 999) + **testnet**. This document is the package
 > auditors and community reviewers should read first.
-> Last updated: **2026-10-23** (deployed-build disclosure added — read §1.4 before anything else).
+> Last updated: **2026-10-26** — book #1 is the 2026-10-25 R1 generation; §1.2 and §1.4 rewritten.
 
-> ⚠ **The code in this repository is NOT what book #1 runs.** Book #1
-> (`0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1`) was deployed 2026-09-25 from source commit
-> **`8daa2ce5`** and has **not** been redeployed since. Every vault/FeeDistributor/strategy fix
-> landed after that commit — `c652e006` (r1), `609ad90b` (r3 CEI), `e9c899a8` (sUSD3), `bec2ff29`
-> (yossweh 2026-10-22) — is **source-only, undeployed**. Proved by ipfs metadata-hash identity on
-> a from-source rebuild, not by inspection. **An audit of this repository is an audit of the
-> intended next build, not of the deployed one.** §1.4 lists the delta; the full ruling is
+> ✅ **Book #1 was replaced on 2026-10-25 and now runs a build this repository contains.**
+> Book #1 is `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9` (deployed 2026-10-25T14:22Z). The
+> 2026-09-25 vault `0x8954a73B…D1C1` is **superseded** — `depositsPaused=true`, $0.004768 left.
+> Deployed build: source cut `0624616c` (= F-4/F-4R-2 vault tip `808e2ecf` + the `depositFor`
+> auto-earn guard), solc 0.8.28, optimizer **runs=200**, no viaIR, evm `paris`. Vault runtime
+> **12,140 B**, lowercase-hex sha256 `ff907cc7…f97e6f0a`, CBOR ipfs `12207cfb…e30ef1dc`;
+> FeeDistributor `0xc8cc10dd…C27970`, 2,106 B, sha256 `e7cceb78…5b004b5`, ipfs `1220161a…4d38bdd8`.
+> Live code equals the pinned artifact **outside constructor-immutable slots only** (vault 440
+> differing bytes, FeeDistributor 80, **0 outside** `immutableReferences`; CBOR trailers
+> byte-identical; block 49,583,955, 2026-10-26). **PY-SCOPE-02's "undeployed fixes" list is CLOSED
+> for the vault and the FeeDistributor** — r1 (`c652e006`), r3-CEI (`609ad90b`), sUSD3 (`e9c899a8`),
+> F-4 gate (`dca15b6a`), F-4R-2 (`808e2ecf`) and `depositFor` are on chain. §1.4 lists exactly what
+> is **still** not deployed (DN core, the PT/sUSD3 lanes, the Morpho build — read it before scoping
+> anything else); the full superseded-generation proof is
 > `docs/SECURITY_FINDING_PY-SCOPE-02_VAULT_BUILD_DRIFT_2026-10-23.md`.
+> Pinned-build note: the repo default `hardhat.config.js` is `runs=1 + viaIR` (a code-size choice,
+> not a source difference). Build at **runs=200 / no-viaIR / paris** to compare with chain, and do
+> **not** use `808e2ecf` alone — that is the pre-`depositFor` cut (11,761 B, sha `90e392b4…`) and was
+> never deployed.
 
 ## 1. What is in scope
 
@@ -27,15 +38,15 @@ Primary (holds or routes user funds):
 | `contracts/FeeDistributor.sol` | 79 | Fee routing (60/20/20 recycle policy) |
 | `contracts/PYDStaking.sol` | 171 | PYD reward streaming (Synthetix-style) |
 | `contracts/PYDToken.sol` | 26 | Fixed-supply OZ ERC20 (standard events); no mint path |
-| `contracts/PYDFeeDiscount.sol` | ~390 nSLOC | v3 universal USDC rebate pool over ≤8 registered vault books: normalized tier-weighted accrual, epoch-lagged clamps, paginated sweep, one claim; source-only, not deployed |
-| `contracts/PYDFunder.sol` | 175 | Capped USDC→PYD conversion → PYDStaking streams (dormant until a swapper is set) |
+| `contracts/PYDFeeDiscount.sol` | ~390 nSLOC | v3 universal USDC rebate pool over ≤8 registered vault books: normalized tier-weighted accrual, epoch-lagged clamps, paginated sweep, one claim. **Deployed 2026-10-26** at `0xD31e6E62F3A2378C12B993BFF6022aD68a8c583e` (runtime 9,791 B, keccak `0xa421f7f5…2c922e24`; owner treasury Safe; `minEpochSeconds` 24h; both R1 books registered and `booksHealthy=true`) but **unfunded and inactive** — `budgetAvailable()` = 0, no rebates accrue, and activation waits on the 10% fee slice plus a signed activation review. |
+| `contracts/PYDFunder.sol` | 175 | Capped USDC→PYD conversion → PYDStaking streams. **RETIRED 2026-10-23** (owner decision B, `t_97bf74a2`): the live `0x1af2Cc10…` is paused, unwired (swapper null), holds no USDC, and runs the `2534780f` build that **predates** the F-8 top-up/rate-floor fix — history, not a money path. A future demand layer deploys fresh from reviewed HEAD. |
 
-**PT fixed-rate sleeve (LIVE, holding real USDC — audited in round 1):**
+**PT fixed-rate sleeve (registered on the SUPERSEDED vault, all lanes INACTIVE and flat as of 2026-10-26):**
 
 | Contract | Lines | Role |
 |---|---|---|
-| `contracts/PTSleeveStrategy.sol` | 221 | HyperEVM side: CCTP burn/return, keeper-attested Arb value. **Live** `0x2D3E5bf1…` (+ a second instance `0x3AE855B6…`) |
-| `contracts/arbi/PTSleeveExecutor.sol` | 273 | Arbitrum side: buys/sells PT via the Pendle router, burns USDC back. **Live on Arbitrum One** `0xA2e53597…` — NOTE: that literal address is `HLEarnStrategy` on HyperEVM (see §1.2 index 5). Same hex, different chains, different contracts: always scope an address by chain id. |
+| `contracts/PTSleeveStrategy.sol` | 221 | HyperEVM side: CCTP burn/return, keeper-attested Arb value. Registered on the **superseded** vault only (`0x2D3E5bf1…`, plus the quarantined `0x3AE855B6…`); both read `strategyActive=false` (2026-10-26) and neither is in the R1 vault's list. |
+| `contracts/arbi/PTSleeveExecutor.sol` | 273 | Arbitrum side: buys/sells PT via the Pendle router, burns USDC back. **Live on Arbitrum One** `0xA2e53597…` — NOTE: that literal address is `HLEarnStrategy` on HyperEVM (see §1.2 / §1.2b). Same hex, different chains, different contracts: always scope an address by chain id. |
 | `contracts/ethi/PTSleeveEthExecutor.sol` | 348 | Ethereum lane (CCTP domain 0). Built + fork-tested, **not deployed** |
 | `contracts/arbi/PendleTypes.sol` | 111 | Pendle router structs (shared by both executors) |
 
@@ -43,13 +54,13 @@ Primary (holds or routes user funds):
 
 | Contract | Lines | Role |
 |---|---|---|
-| `contracts/MorphoStrategy.sol` | 219 | **LIVE** `0xBF4C5e33…` — Morpho Blue supply on HyperEVM, position-based yield accounting |
-| `contracts/HLEarnStrategy.sol` | 345 | HYPE-earning sleeve. **LIVE on HyperEVM mainnet** at `0xA2e535970dc1492f77843E26F25Ab314735F4dF5` (vault `strategyList` index 5, ACTIVE; `totalAssets` = 17,970,861 USDC-6dp = **$17.97** at block 49,277,256, 2026-10-23). PY-SCOPE-01 (yossweh 2026-10-22): this row previously said "testnet only (`0x08EC018f…` on chain 998); not in the live vault's strategyList" — both halves were false. Do not confuse it with the Arbitrum-lane `PTSleeveExecutor` that shares the same hex (see above). |
+| `contracts/MorphoStrategy.sol` | 219 | Morpho Blue supply on HyperEVM, position-based yield accounting. **Live on book #1** at `0xb7F5DD7bF4b94540d3B7f8CEC9C59c7eBefe0A3E` (R1 `strategyList` index 0, ACTIVE, $5.974999 at block 49,583,849) — build `head-fixed`, source `168310a5`, runtime 7,985 B, ipfs `12202e64…`. The pre-R1 instance `0xBF4C5e33…` is active on the superseded vault only. |
+| `contracts/HLEarnStrategy.sol` | 345 | HYPE-earning sleeve. **Live on book #1** at `0xA2e535970dc1492f77843E26F25Ab314735F4dF5` (R1 `strategyList` index 1, ACTIVE; `totalAssets` = 5,974,999 USDC-6dp = **$5.974999** at block 49,583,849, and its `vault()` reads the R1 vault — it was re-pointed by `setVault` during the 2026-10-25 migration). The `$17.97` figure this row used to carry was its balance on the superseded book before that migration. PY-SCOPE-01 (yossweh 2026-10-22): this row previously said "testnet only (`0x08EC018f…` on chain 998); not in the live vault's strategyList" — both halves were false. Do not confuse it with the Arbitrum-lane `PTSleeveExecutor` that shares the same hex (see above). |
 
 Legacy/secondary (deployed but pending migration review):
 `DeltaNeutralStrategy.sol`, `SkyStrategy.sol`, `PendleStrategy.sol` —
-reentrancy-hardened 2026-09-18 (23 findings fixed). **Verified 2026-09-30: all three
-are dead code** — absent from every manifest and from the live vault's
+reentrancy-hardened 2026-09-18 (23 findings fixed). **Verified 2026-09-30 and still true
+2026-10-26: all three are dead code** — absent from every manifest and from every vault's
 `strategyList`. `DeltaNeutralStrategy` was never deployed.
 
 ### 1.1 Scope corrections made 2026-09-30 (round-1 audit)
@@ -60,30 +71,62 @@ listed `MorphoStrategy` as merely "legacy" when it is the live lending core. Bot
 now corrected above. Findings and fixes: `AUDIT_HANDOFF_2026-09-30.md` and
 `docs/AUDIT_ROUND1.md`.
 
-**SUSD3 sleeve (registered + ACTIVE on the live vault):**
+**SUSD3 sleeve (registered on the SUPERSEDED vault, INACTIVE):**
 
 | Contract | Lines | Role |
 |---|---|---|
-| `contracts/SUSD3Strategy.sol` | — | Legacy sUSD3 CCTP sleeve (v1). **Live** `0x9978e8745cdb0d3e5B970aC36C38575eC70D612A` (registered + ACTIVE, index 6; superseded by the dormant `0x7dc1874F…` replacement but never de-registered). |
+| `contracts/SUSD3Strategy.sol` | — | Legacy sUSD3 CCTP sleeve (v1). `0x9978e8745cdb0d3e5B970aC36C38575eC70D612A` — registered on the **superseded** vault (index 6), `strategyActive=false` as of 2026-10-26, **not** in the R1 vault's `strategyList`. Superseded in source by the dormant `0x7dc1874F…` replacement, which is not registered either. |
 | `contracts/ethi/SUSD3Executor.sol` | — | Ethereum-side executor for the sUSD3 sleeve |
 
-### 1.2 Live `strategyList` — 7 registered strategies → sources (live-verified 2026-10-23)
+### 1.2 Live `strategyList` — 2 registered strategies on book #1 (live-verified 2026-10-26)
 
-The vault `0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1` holds **7 registered
-strategies** on-chain. The manifest previously named only 5 (indices 2 and 6
-were absent, and index 6 is ACTIVE); it was reconciled 7-vs-5 on 2026-10-10
-(`deployed_addresses.mainnet.json:strategyList_reconciled`). **The on-chain
-`strategyList` is the source of truth — never enumerate strategies from the
-manifest.** Every registered address maps to a source file below; the legacy
-SUSD3 adapter, previously unmapped, is included.
+The live vault `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9` holds **2 registered
+strategies**, both `strategyActive == true`. Flags and values are `strategyActive()` /
+`totalAssets()` read in the same block, **49,583,849** (2026-10-26T15:15Z); the vault's own
+`totalAssets()` and `totalShares()` are both 12,950,000 (6dp) = **$12.95**, `depositsPaused=false`,
+caps $10,000 TVL / $1,000 per user. Both strategies' `vault()` returns the R1 vault.
+
+| # | Live strategy address | Active | Value (USDC-6dp) | Source |
+|---|---|---|---|---|
+| 0 | `0xb7F5DD7bF4b94540d3B7f8CEC9C59c7eBefe0A3E` | yes | 5,974,999 ($5.974999) | `contracts/MorphoStrategy.sol` (build `head-fixed`, source `168310a5`) |
+| 1 | `0xA2e535970dc1492f77843E26F25Ab314735F4dF5` | yes | 5,974,999 ($5.974999) | `contracts/HLEarnStrategy.sol` |
+
+The rest of `totalAssets` is idle USDC in the vault — 1,000,002 (6dp) = $1.000002, of which the cash
+ledger `accountedBalance()` records $1.000000 and 2 µUSDC is uncredited arrival dust
+(`uncreditedArrivals()`) — plus 11,949,998 ($11.949998) in the two strategies: $12.950000 total.
+The same list is recorded machine-readably in `deployed_addresses.mainnet.json` →
+`strategyList_reconciled` (R1 read at block 49,584,595, 2026-10-26).
+
+### 1.2b The superseded vault's `strategyList` — 7 entries (historical record, read 2026-10-23)
+
+> ⚠ This is the list of the **superseded** vault `0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1`
+> (`depositsPaused=true` since 2026-10-25; `totalAssets` = 4,768 = **$0.004768** on 2026-10-26).
+> It is kept because it is the record of where the pre-R1 capital sat and because every entry's
+> `vault()` still points at that vault (except HLEarn, which was re-pointed). **Do not scope these
+> as the live book.** Re-read 2026-10-26: `strategyActive` is now false for PT v1 `0x3AE855B6…`,
+> PT-Arb `0x2D3E5bf1…`, PT-ETH `0xA96D0BB2…` and legacy sUSD3 `0x9978e874…`; it is still true for
+> DN core `0xeD40C3c3…` and the old Morpho `0xBF4C5e33…`; HLEarn `0xA2e53597…` still appears in
+> this old list but now serves the R1 vault. Values below are the 2026-10-23 snapshot; on
+> 2026-10-26 every leg reads 0 (old Morpho: 26 µUSDC) except HLEarn, whose $5.974999 now belongs
+> to the R1 vault.
+
+The superseded vault held **7 registered strategies** on-chain. The manifest previously named only
+5 (indices 2 and 6 were absent, and index 6 was then ACTIVE); it was reconciled 7-vs-5 on 2026-10-10.
+That `strategyList_reconciled` block has since been regenerated for the R1 vault, so this 2026-10-23
+7-entry record now lives in the repository's git history (and in the private manifest's
+`_strategyList_superseded_2026-10-25` archive), not in the current manifest. **The on-chain
+`strategyList` is the source of truth — never enumerate strategies from the manifest.** Every
+registered address maps to a source file below; the legacy SUSD3 adapter, previously unmapped, is
+included.
 
 PY-SCOPE-01 (yossweh 2026-10-22): this table used to mark indices 3 and 4
 ACTIVE. A live read at block **49,277,256** (2026-10-23) shows both are
-`strategyActive == false`. Index 4 is deactivated but **still carries value**
-(18,891,846 USDC-6dp = $18.89) — money-out is not gated on `strategyActive`, so
-it stays recallable. Values below are `totalAssets()` read in the same block.
+`strategyActive == false`. Index 4 was deactivated but still **carried value** at that
+block (18,891,846 USDC-6dp = $18.89) — money-out is not gated on `strategyActive`, so
+it stayed recallable. That lane now reads $0 (see the warning above). Values below are
+`totalAssets()` read in the same block, 49,277,256.
 
-| # | Live strategy address | Active | Value (USDC-6dp) | Source |
+| # | Address on the superseded vault | Active (2026-10-23) | Value (USDC-6dp) | Source |
 |---|---|---|---|---|
 | 0 | `0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4` | yes | 1,134,268 ($1.13) | `contracts/DNCoreStrategy.sol` (+ `contracts/adapters/DNCoreBase.sol`) |
 | 1 | `0xBF4C5e339D63EEB393DA2797679879a0a5Af2D53` | yes | 50,547,918 ($50.55) | `contracts/MorphoStrategy.sol` |
@@ -107,34 +150,86 @@ attack-surface concern; see audit F-1).
 ### 1.3 Carry-forward constraints (internal adversarial pass, 2026-10-14)
 
 - Internal AI-assisted adversarial review — **supplement only, never a substitute** for the third-party audit lane: `docs/research/INTERNAL_AI_ADVERSARIAL_REVIEW_2026-10-14.md` (ranked findings, dispositions, failing-Forge-repro evidence).
-- **v3 is the only rebate build that may be funded/wired.** It replaces the one-vault v1 model and the known-drift v2 (`PY-REBATE-01`); v1/v2 must not be activated. v3 is source-only, not deployed; funding waits on third-party audit + owner activation. The legacy contract now lives under `test/legacy/` as a test fixture and is out of production scope.
+- **v3 is the only rebate build that may be funded/wired.** It replaces the one-vault v1 model and the known-drift v2 (`PY-REBATE-01`); v1/v2 must not be activated. v3 **is deployed** (§1.0, `0xD31e6E62…583e`, 2026-10-26) but unfunded and inactive: `budgetAvailable()` = 0 and no rebates accrue; funding waits on the 10% fee slice landing plus a signed activation review. The legacy contract now lives under `test/legacy/` as a test fixture and is out of production scope.
 - **Pin the `DNCoreBase.hedgeTransferOut` destination** (internal IA-1) in the DN revision that ships the F3/F6 fixes.
 
-### 1.4 Deployed build vs this source (PY-SCOPE-02, live-verified 2026-10-23)
+### 1.4 Deployed build vs this source (PY-SCOPE-02 — generation 2026-10-25)
 
-Book #1 vault runtime is **9,952 B**, ipfs `1220e58e6bea…24ea`, = rebuild of **`8daa2ce5`**
-(solc 0.8.28, optimizer runs **200**, no viaIR, evm target paris). HEAD artifacts cannot reproduce
-it: `hardhat.config.js` was changed to `runs=1 + viaIR` in `2534780f`, *after* the deploy. 380
-differing bytes vs the rebuild, **0 outside** the constructor-immutable slots.
+**Book #1 is `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9`** (HyperEVM 999), deployed
+2026-10-25T14:22:00Z (deploy txs in `deployed_addresses.mainnet.json`, nonces 692–696), owned by the
+treasury Safe `0x8A1b107e…C9aB` (Safe v1.4.1, 2-of-3), caps $10,000 TVL / $1,000 per user,
+`depositsPaused=false`, `totalAssets` = $12.95 at block 49,583,849. It runs the **R1 converged
+build**, and that build is this repository's source:
 
-| what HEAD has that the chain does not | commit | live consequence |
+| | vault `0x9DA979…AcFD9` | FeeDistributor `0xc8cc10dd…C27970` |
 |---|---|---|
-| `uncreditedArrivals()`, `creditYield` arrival clamp (**F-4**) | `c652e006` | the owner (2-of-3 Safe) can credit idle float as yield — no third-party path |
-| `onStrategyReturn(uint256)` (**F-5** vault half) | `e9c899a8` | returned principal has no booking hook; live `allocate()` ships raw balance so principal is still redeployable |
-| `addStrategy` codeless-address check (**F-15**) | `c652e006` | a typo'd strategy address would accept and burn allocated USDC |
-| `emergencyWithdraw` bounded write-down + emit (**F-5**) | `c652e006` / `609ad90b` | live writes down *after* the transfer and underflows (Panic 0x11) once `balance > totalAssets` — a 1-wei donation then bricks the crisis lever (`PY-EMERG-02`) |
-| FD `peakBalance` / cumulative fees (**F-13**), `route()` CEI | `c652e006` / `609ad90b` | lifetime fee counter freezes after the first route |
-| `MAX_PERFORMANCE_FEE()`, `MAX_WITHDRAWAL_FEE()` | *removed by* `c652e006` | present live, absent at HEAD — the live build is a **sibling generation**, so a "missing-from-HEAD" selector check reports a false all-clear |
+| runtime | 12,140 B | 2,106 B |
+| sha256 (lowercase-hex runtime digest) | `ff907cc7…f97e6f0a` | `e7cceb78…5b004b5` |
+| CBOR ipfs | `12207cfb…e30ef1dc` | `1220161a…4d38bdd8` |
+| live vs pinned artifact | 440 bytes differ, **0 outside** `immutableReferences` | 80 bytes differ, **0 outside** `immutableReferences` |
 
-Also stale on chain, and accepted/tracked: `DNCoreStrategy` (no `reconcileProfit`, and no A3
-spot-cash NAV — its own `totalAssets()` under-reports by **$30.35**), the two registered
-pre-remediation PT lanes (`_accepted_risks[F-1]`), the legacy SUSD3 v1, and the live
-`FeeDistributor`. `MorphoStrategy` is selector-clean but **not** current (`PY-RECALL-01` is a body
-change). **A selector diff is not a currency test** — verify ipfs against a rebuild of the intended
-commit.
+Build profile: solc 0.8.28, optimizer **runs=200**, no viaIR, evm `paris`; build cut `0624616c`
+(= the F-4/F-4R-2 vault tip `808e2ecf` + the `depositFor` auto-earn guard). Verified 2026-10-26 by
+rebuilding the cut at that profile and comparing to chain at block 49,583,955: CBOR trailers
+byte-identical (the ipfs values above), every differing byte inside a constructor-immutable slot,
+and `contracts/ProYieldVault.sol` / `contracts/FeeDistributor.sol` / `contracts/BaseStrategy.sol`
+unchanged since the cut. The same pins ship machine-readably in `deployed_addresses.mainnet.json`
+(`expected_ipfs.contracts` → address, byte length, ipfs multihash, build key), which is what
+`scripts/build_currency_gate.js` grades. Two build traps, both checked: (a) the repo default
+`hardhat.config.js` is `runs=1 + viaIR` and never produces a deploy artifact — build at runs=200 /
+no-viaIR / paris; (b) the manifest's build label `r1-2026-10-25-808e2ecf` names the F-4/F-4R-2
+*base* commit, and `808e2ecf` **alone** rebuilds to 11,761 B / sha `90e392b4…`, which is **not** the
+deployed code — the deployable artifact carries the following `depositFor` commit (`0624616c`).
+Reproduce from the pinned artifact or the `0624616c` tree; the runtime sizes and hashes above are
+the check that matters.
 
-Nothing in §1.4 changes §3's invariants for the *intended build*; it changes what an auditor may
-assert about the *deployed* one.
+**PY-SCOPE-02 status: CLOSED for the vault and the FeeDistributor.** On chain now: r1 `c652e006`
+(F-4 `uncreditedArrivals()`/arrival clamp, F-15 codeless-strategy check, F-13 FD cumulative fees),
+r3 CEI `609ad90b` (`emergencyWithdraw` writes down before the sweep — PY-EMERG-02 closed), sUSD3
+`e9c899a8` (`onStrategyReturn` booking hook, F-5 vault half), F-4 gate `dca15b6a` (F-4R-1 split
+guard + F-4R-3), F-4R-2 `808e2ecf` (cash ledger capped at claims) and the `depositFor` auto-earn
+guard. `MAX_PERFORMANCE_FEE()` / `MAX_WITHDRAWAL_FEE()` are absent from the live vault too, so the
+old "selector present on chain, absent at HEAD" divergence is gone.
+
+**Still NOT deployed — the residual scope (read before scoping anything else):**
+
+- **DN core** `0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4` is the vendored `2534780f` parity build
+  (12,452 B), registered on the **superseded** vault only — `strategyActive` there is still true,
+  but the strategy's own `paused()` is **true** and it holds $0 — and it is not re-pointed to R1. It
+  is the pre-remediation build: no `reconcileProfit`, no A3 spot-cash NAV (its own `totalAssets()`
+  under-reports), and the F-8 `bridgeBackToEvm` scaling defect is live code on it; the lane was
+  paused by Safe tx on 2026-10-24 after the Core-spot rescue. HEAD `DNCoreStrategy.sol` /
+  `DNCoreBase.sol` carry a size-feasible fixed build that has **not** been deployed.
+- **PT lanes** `0x2D3E5bf1…` (Arbitrum) and `0xA96D0BB2…` (ETH lane — it read $18.89 on
+  2026-10-23 and reads **$0** on 2026-10-26), plus **legacy sUSD3 v1** `0x9978e874…`, are
+  registered on the **superseded** vault only, all `strategyActive=false` on 2026-10-26, and none
+  of them is in the R1 vault's list.
+- **Morpho strategy** `0xb7F5DD7b…0A3E` (on the R1 vault) is the `head-fixed` build of source
+  `168310a5` — 7,985 B, ipfs `12202e64…f132c45d`. That source **contains** the PY-RECALL-01 fix
+  (`bec2ff29`), and `MorphoStrategy.sol` + `BaseStrategy.sol` are byte-identical between `168310a5`
+  and HEAD, so PY-RECALL-01 is closed on the live book as well; it is simply not a build of the
+  `bec2ff29` commit itself.
+- **PYDFeeDiscount v3** is deployed but inert (§1.0): `budgetAvailable()` = 0, no rebates accrue,
+  and it is not in the published `deployed_addresses.pyd.mainnet.json` until that manifest is
+  promoted.
+
+**F-1 (accepted risk) no longer attaches to the live book.** The pre-remediation PT lanes named in
+`deployed_addresses.mainnet.json:_accepted_risks[F-1]` (`0x2D3E5bf1…`, `0xA96D0BB2…`) are on the
+superseded vault with `strategyActive=false` (block 49,583,849); the R1 vault cannot allocate to
+them, and `scripts/pt_strategy_gate.js` still hard-fails any activation. The manifest entry stays
+(the gate reads it) as the record of a risk that is now live only on the archived book. Every PT
+leg reads $0 on 2026-10-26, so the accepted risk has no capital behind it today.
+
+**Historical generation (record, not scope):** the superseded vault `0x8954a73B…D1C1` (2026-09-25,
+source `8daa2ce5`, runtime 9,952 B, ipfs `1220e58e6bea…24ea`) is `depositsPaused=true` and holds
+$0.004768. The previous version of this section described *that* build — "an audit of this
+repository is an audit of the intended next build, not of the deployed one" was true for generation
+2026-09-25 and is **not** true for generation 2026-10-25. That generation's rebuild comparison (380
+differing bytes, 0 outside immutable slots) is preserved in
+`docs/SECURITY_FINDING_PY-SCOPE-02_VAULT_BUILD_DRIFT_2026-10-23.md`.
+
+Nothing in §1.4 changes §3's invariants for this source; it changes what an auditor may assert about
+the deployed contracts — and it can now assert them against HEAD source at the pinned profile.
 
 ## 2. Architecture in one page
 

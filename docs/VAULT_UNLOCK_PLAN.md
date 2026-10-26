@@ -119,15 +119,22 @@ way to honor it.
       creation; unlike testnet, the box never generated a backup key**
       (deploy txs `0xa8391283…` / `0x1e49652b…`; records in
       `~/.proyield/{treasury,insurance}_multisig_mainnet.json`).
-- [x] Minimal deploy set — **deployed 2026-09-24: `ProYieldVault` + `FeeDistributor`**
-      on HyperEVM mainnet (strategies/PYD suite deliberately deferred — attack-surface
-      rule; no HyperEVM venue adapter exists yet, so the team-stage vault holds idle
+- [x] Minimal deploy set — **vault + FeeDistributor live on HyperEVM mainnet** (strategies/PYD
+      suite deliberately deferred at first — attack-surface rule; the team-stage vault held idle
       USDC: zero venue risk while the money path is proven end-to-end).
-      - Vault `0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1` · FeeDistributor
-        `0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9` (see `deployed_addresses.mainnet.json`;
-        redeployed 2026-09-25 with the round-2 fixes, superseding the 2026-09-24 set)
-      - caps: TVL $500 · per-user $500; perf fee 1000 bps; withdrawal fee 0; deposits open
-      - deploy txs (blocks 46,757,859 / 46,757,867):
+      - **Live book #1 (generation 2026-10-25, R1):** vault
+        `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9` · FeeDistributor
+        `0xc8cc10ddC8a6605CfDDB3886962C184829C27970` — see `deployed_addresses.mainnet.json`
+        (its `supersedes` block names the 2026-09-25 pair). Deposits open; `totalAssets` $12.95 at
+        block 49,583,849 (2026-10-26), two registered strategies both active ($5.974999 Morpho +
+        $5.974999 HLEarn). Build and byte-identity proof: `docs/AUDIT_SCOPE.md` §1.4.
+      - caps: TVL $10,000 · per-user $1,000 (R1 restart rung, GO-C 2026-10-23); perf fee 1000 bps;
+        withdrawal fee 0.
+      - **Superseded generation (history — do not use these as live addresses):** the 2026-09-25
+        pair vault `0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1` · FeeDistributor
+        `0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9` (round-2 fixes, superseding the 2026-09-24
+        set). `depositsPaused=true` since 2026-10-25 with $0.004768 left. It ran caps TVL $500 ·
+        per-user $500; deploy txs (blocks 46,757,859 / 46,757,867):
         FD `0x3e2331656dc0d3adcd37f70d1ded79338cbe0b79e6aad7912c2cc533926843dc` (gasUsed 531,049)
         · vault `0x968d90b3a468588cdb20186cb14ec25377d8ba62963bbce3bc6c1a19375008d8` (gasUsed 2,201,231)
         — both under the 3,000,000-gas HyperEVM tx cap; setCaps `0x0a6203df…`

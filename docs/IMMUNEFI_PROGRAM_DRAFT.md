@@ -5,6 +5,13 @@
 > document is the ready-to-paste answer set so the questionnaire turnaround is
 > same-day. Terms are already fixed in advance in `SECURITY.md` — nothing here
 > is negotiable-under-pressure.
+>
+> ⚠ **Live addresses refreshed 2026-10-26 (R1 generation); the strategy rows and the §3 numbers
+> are not.** Book #1 was replaced on 2026-10-25 (R1 generation): live vault `0x9DA979aD…AcFD9`,
+> FeeDistributor `0xc8cc10dd…C27970`, caps **$10,000 TVL / $1,000 per user**, two active strategies
+> (Morpho `0xb7F5DD7b…`, HLEarn `0xA2e53597…`), `totalAssets` **$12.95**. The strategy rows and the
+> "$53.40 TVL" / "$500 caps" lines in §3 are the **2026-10-02** state and must be re-read against
+> `docs/AUDIT_SCOPE.md` §1.2 / §1.4 before this package is submitted.
 
 ## 1. Project identity
 
@@ -21,13 +28,14 @@
 
 ## 2. Scope — smart contracts (primary)
 
-Live mainnet addresses, verified on-chain 2026-10-02 (`strategyList()` = 5
-entries; caps and TVL read live):
+Live mainnet addresses. The vault and FeeDistributor rows were refreshed 2026-10-26 for the
+2026-10-25 R1 generation; the strategy rows were last verified on-chain **2026-10-02**
+(`strategyList()` = 5 entries then) and are stale — see the banner above.
 
 | Contract | Address | Role |
 |---|---|---|
-| `ProYieldVault.sol` | `0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1` | ERC-4626-style vault: deposits, withdrawals, allocation, harvest, share price |
-| `FeeDistributor.sol` | `0x18FB3e2FCd2221EeeB73E8D92ac892E38483b8E9` | Fee routing (60/20/20 recycle policy) |
+| `ProYieldVault.sol` | `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9` | ERC-4626-style vault: deposits, withdrawals, allocation, harvest, share price. (The 2026-09-25 vault `0x8954a73B…D1C1` is superseded, `depositsPaused=true`.) |
+| `FeeDistributor.sol` | `0xc8cc10ddC8a6605CfDDB3886962C184829C27970` | Fee routing (60/20/20 recycle policy). (The 2026-09-25 FD `0x18FB3e2F…b8E9` belongs to the superseded vault.) |
 | `DNCoreStrategy.sol` / `DNCoreBase` | `0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4` | Delta-neutral sleeve on HyperCore (active) |
 | `MorphoStrategy.sol` | `0xBF4C5e339D63EEB393DA2797679879a0a5Af2D53` | Morpho lending sleeve (active) |
 | `PendleStrategy` (PT-Arb executor `0xA2e535970dc1492f77843E26F25Ab314735F4dF5`) | `0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b` | Pendle PT sleeve via CCTP↔Arbitrum (active) |
@@ -35,8 +43,8 @@ entries; caps and TVL read live):
 | Sky sleeve | `0x3AE855B65a021397f7A3CA838ACc8E4C82CF815f` | Registered, inactive (circuit breaker open) |
 | `PYDToken.sol` | `0xbF38e441166f44cfc05205B21168a01b8a1ABf4F` | Fixed-supply ERC20, no mint path |
 | `PYDStaking.sol` | `0x3211e1C5443B1d178b76B4f0AF1cEf37741DbBb7` | Reward streaming (Synthetix-style) |
-| `PYDFunder.sol` | `0x1af2Cc1045584069fA34b0121D4020d28104dd1e` | Capped USDC→PYD conversion (dormant: no swapper set) |
-| `PYDFeeDiscount.sol` | `0x2B591845a250258d40B468372F432f7fda7cBE88` | Tiered fee rebates from real fee deltas |
+| `PYDFunder.sol` | `0x1af2Cc1045584069fA34b0121D4020d28104dd1e` | **RETIRED 2026-10-23 (owner decision B; paused/unwired; do not wire; not in scope)** |
+| `PYDFeeDiscount.sol` | `0xcFC78dc4Ad488f0f3b5345ceC26BB5354Cd4f0aF` | Tiered fee rebates from real fee deltas (A2 build, deployed 2026-10-23, block 49,298,860; replaces the PY-REBATE-01 build `0x2B591845…cBE88`, retired — never activated, out of scope) |
 
 Secondary (lower bounty tier, smart-contract + API category): the auto-earn
 permit flow — `functions/api/autoearn.js` + `scripts/autoearn_sweep.js` in the
@@ -44,7 +52,10 @@ source repo. The permit spender is the VAULT itself; the sweep is gated
 no-op until the r3 deploy ships `depositFor` (community finding #3, fixed
 2026-10-02).
 
-**Out of scope:** `contracts/mocks/*`, HyperCore itself (Hyperliquid's system),
+**Out of scope:** the retired `PYDFeeDiscount` build at
+`0x2B591845a250258d40B468372F432f7fda7cBE88` (PY-REBATE-01, replaced by the A2 build
+above, never registered or activated — findings there are not in scope),
+`contracts/mocks/*`, HyperCore itself (Hyperliquid's system),
 the website frontend, off-chain keepers except where they move user funds
 (the auto-earn sweep above).
 
