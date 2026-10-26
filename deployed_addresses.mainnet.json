@@ -53,11 +53,10 @@
   "R1 convergence \u2014 book #1 REPLACEMENT vault + FeeDistributor from the fixed build (r1+r3+sUSD3).",
   "Mirror bytecode with book #2's first deploy (\u00a74.10 parity): both books land identical bytecode.",
   "THIS FILE IS THE R1 RECORD: deployed_addresses.mainnet.json was promoted to the 2026-10-25 generation when the R1 sitting landed. The pre-R1 rollback anchor is the on-disk archive deployed_addresses.mainnet.pre-r1-20261025.json (deliberately untracked: under a gate-discovered filename it would be graded as live and re-create the paused-vault row this card removed). (This note used to say this file was left UNTOUCHED as the rollback anchor \u2014 that stopped being true at the promotion and is corrected here, card t_e7e6ae53.)",
-  "Strategies ARE registered on the R1 vault: strategyList = [0xb7F5DD7b\u20260A3E Morpho, 0xA2e53597\u2026F4dF5 HLEarn], BOTH ACTIVE, $5.974999 each, vault totalAssets = totalShares = $12.95 (chain read at block 49,583,932, 2026-10-26). Registering none was the deploy-step contract; the owner-Safe setVault/addStrategy migration txs did it (docs/CONVERGENCE_R1_RUNBOOK.md) and it is done, not pending. The 7-entry list in strategyList_reconciled below is the SUPERSEDED vault's \u2014 regenerating it for R1 is card t_acc5f03b.",
+  "Strategies ARE registered on the R1 vault: strategyList = [0xb7F5DD7b\u20260A3E Morpho, 0xA2e53597\u2026F4dF5 HLEarn], BOTH ACTIVE, $5.974999 each, vault totalAssets = totalShares = $12.95 (chain read at block 49,583,932, 2026-10-26). Registering none was the deploy-step contract; the owner-Safe setVault/addStrategy migration txs did it (docs/CONVERGENCE_R1_RUNBOOK.md) and it is done, not pending. strategyList_reconciled below is the R1 regeneration (script read at block 49,584,595, 2026-10-26; card t_acc5f03b) \u2014 the superseded vault's own 7-entry list was read at block 49,277,959 on 2026-10-23, before the migration, and now lives in this repository's git history plus the private manifest's _strategyList_superseded_2026-10-25 archive.",
   "Ownership transferred to the treasury Safe (2-of-3) at deploy time, never left on the deployer EOA.",
   "Caps = guarded-beta $10,000 TVL / $1,000 per user (GO-2 default = restart at $10k, not carry the raise).",
-  "The S3b streak is per-address: the attestation must name this new vault from day 1 (streak re-init).",
-  "[public snapshot 2026-10-26 \u2014 pinned read block 49,583,100; expected_ipfs verified at 49,583,932] R1 live state: vault.strategyList = 2 entries, both ACTIVE (0xb7F5DD7b\u2026 Morpho, 0xA2e53597\u2026 HLEarn, $5.974999 each); vault totalAssets = totalShares = $12.95; deposits open; the superseded vault 0x8954a73B\u2026 is depositsPaused=true with $0.004768 left. The 7-entry list recorded in strategyList_reconciled below was read at block 49,277,959 on 2026-10-23, i.e. BEFORE the 2026-10-25 migration \u2014 that block describes the SUPERSEDED vault, not this generation; its R1 regeneration is card t_acc5f03b. expected_ipfs IS published in this copy as of 2026-10-26 (card t_e7e6ae53): pro_yield_vault / fee_distributor now pin the R1 build (deploy-artifacts/r1-2026-10-25, source 808e2ecf) at 0x9DA979aD\u2026AcFD9 / 0xc8cc10dd\u2026C27970, morpho_strategy pins the PY-RECALL-01-fixed head-fixed build at 0xb7F5DD7b\u2026fe0A3E, and the superseded 0x8954/0x18FB/0xBF4C addresses moved to `supersedes` \u2014 they are recorded, not graded. Verified against chain 999 before publishing: live runtime == those artifacts except immutable slots (vault 440 differing bytes / FD 80 / morpho 744, 0 outside the immutable ranges; CBOR ipfs identical in all three)."
+  "The S3b streak is per-address: the attestation must name this new vault from day 1 (streak re-init)."
  ],
  "_accepted_risks": [
   {
@@ -216,70 +215,30 @@
   "verified_utc": "2026-10-10"
  },
  "strategyList_reconciled": {
-  "vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
+  "vault": "0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9",
   "chain_id": 999,
   "chain": "hyperevm-mainnet",
   "rpc": "https://rpc.hyperliquid.xyz/evm",
-  "read_utc": "2026-10-23",
-  "block": 49277959,
-  "registered_count": 7,
-  "note": "Live vault.strategyList enumeration regenerated from chain on 2026-10-23 (scripts/reconcile_strategy_manifest.js \u2014 read-only, block 49277959). PY-SCOPE-01 (yossweh 2026-10-22): the 2026-10-10 block still marked PT lanes 3/4 active after they were deactivated on-chain; `active` here is chain-read, and `total_assets_usdc6` is live totalAssets() in the same block. The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel \u2014 latched alerts for an unmanifested strategy AND for a recorded-vs-live active-flag mismatch). Prior note: Live vault.strategyList enumeration reconciled against this manifest on 2026-10-10 (kanban t_ed8b04aa; finding t_edbb5fb7). All 7 registered strategies now have a manifest key (pre-fix the manifest named only 5 \u2014 indices 2 and 6 were absent, and index 6 was ACTIVE). The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel \u2014 latched alert when a registered strategy is unmanifested).",
+  "read_utc": "2026-10-26",
+  "block": 49584595,
+  "registered_count": 2,
+  "note": "Live vault.strategyList enumeration regenerated from chain on 2026-10-26 (scripts/reconcile_strategy_manifest.js \u2014 read-only, block 49584595). PY-SCOPE-01 (yossweh 2026-10-22): the 2026-10-10 block still marked PT lanes 3/4 active after they were deactivated on-chain; `active` here is chain-read, and `total_assets_usdc6` is live totalAssets() in the same block. The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel \u2014 latched alerts for an unmanifested strategy AND for a recorded-vs-live active-flag mismatch). Prior note: Live vault.strategyList enumeration regenerated from chain on 2026-10-23 (scripts/reconcile_strategy_manifest.js \u2014 read-only, block 49277959). PY-SCOPE-01 (yossweh 2026-10-22): the 2026-10-10 block still marked PT lanes 3/4 active after they were deactivated on-chain; `active` here is chain-read, and `total_assets_usdc6` is live totalAssets() in the same block. The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel \u2014 latched alerts for an unmanifested strategy AND for a recorded-vs-live active-flag mismatch).",
   "entries": [
    {
     "index": 0,
-    "address": "0xeD40C3c34e2d4D6F2e1C0F0e688a6c05c82F9Bf4",
-    "active": true,
-    "manifest_key": "dn_core_strategy",
-    "classification": "DNCoreStrategy (dn-boost-parity build)",
-    "total_assets_usdc6": "1134268"
-   },
-   {
-    "index": 1,
-    "address": "0xBF4C5e339D63EEB393DA2797679879a0a5Af2D53",
+    "address": "0xb7F5DD7bF4b94540d3B7f8CEC9C59c7eBefe0A3E",
     "active": true,
     "manifest_key": "morpho_strategy",
     "classification": "MorphoStrategy",
-    "total_assets_usdc6": "50547983"
+    "total_assets_usdc6": "5974999"
    },
    {
-    "index": 2,
-    "address": "0x3AE855B65A021397f7a3ca838acc8E4c82cF815f",
-    "active": false,
-    "manifest_key": "pt_v1_quarantined_2026-10-10",
-    "classification": "PTSleeveStrategy OLD (v1)",
-    "total_assets_usdc6": "0"
-   },
-   {
-    "index": 3,
-    "address": "0x2D3E5bf1D34791b8b66Ac4eEA6D281E918577B6b",
-    "active": false,
-    "manifest_key": "pt_sleeve_strategy",
-    "classification": "PTSleeveStrategy OLD (v1)",
-    "total_assets_usdc6": "0"
-   },
-   {
-    "index": 4,
-    "address": "0xA96D0BB29cEE6F9e26239529789CEb74912C4b25",
-    "active": false,
-    "manifest_key": "pt_sleeve_eth_strategy",
-    "classification": "PTSleeveEthStrategy OLD (v1)",
-    "total_assets_usdc6": "18891846"
-   },
-   {
-    "index": 5,
+    "index": 1,
     "address": "0xA2e535970dc1492f77843E26F25Ab314735F4dF5",
     "active": true,
     "manifest_key": "hlearn_strategy",
     "classification": "HLEarnStrategy",
-    "total_assets_usdc6": "17970861"
-   },
-   {
-    "index": 6,
-    "address": "0x9978e8745cdb0d3e5B970aC36C38575eC70D612A",
-    "active": true,
-    "manifest_key": "susd3_registered_2026-09-30",
-    "classification": "SUSD3Strategy OLD (v1)",
-    "total_assets_usdc6": "0"
+    "total_assets_usdc6": "5974999"
    }
   ]
  },
