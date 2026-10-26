@@ -216,7 +216,7 @@
   "status": "REGISTERED + ACTIVE (registered 2026-09-30; superseded 2026-10-04 but never de-registered): strategyActive=true in the live vault strategyList, totalAssets()=0. The vault's `susd3_strategy` key names the DORMANT replacement 0x7dc1874F…616DB. Reconciled onto the manifest 2026-10-10 (t_ed8b04aa) — read-only record fix; no on-chain change. De-registration would be a vault-owner (Safe) action and was NOT taken.",
   "verified_utc": "2026-10-10"
  },
- "strategyList_reconciled": {
+ "_strategyList_superseded_2026-10-26": {
   "vault": "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1",
   "chain_id": 999,
   "chain": "hyperevm-mainnet",
@@ -224,7 +224,11 @@
   "read_utc": "2026-10-23",
   "block": 49277959,
   "registered_count": 7,
-  "note": "Live vault.strategyList enumeration regenerated from chain on 2026-10-23 (scripts/reconcile_strategy_manifest.js — read-only, block 49277959). PY-SCOPE-01 (yossweh 2026-10-22): the 2026-10-10 block still marked PT lanes 3/4 active after they were deactivated on-chain; `active` here is chain-read, and `total_assets_usdc6` is live totalAssets() in the same block. The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel — latched alerts for an unmanifested strategy AND for a recorded-vs-live active-flag mismatch). Prior note: Live vault.strategyList enumeration reconciled against this manifest on 2026-10-10 (kanban t_ed8b04aa; finding t_edbb5fb7). All 7 registered strategies now have a manifest key (pre-fix the manifest named only 5 — indices 2 and 6 were absent, and index 6 was ACTIVE). The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel — latched alert when a registered strategy is unmanifested).",
+  "archived_utc": "2026-10-26T16:03:23Z",
+  "archived_by_card": "t_395f9470",
+  "book_2_live_vault": "0x2ebA2DF7d4A81a4B6294185468F3Bb516970cE29",
+  "archived_reason": "not book #2 history — a verbatim copy of book #1's pre-R1 list carried in the boost manifest by mistake",
+  "note": "ARCHIVED 2026-10-26 (card t_395f9470) — THIS BLOCK WAS NEVER BOOK #2's STRATEGY LIST. It is a verbatim copy of book #1's pre-R1 7-entry list (vault 0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1, read 2026-10-23 at block 49277959) that was copied into the book #2 (Boost) manifest when that manifest was regenerated for R1 on 2026-10-25 (commit 2704e63a), not reconciled against book #2. It is not book #2's history: book #2's live vault 0x2ebA2DF7d4A81a4B6294185468F3Bb516970cE29 registers three strategies, and only one of them (0xA2e53597, HLEarn) appears in this list; the other six were never registered on the book #2 vault. The LIVE enumeration is `strategyList_reconciled`; a reader comparing the boost manifest to chain must use that block. Kept so the copy that shipped in this manifest is not lost. DOCUMENTATION ONLY: scripts/strategy_manifest_guard.js does not count an address that appears only here as manifested, so this archive cannot mask an unmanifested live strategy. Original note (verbatim): Live vault.strategyList enumeration regenerated from chain on 2026-10-23 (scripts/reconcile_strategy_manifest.js — read-only, block 49277959). PY-SCOPE-01 (yossweh 2026-10-22): the 2026-10-10 block still marked PT lanes 3/4 active after they were deactivated on-chain; `active` here is chain-read, and `total_assets_usdc6` is live totalAssets() in the same block. The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel — latched alerts for an unmanifested strategy AND for a recorded-vs-live active-flag mismatch). Prior note: Live vault.strategyList enumeration reconciled against this manifest on 2026-10-10 (kanban t_ed8b04aa; finding t_edbb5fb7). All 7 registered strategies now have a manifest key (pre-fix the manifest named only 5 — indices 2 and 6 were absent, and index 6 was ACTIVE). The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel — latched alert when a registered strategy is unmanifested).",
   "entries": [
    {
     "index": 0,
@@ -284,6 +288,42 @@
    }
   ]
  },
+ "strategyList_reconciled": {
+    "vault": "0x2ebA2DF7d4A81a4B6294185468F3Bb516970cE29",
+    "chain_id": 999,
+    "chain": "hyperevm-mainnet",
+    "rpc": "https://rpc.hyperliquid.xyz/evm",
+    "read_utc": "2026-10-26",
+    "block": 49586781,
+    "registered_count": 3,
+    "note": "Live vault.strategyList enumeration regenerated from chain on 2026-10-26 (scripts/reconcile_strategy_manifest.js \u2014 read-only, block 49586781). PY-SCOPE-01 (yossweh 2026-10-22): the 2026-10-10 block still marked PT lanes 3/4 active after they were deactivated on-chain; `active` here is chain-read, and `total_assets_usdc6` is live totalAssets() in the same block. The on-chain strategyList is the source of truth; never enumerate strategies from the manifest. Guard: scripts/strategy_manifest_guard.js (read-only; wired into the vault_watch_mainnet.js 10-min sentinel \u2014 latched alerts for an unmanifested strategy AND for a recorded-vs-live active-flag mismatch). This block was rewritten on 2026-10-26 (card t_395f9470): it had described book #1's retired pre-R1 vault 0x8954a73B\u20264D1C1; that copy is archived verbatim under _strategyList_superseded_2026-10-26 and is NOT book #2 history.",
+    "entries": [
+      {
+        "index": 0,
+        "address": "0x36D92ab26638d7d76CE7C955347B00d7DFaDDb76",
+        "active": false,
+        "manifest_key": "morpho_boost_strategy_retired_2026-10-25",
+        "classification": "MorphoStrategy OLD (legacy book #2 leg, 7,985 B build; deactivated, holds $0 \u2014 do not reactivate)",
+        "total_assets_usdc6": "0"
+      },
+      {
+        "index": 1,
+        "address": "0x16181E549860003dC20585B21DDB9007aD339409",
+        "active": true,
+        "manifest_key": "morpho_boost_r1_strategy",
+        "classification": "MorphoStrategy (R1 build, source_commit 168310a5, 7,985 B)",
+        "total_assets_usdc6": "53400365"
+      },
+      {
+        "index": 2,
+        "address": "0x6be5CE6f4E973C42848e2Ed4adfb724244fEC375",
+        "active": true,
+        "manifest_key": "dn_boost_strategy",
+        "classification": "DNCoreStrategy (DN engine, deployed 2026-10-25; perp 159 / spot 10107)",
+        "total_assets_usdc6": "52808958"
+      }
+    ]
+  },
  "expected_ipfs": {
   "_doc": "Build-currency pins (PY-SCOPE-02, card t_5c5b9f05). Checked by scripts/build_currency_gate.js: eth_getCode -> trailing CBOR metadata -> ipfs multihash, compared to expected_ipfs. expected_ipfs = the build this contract is SUPPOSED to run (a reproducible build of the reviewed source, in the compile profile its deploy lineage uses). known_drift = a live build that is KNOWN to differ and is tracked by the named card; it is reported as KNOWN-DRIFT with BOTH hashes, never as PASS. scope:'inactive' = deployed but not registered / not gating money. No pin = UNPINNED (currency unverifiable). known_unpinned = {contract: {card, reason}}: the ONLY way an unpinned live contract may be non-fatal (reported KNOWN-UNPINNED, loud, with the live ipfs) — any unpinned live contract NOT listed still exits 3, and a vacuous or undisclosed entry FAILs (card t_57742b2e). The gate never rewrites this file: a mismatch is a finding, not a fix. Selector diffs are NOT a currency test (MorphoStrategy scores 0 missing while carrying PY-RECALL-01). known_drift MUST name a build that is declared in builds{} (card t_10b79b12) — a drift whose build cannot be identified or reproduced is a FAIL, not a disclosure; and an exemption's card id MUST resolve to an OPEN card on the kanban board (the sentinel cross-checks it every 10 min, the gate only format-checks it).",
   "verified_block": 49585747,
@@ -470,6 +510,16 @@
   "deployed_utc": "2026-10-25T14:22:26.824Z",
   "tx": "0x811686e030eadc79363a72c66f781dcba16a6f1ffc789967c394afb2061760b7",
   "card": "t_0adbf5f0"
+ },
+ "morpho_boost_strategy_retired_2026-10-25": "0x36D92ab26638d7d76CE7C955347B00d7DFaDDb76",
+ "morpho_boost_strategy_retired_2026-10-25_meta": {
+  "origin": "book #2 Morpho leg. Bound as `morpho_boost_strategy` in the pre-R1 version of THIS manifest (tracked in git history, e.g. commit 02e8d724) against the pre-R1 book #2 vault 0xdeD29C2EcC1bc26D6cE0844498Dd608e1C725d3e; the GO-P1 fresh pair (2026-10-23, card t_0adbf5f0) re-deployed it from deploy-artifacts/head-fixed/MorphoStrategy.json and re-bound the same key to 0x36D92ab2\u2026",
+  "build": "MorphoStrategy source_commit 168310a5, 7,985 B, runtime_sha256 864c90fc\u2026b4d813 (the same audited build the R1 legs use)",
+  "activated_utc": "2026-10-23",
+  "activated_by": "GO-P1 fresh-pair deploy (card t_0adbf5f0); Safe tx 0x33d49ea457244e88609cb69a79580b91de3cdac85c63d3940c8b467d3833190d calls setStrategyActive(0x36D92ab2\u2026, true) on the legacy vault",
+  "live_state": "REGISTERED but INACTIVE at index 0 of the R1 book #2 vault 0x2ebA2DF7d4A81a4B6294185468F3Bb516970cE29 \u2014 strategyActive()=false, totalAssets()=0 (live read 2026-10-26, chain 999)",
+  "card": "t_395f9470",
+  "note": "Named here because it is still on the live vault's on-chain strategyList, so scripts/strategy_manifest_guard.js can see it; before this card it was UNMAPPED in this manifest. Do NOT reactivate or allocate to it \u2014 the operative book #2 Morpho strategy is morpho_boost_r1_strategy (0x16181E54\u2026)."
  },
  "morpho_boost_r1_strategy": "0x16181E549860003dC20585B21DDB9007aD339409",
  "morpho_boost_r1_strategy_market": {
