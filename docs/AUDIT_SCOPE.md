@@ -21,8 +21,8 @@
 > for the vault and the FeeDistributor** — r1 (`c652e006`), r3-CEI (`609ad90b`), sUSD3 (`e9c899a8`),
 > F-4 gate (`dca15b6a`), F-4R-2 (`808e2ecf`) and `depositFor` are on chain. §1.4 lists exactly what
 > is **still** not deployed (DN core, the PT/sUSD3 lanes, the Morpho build — read it before scoping
-anything else); the public outcome note for the superseded generation is
-`docs/SECURITY_FINDING_PY-SCOPE-02_PUBLIC_2026-10-28.md`.
+> anything else); the public outcome note for the superseded generation is
+> `docs/SECURITY_FINDING_PY-SCOPE-02_PUBLIC_2026-10-28.md`.
 > Pinned-build note: the repo default `hardhat.config.js` is `runs=1 + viaIR` (a code-size choice,
 > not a source difference). Build at **runs=200 / no-viaIR / paris** to compare with chain, and do
 > **not** use `808e2ecf` alone — that is the pre-`depositFor` cut (11,761 B, sha `90e392b4…`) and was
