@@ -154,9 +154,9 @@ reset the count. Rows are per generation: a superseded generation's days are rec
 The auto block above lists every non-counted day with its reason, read from the day's own evidence.
 The two mechanisms behind them:
 
-- **Rule 5 (recon breach).** The associated snapshot for a date is `~/.proyield/recon/<date>.json`
-  (written by `scripts/recon_cron.sh`, every 6 h, block-tag enforced). Those snapshots are **not
-  published** in this repository; an auditor can request the exact bytes. The auto block quotes each
+- **Rule 5 (recon breach).** The associated snapshot for a date is `~/.proyield/recon/<date>.json`,
+  written every 6 h by the private reconciliation job (not published in this repository). Those
+  snapshots are **not published**; an auditor can request the exact bytes. The auto block quotes each
   snapshot's `generated_at`, block and per-book `gap_bps` — the 2026-10-17 hand-written bullet list is
   retired, because the doc itself noted that some of its boost figures matched no run of their day.
 - **Quarantine (audit F4).** A degraded run is written to `attestations/degraded/<date>.json` and is

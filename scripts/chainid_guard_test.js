@@ -78,8 +78,8 @@ async function main() {
     // No anvil on this host (some CI images): still run the static guard checks
     // and skip the dynamic ones loudly, so the suite never reds a pipeline for a
     // missing binary while making the gap obvious in the log.
-    report("explicit chain guard present in dn_keeper + recycler source",
-      guardPresent("dn_keeper.js") && guardPresent("recycle_fees.js"),
+    report("explicit chain guard present in recycler source",
+      guardPresent("recycle_fees.js"),
       "dynamic refusal checks SKIPPED — no anvil binary on this host");
     console.log(`\n══════ GUARD: ${pass} passed, ${fail} failed (dynamic checks skipped — no anvil) ══════`);
     process.exit(fail === 0 ? 0 : 1);
@@ -116,14 +116,6 @@ async function main() {
       const g = runScript("npx hardhat run scripts/chain_guard.js --network hyperTestnet", decoyUrl);
       report("chain_guard refuses chain 1 (non-zero + chain-mismatch reason)",
         g.rc !== 0 && refusalLayer(g.out) !== "none", `rc=${g.rc} layer=${refusalLayer(g.out)}`);
-
-      const k = runScript("npx hardhat run scripts/dn_keeper.js --network hyperTestnet", decoyUrl,
-        { DN_STRATEGY: "0x000000000000000000000000000000000000dEaD", DN_SILENCE_TELEGRAM: "1" });
-      report("dn_keeper refuses chain 1 before touching any strategy",
-        k.rc !== 0 && refusalLayer(k.out) !== "none" && !/position|szi|UNWIND/.test(k.out),
-        `rc=${k.rc} layer=${refusalLayer(k.out)}`);
-      report("dn_keeper carries an EXPLICIT chain guard in source (defence in depth)",
-        guardPresent("dn_keeper.js"), guardPresent("dn_keeper.js") ? "explicit guard present" : "missing");
 
       const r = runScript("npx hardhat run scripts/recycle_fees.js --network hyperTestnet", decoyUrl,
         { DEPLOY_MANIFEST: manifestExists ? manifest : "" });

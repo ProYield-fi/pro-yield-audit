@@ -47,10 +47,10 @@ LOG_DIR="${BATTERY_LOGS:-$ROOT/.battery_logs}"
 mkdir -p "$LOG_DIR"
 
 KEEP=0; WITH_DEPLOY="${BATTERY_WITH_DEPLOY:-0}"
-# (public export) dn_keeper_alert_throttle_test.js (private alert-throttle suite),
-# book_policy_test.js and vault_status_books_test.js (book registry not published)
-# are internal-dep suites — they run in the dev battery only.
-SUITES="${BATTERY_SUITES:-integration_tests.js dn_strategy_tests.js dn_adapter_tests.js pyd_demand_tests.js dn_keeper_dryrun_test.js dn_keeper_unwind_test.js dn_keeper_hedgedprofit_test.js vault_caps_test.js test_all.js dn_realread_replay.js ecosystem_journey_test.js ecosystem_audit.js chainid_guard_test.js dn_keeper_roster_test.js dn_keeper_hedge_sizing_test.js dn_keeper_rebalance_min_test.js dn_keeper_fresh_open_test.js}"
+# (public export) the dn_keeper_* suites are ops-only and require private
+# report/broadcast modules; book_policy_test.js and vault_status_books_test.js
+# need the unpublished book registry. They run in the dev battery only.
+SUITES="${BATTERY_SUITES:-integration_tests.js dn_strategy_tests.js dn_adapter_tests.js pyd_demand_tests.js vault_caps_test.js test_all.js dn_realread_replay.js ecosystem_journey_test.js ecosystem_audit.js chainid_guard_test.js}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --keep) KEEP=1 ;;

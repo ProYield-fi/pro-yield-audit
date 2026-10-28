@@ -21,8 +21,8 @@
 > for the vault and the FeeDistributor** — r1 (`c652e006`), r3-CEI (`609ad90b`), sUSD3 (`e9c899a8`),
 > F-4 gate (`dca15b6a`), F-4R-2 (`808e2ecf`) and `depositFor` are on chain. §1.4 lists exactly what
 > is **still** not deployed (DN core, the PT/sUSD3 lanes, the Morpho build — read it before scoping
-> anything else); the full superseded-generation proof is
-> `docs/SECURITY_FINDING_PY-SCOPE-02_VAULT_BUILD_DRIFT_2026-10-23.md`.
+anything else); the public outcome note for the superseded generation is
+`docs/SECURITY_FINDING_PY-SCOPE-02_PUBLIC_2026-10-28.md`.
 > Pinned-build note: the repo default `hardhat.config.js` is `runs=1 + viaIR` (a code-size choice,
 > not a source difference). Build at **runs=200 / no-viaIR / paris** to compare with chain, and do
 > **not** use `808e2ecf` alone — that is the pre-`depositFor` cut (11,761 B, sha `90e392b4…`) and was
@@ -289,7 +289,7 @@ $0.004768. The previous version of this section described *that* build — "an a
 repository is an audit of the intended next build, not of the deployed one" was true for generation
 2026-09-25 and is **not** true for generation 2026-10-25. That generation's rebuild comparison (380
 differing bytes, 0 outside immutable slots) is preserved in
-`docs/SECURITY_FINDING_PY-SCOPE-02_VAULT_BUILD_DRIFT_2026-10-23.md`.
+`docs/SECURITY_FINDING_PY-SCOPE-02_PUBLIC_2026-10-28.md`.
 
 Nothing in §1.4 changes §3's invariants for this source; it changes what an auditor may assert about
 the deployed contracts — and it can now assert them against HEAD source at the pinned profile.
@@ -447,15 +447,13 @@ unswept yield) and fee deltas, plus the share-price floor.
 
 | Suite | What it proves | Result |
 |---|---|---|
-| `scripts/run_battery.sh` | Every suite below on a FRESH isolated anvil (cold-start deploy, per-suite exit codes, disposable chain) | 12/12 suites |
+| `scripts/run_battery.sh` | Every published suite below on a FRESH isolated anvil (cold-start deploy, per-suite exit codes, disposable chain) | all published suites |
 | `scripts/integration_tests.js` | Full protocol: deposit→harvest→withdraw, fee→staker loop, token invariants | 120/120 |
 | `scripts/dn_strategy_tests.js` | Vault DN money loop: allocate→bridge→sync→split→harvest→withdraw; loss case | 28/28 |
 | `scripts/dn_adapter_tests.js` | Byte-exact CoreWriter encodings + all gates | 26/26 |
 | `scripts/dn_realread_check.js` | Read layer vs LIVE mainnet precompiles (read-only, manual) | 15/15 |
 | `scripts/dn_realread_replay.js` | Read-layer decoders (JS + real Solidity structs) vs FROZEN real mainnet bytes at block 46644202 — offline, in the battery + CI (`dn_realread_capture.js` refreshes the fixture) | 13/13 |
 | `scripts/web_smoke.sh` + `pro-yield-web/web-smoke-local.mjs` | Web-app data path vs local chain: `vault_status.json` → rendered `/account` + `/transparency` (marker + TVL + share price + no console/page/request errors), with a real customer deposit→withdraw round-trip visibly updating the UI | PASS ($100k → $105k → $100k) |
-| `scripts/dn_keeper_dryrun_test.js` | Keeper sizing policy end-to-end (subprocess) | 8/8 |
-| `scripts/dn_keeper_unwind_test.js` | Keeper unwind policy end-to-end (subprocess) | 6/6 |
 | `scripts/pyd_demand_tests.js` | PYD demand layer: discount tiers/accrual/claims + funder conversion → real staking stream + **K: mutation-survivor regression** (exact-value kills for the campaign survivors) | 29/29 |
 | `scripts/test_all.js` | Unit suite | 16/16 |
 | `scripts/vault_caps_test.js` | Beta safety rails: TVL + per-user caps at their boundaries, pause blocks deposits but never withdrawals | 12/12 |
@@ -512,10 +510,10 @@ Beyond the per-module suites, three angles cover the ecosystem as a system:
 |---|---|---|
 | **Journey — one continuous customer path** | `scripts/ecosystem_journey_test.js` (24 checks) | on-ramp → deposit → fee income → FD reconcile → **the real `recycle_fees.js` run against the test chain** (60/20/20 split to the wei, FD fully drained, cold-start must not touch the shared ledger) → PYD demand (funder converts, documented swapper delivers, stream pays over time, `getReward` transfers) → tier + `snapshotHarvest` on a real fee delta → `claimRebate` equals the documented formula exactly → redemption (pays the exact quote, no cross-user leakage, floor dust bounded) → **USDC conservation to the wei summed over every ecosystem contract**. |
 | **Cross-artifact integrity audit** | `scripts/ecosystem_audit.js` (offline + RPC identity probes) | every artifact names the same canonical vault; no operating loop is silently stale; the deploy manifest is complete and non-zero; **every recycling ledger run matches the live policy split to the wei**; the web feed matches the reader's schema; website blend == scout's live blend; the operator alert queue carries no test-generated alerts; **§8 chain identity** — the testnet RPC answers as 998, the manifest vault is verified to have code on the chain the ops actually read, the keeper's vault is verified on the real testnet, a chain map shows where each vault generation lives, the recycler refuses an implicit RPC, and the insurance module pins + verifies its chain and sources reserves from the ledger (never a hardcoded stub). Checks whose artifact root is absent on the host SKIP (point `AUDIT_SCOUT_DIR` / `AUDIT_WEB_DIR` at a checkout to run them anywhere); `AUDIT_MODE=strict` turns FAILs into a non-zero exit (CI gate), default info mode reports operator-state drift without failing contract-correctness suites. See `docs/ATTACK_SURFACE_PLAN.md` for the reduction plan this informs. |
-| **Chain guard — "never mainnet", enforced** | `scripts/chain_guard.js` + `scripts/chainid_guard_test.js` (12 checks) | a decoy anvil with **chain id 1 (mainnet's id)** is stood up and every money-mover is pointed at it: hardhat's own config chainId check refuses first (HH101), an explicit `REFUSING` guard is present in `dn_keeper.js` and `recycle_fees.js`, and `vault_keeper.check_chain()` (raw JSON-RPC path — no hardhat layer) refuses outright before any on-chain action. **Implicit-RPC class** (which put real recycling on a local chain spoofing chain-id 998): the recycler must refuse an unset `HYPEREVM_RPC_URL` before touching the network, while an explicit RPC passes the check — controls proving the guard is neither a brick nor a rubber stamp. Positive control: chain 998 is still allowed. |
+| **Chain guard — "never mainnet", enforced** | `scripts/chain_guard.js` + `scripts/chainid_guard_test.js` (chain-guard checks) | a decoy anvil with **chain id 1 (mainnet's id)** is stood up and every money-mover is pointed at it: hardhat's own config chainId check refuses first (HH101), an explicit `REFUSING` guard is present in the private keeper and `recycle_fees.js` (the ops-only keeper is not part of this public export), and `vault_keeper.check_chain()` (raw JSON-RPC path — no hardhat layer) refuses outright before any on-chain action. **Implicit-RPC class** (which put real recycling on a local chain spoofing chain-id 998): the recycler must refuse an unset `HYPEREVM_RPC_URL` before touching the network, while an explicit RPC passes the check — controls proving the guard is neither a brick nor a rubber stamp. Positive control: chain 998 is still allowed. |
 
 All three run inside the default battery (`./scripts/run_battery.sh`,
-12 suites / ~300 checks / ~96s).
+the published suites / ~300 checks / ~96s).
 
 ## 8. How to review
 
