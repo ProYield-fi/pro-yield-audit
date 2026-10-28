@@ -6,22 +6,41 @@
 // transferFrom→deposit parked user funds in the keeper EOA (a custody window).
 //
 // v2 design, zero custody by construction:
-//   1. CAPABILITY GATE: the sweep only acts if the deployed vault exposes a
-//      keeper-credit path (depositFor). Today it does not — so the sweep is a
-//      GATED NO-OP: no permits submitted, no funds moved, clean exit. Stored
-//      permits just wait (they have deadlines).
+//   1. CAPABILITY GATE: the sweep only acts if the vault it is pointed at
+//      exposes a keeper-credit path (depositFor). RETRACTED CLAIM: this header
+//      used to say "today it does not — so the sweep is a gated no-op". That
+//      was true of the 2026-09-25 build and is FALSE for the live book #1
+//      vault `0x9DA979aD9F44dBC96f3977F305cea9D1E1EAcFD9`, which has carried
+//      `depositFor(address,uint256)` (selector `0x2f4f21e2`) since the
+//      2026-10-25 R1 deploy. This published file is a SNAPSHOT of the
+//      2026-10-02 v2 and still pins the superseded vault as a literal (line
+//      25); the live ops script resolves the vault from
+//      `deployed_addresses.mainnet.json` and therefore targets R1. The two
+//      gates that actually keep the sweep inert today, neither of which is the
+//      capability probe: (a) DRY by default — `SWEEP_OK=1` is unset and no
+//      cron/systemd/pm2 job schedules this script; (b) the single stored
+//      permit in the ops DB names the superseded vault `0x8954…` as spender,
+//      so it is skipped as `legacy-spender`. A fresh permit signed for the
+//      live vault WOULD be sweepable — see docs/AUDIT_SCOPE.md §1.4 and
+//      docs/IMMUNEFI_PROGRAM_DRAFT.md §2.
 //   2. The permit SPENDER is the VAULT itself (web spender + card updated in
 //      lockstep — no user had signed when this changed, verified 0 permits).
-//      When r3 ships depositFor(receiver), the vault pulls from the user
-//      within their own signed allowance and mints to them — atomically, in
-//      one tx. The keeper never touches user funds.
+//      The vault pulls from the user within their own signed allowance and
+//      mints to them — atomically, in one tx. The keeper never touches user
+//      funds.
 //   3. Per-row fault isolation: one junk row can never kill the run (finding
 //      #3, item 2). Failures mark the row's last_error and continue.
 //
-// DRY BY DEFAULT; SWEEP_OK=1 + a capable deployed vault to send.
+// DRY BY DEFAULT; SWEEP_OK=1 + a capable vault + a stored permit whose spender
+// is that vault, to send.
 const hre = require("hardhat");
 const { execFileSync } = require("child_process");
 
+// SUPERSEDED VAULT — this published snapshot pins book #1's 2026-09-25..10-25
+// address as a literal. The live book #1 vault is 0x9DA979aD…cFD9 (R1,
+// 2026-10-25) and the live ops script reads it from the deploy manifest; do not
+// read this constant as the current vault, and do not re-point the constant in
+// this export without also re-pointing SPENDER below.
 const VAULT = "0x8954a73Bb36D17e4B212137Eb7B2328A1A14D1C1";
 const USDC = "0xb88339CB7199b77E23DB6E890353E22632Ba630f";
 const SPENDER = VAULT; // the allowance holder is the vault itself — no keeper custody, ever
@@ -53,9 +72,12 @@ async function main() {
   console.log(`=== autoearn_sweep v2 ${new Date().toISOString()} · ${DRY ? "DRY" : "SEND"} ===`);
 
   // ── Capability gate ──────────────────────────────────────────────
-  // r3 adds depositFor: the vault pulls from the user (allowance holder =
-  // vault) and mints to the user, atomically — the keeper never touches
-  // user funds. Until it exists, the sweep is a gated no-op.
+  // depositFor: the vault pulls from the user (allowance holder = vault) and
+  // mints to the user, atomically — the keeper never touches user funds. The
+  // live book #1 vault has carried this since the 2026-10-25 R1 deploy, so the
+  // gate passes on a correct target and only trips on a stale address such as
+  // the snapshot literal above. It is NOT what keeps the sweep inert today;
+  // DRY-by-default + the stored permit's spender are (see the header).
   const hasDepositFor = (await hasSelector(hre.ethers.id("depositFor(address,uint256)").slice(0, 10)))
     || (await hasSelector(hre.ethers.id("depositFor(uint256,address)").slice(0, 10)));
   if (!hasDepositFor) {
