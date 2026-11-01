@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-01",
+  "owner_exception": true,
+  "approved_by": "Nathan (owner)",
+  "recorded_by": "Hermes",
+  "reason": "Owner-directed repair day. Boost was written down $0.469456 via reportLoss at block 50103304 after the legacy-book retirement cleanup. The live mark then left both books BELOW their all-legs: Core -$0.265209 (unbooked HL-Earn spot HYPE; reported 5.978662 vs legs 6.239886) and Boost -$0.131172 (conservative write-down vs a rising HYPE mark). Both gaps are negative, so the book is conservative and no depositor can be overpaid; the Core difference is an unbooked asset, not a loss. Owner accepts the day's recon gap; no further write-down is authorized by this exception."
+}
